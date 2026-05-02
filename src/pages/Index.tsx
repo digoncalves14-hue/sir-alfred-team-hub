@@ -1,16 +1,15 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import Login from "@/components/Login";
+import ManagerView from "@/components/manager/ManagerView";
+import ProfessionalView from "@/components/professional/ProfessionalView";
 
-// IMPORTANT: Fully REPLACE this with your own code
-const PlaceholderIndex = () => {
-  // PLACEHOLDER: Replace this entire return statement with the user's app.
-  // The inline background color is intentionally not part of the design system.
-  return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: '#fcfbf8' }}>
-      <img data-lovable-blank-page-placeholder="REMOVE_THIS" src="/placeholder.svg" alt="Your app will live here!" />
-    </div>
-  );
+type View = "login" | "manager" | "professional";
+
+const Index = () => {
+  const [view, setView] = useState<View>("login");
+  if (view === "login") return <Login onSelect={(v) => setView(v)} />;
+  if (view === "manager") return <ManagerView onLogout={() => setView("login")} />;
+  return <ProfessionalView onLogout={() => setView("login")} />;
 };
-
-const Index = PlaceholderIndex;
 
 export default Index;

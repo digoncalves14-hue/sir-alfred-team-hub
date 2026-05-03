@@ -1,6 +1,7 @@
 import { Logo } from "./Logo";
 import { Crown, User } from "lucide-react";
 
+
 export default function Login({ onSelect }: { onSelect: (v: "manager" | "professional") => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden bg-background">
@@ -10,11 +11,6 @@ export default function Login({ onSelect }: { onSelect: (v: "manager" | "profess
       </div>
       <div className="relative w-full max-w-md space-y-12 animate-fade-in">
         <div className="space-y-2 text-center">
-          <div className="inline-block p-1 rounded-full gradient-gold mb-6">
-            <div className="bg-background rounded-full p-4">
-              <Crown className="h-10 w-10 text-gold" />
-            </div>
-          </div>
           <Logo size="lg" />
         </div>
 

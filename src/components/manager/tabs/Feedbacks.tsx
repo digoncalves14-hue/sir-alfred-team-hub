@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Card, SectionTitle, Badge } from "@/components/ui-kit";
+import { Avatar } from "@/components/Avatar";
 import { feedbacks, team } from "@/data/team";
+import { usePhotos } from "@/hooks/usePhotos";
 import { Send } from "lucide-react";
 
+const initialsOf = (name: string) =>
+  name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+
 export default function Feedbacks() {
+  const { getPhoto } = usePhotos();
   const [list, setList] = useState(feedbacks);
   const [pro, setPro] = useState(team[0].name);
   const [type, setType] = useState("Positivo");
@@ -35,6 +41,7 @@ export default function Feedbacks() {
         {list.map((f) => (
           <Card key={f.id}>
             <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <Avatar initials={initialsOf(f.pro)} photoUrl={getPhoto(f.pro)} size="sm" />
               <p className="font-bold">{f.pro}</p>
               <Badge className={f.color}>{f.type}</Badge>
             </div>

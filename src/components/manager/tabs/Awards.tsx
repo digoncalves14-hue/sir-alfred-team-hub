@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { Card, SectionTitle, Badge } from "@/components/ui-kit";
+import { Avatar } from "@/components/Avatar";
 import { awards, team } from "@/data/team";
+import { usePhotos } from "@/hooks/usePhotos";
 import { Trophy, Send } from "lucide-react";
 
+const initialsOf = (name: string) =>
+  name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+
 export default function Awards() {
+  const { getPhoto } = usePhotos();
   const [list, setList] = useState(awards);
   const [type, setType] = useState("Barbeiro do Mês");
   const [winner, setWinner] = useState(team[0].name);
@@ -38,7 +44,10 @@ export default function Awards() {
                   <p className="text-xs text-gold font-bold uppercase tracking-wider">{a.type}</p>
                   <Badge className={a.active ? "bg-success/20 text-success border-success/40" : "bg-muted text-muted-foreground border-border"}>{a.active ? "Ativo" : "Histórico"}</Badge>
                 </div>
-                <p className="font-bold">{a.winner}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Avatar initials={initialsOf(a.winner)} photoUrl={getPhoto(a.winner)} size="sm" />
+                  <p className="font-bold">{a.winner}</p>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">{a.desc}</p>
               </div>
             </div>

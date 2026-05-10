@@ -1,18 +1,42 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, SectionTitle, Stars } from "@/components/ui-kit";
 import { team, announcements, feedbacks } from "@/data/team";
 import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle } from "lucide-react";
+import { AvatarUpload } from "@/components/AvatarUpload";
+import { useAuth } from "@/hooks/useAuth";
+import { usePhotos } from "@/hooks/usePhotos";
+import { supabase } from "@/integrations/supabase/client";
 
 const me = team.find((t) => t.id === "thiago")!;
 const moods = ["😁", "😊", "😐", "😔", "😤"];
 
 export default function PHome() {
+  const { user } = useAuth();
+  const { getPhoto, refresh } = usePhotos();
+  const [profileName, setProfileName] = useState<string>(me.name);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle().then(({ data }) => {
+      if (data?.nome) setProfileName(data.nome);
+    });
+  }, [user]);
+
   const [pulse, setPulse] = useState<string | null>(null);
   const pct = Math.round((me.clients / me.goal) * 100);
   const dash = 2 * Math.PI * 54;
   return (
     <div className="space-y-6">
-      <SectionTitle title={`Olá, ${me.name} 👋`} subtitle={`${me.unit} · ${me.role}`} />
+      <Card className="flex items-center gap-4">
+        {user ? (
+          <AvatarUpload userId={user.id} initials={me.initials} photoUrl={getPhoto(profileName)} size="lg" onUploaded={() => refresh()} />
+        ) : null}
+        <div>
+          <p className="text-xl font-black">Olá, {profileName} 👋</p>
+          <p className="text-sm text-muted-foreground">{me.unit} · {me.role}</p>
+          <p className="text-[10px] text-gold uppercase tracking-widest mt-1">Toque na foto para atualizar</p>
+        </div>
+      </Card>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { icon: Target, label: "Clientes mês", v: me.clients },

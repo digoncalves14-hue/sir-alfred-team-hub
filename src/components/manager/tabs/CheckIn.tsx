@@ -1,11 +1,13 @@
 import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team } from "@/data/team";
+import { usePhotos } from "@/hooks/usePhotos";
 
 const dot = { present: "bg-success", late: "bg-warning", absent: "bg-destructive", pending: "bg-muted-foreground" };
 const label = { present: "Presente", late: "Atrasado", absent: "Falta", pending: "Pendente" };
 
 export default function CheckIn() {
+  const { getPhoto } = usePhotos();
   return (
     <div>
       <SectionTitle title="Check-in ao vivo" subtitle="Status em tempo real da equipe" />
@@ -14,7 +16,7 @@ export default function CheckIn() {
           <Card key={p.id}>
             <div className="flex items-center gap-3">
               <div className="relative">
-                <Avatar initials={p.initials} />
+                <Avatar initials={p.initials} photoUrl={getPhoto(p.name)} />
                 <span className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${dot[p.checkIn.status]}`} />
               </div>
               <div className="flex-1 min-w-0">

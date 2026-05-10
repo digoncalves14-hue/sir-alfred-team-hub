@@ -1,6 +1,7 @@
 import { Card, SectionTitle } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team, updates, birthdays } from "@/data/team";
+import { usePhotos } from "@/hooks/usePhotos";
 import { Users, Activity, Star, Trophy, Crown, Cake, Sparkles } from "lucide-react";
 
 const Metric = ({ icon: Icon, label, value, accent }: any) => (
@@ -16,6 +17,7 @@ const Metric = ({ icon: Icon, label, value, accent }: any) => (
 );
 
 export default function Dashboard() {
+  const { getPhoto } = usePhotos();
   const online = team.filter((t) => t.checkIn.status === "present").length;
   const avg = (team.reduce((s, t) => s + t.rating, 0) / team.length).toFixed(1);
   const star = team[0];
@@ -38,7 +40,7 @@ export default function Dashboard() {
             <Crown className="h-5 w-5" /> <span className="text-xs font-bold tracking-widest uppercase">Destaque da Semana</span>
           </div>
           <div className="flex items-center gap-4">
-            <Avatar initials={star.initials} size="xl" />
+            <Avatar initials={star.initials} photoUrl={getPhoto(star.name)} size="xl" />
             <div>
               <p className="text-2xl font-black text-foreground">{star.name}</p>
               <p className="text-sm text-muted-foreground">{star.unit}</p>

@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Card, SectionTitle, ProgressBar, Stars } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team } from "@/data/team";
+import { usePhotos } from "@/hooks/usePhotos";
 
 export default function Ranking() {
+  const { getPhoto } = usePhotos();
   const [tab, setTab] = useState<"barber" | "support">("barber");
   const list = team.filter((t) => t.category === tab).sort((a, b) => a.rank - b.rank);
   return (
@@ -21,7 +23,7 @@ export default function Ranking() {
           <Card key={p.id} className="hover:border-gold/40 transition">
             <div className="flex items-center gap-4">
               <span className="text-2xl font-black text-gold w-8">#{p.rank}</span>
-              <Avatar initials={p.initials} />
+              <Avatar initials={p.initials} photoUrl={getPhoto(p.name)} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-bold truncate">{p.name}</p>

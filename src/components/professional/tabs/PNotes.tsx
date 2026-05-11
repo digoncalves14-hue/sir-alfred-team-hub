@@ -1,5 +1,22 @@
-import { Card, SectionTitle, Stars } from "@/components/ui-kit";
+import { useEffect, useState } from "react";
+import { Card, SectionTitle, Stars, Badge } from "@/components/ui-kit";
 import { reviews } from "@/data/team";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+
+type Feedback = {
+  id: string;
+  type: "Positivo" | "Melhoria" | "Tecnico";
+  message: string;
+  created_at: string;
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  Positivo: "bg-success/20 text-success border-success/40",
+  Melhoria: "bg-warning/20 text-warning border-warning/40",
+  Tecnico: "bg-blue-500/20 text-blue-400 border-blue-500/40",
+};
+const TYPE_LABEL: Record<string, string> = { Positivo: "Positivo", Melhoria: "Melhoria", Tecnico: "Técnico" };
 
 const dist = [
   { star: 5, count: 38 },

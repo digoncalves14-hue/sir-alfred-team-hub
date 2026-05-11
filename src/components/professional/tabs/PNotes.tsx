@@ -1,5 +1,22 @@
-import { Card, SectionTitle, Stars } from "@/components/ui-kit";
+import { useEffect, useState } from "react";
+import { Card, SectionTitle, Stars, Badge } from "@/components/ui-kit";
 import { reviews } from "@/data/team";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+
+type Feedback = {
+  id: string;
+  type: "Positivo" | "Melhoria" | "Tecnico";
+  message: string;
+  created_at: string;
+};
+
+const TYPE_COLORS: Record<string, string> = {
+  Positivo: "bg-success/20 text-success border-success/40",
+  Melhoria: "bg-warning/20 text-warning border-warning/40",
+  Tecnico: "bg-blue-500/20 text-blue-400 border-blue-500/40",
+};
+const TYPE_LABEL: Record<string, string> = { Positivo: "Positivo", Melhoria: "Melhoria", Tecnico: "Técnico" };
 
 const dist = [
   { star: 5, count: 38 },
@@ -10,6 +27,19 @@ const dist = [
 ];
 
 export default function PNotes() {
+  const { user } = useAuth();
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("feedbacks")
+      .select("id,type,message,created_at")
+      .eq("professional_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setFeedbacks((data ?? []) as Feedback[]));
+  }, [user]);
+
   const total = dist.reduce((s, d) => s + d.count, 0);
   const avg = (dist.reduce((s, d) => s + d.star * d.count, 0) / total).toFixed(1);
   return (
@@ -44,6 +74,24 @@ export default function PNotes() {
             <p className="text-sm italic text-muted-foreground">"{r.comment}"</p>
           </Card>
         ))}
+      </div>
+      <div className="space-y-3">
+        <p className="text-xs uppercase tracking-widest text-gold font-bold">Feedbacks do gestor</p>
+        {feedbacks.length === 0 ? (
+          <Card><p className="text-sm text-muted-foreground">Nenhum feedback recebido ainda.</p></Card>
+        ) : (
+          feedbacks.map((f) => (
+            <Card key={f.id}>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <Badge className={TYPE_COLORS[f.type]}>{TYPE_LABEL[f.type]}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(f.created_at).toLocaleDateString("pt-BR")}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">{f.message}</p>
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

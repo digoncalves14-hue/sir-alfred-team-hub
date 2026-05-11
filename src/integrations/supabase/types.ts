@@ -83,6 +83,33 @@ export type Database = {
         }
         Relationships: []
       }
+      feedbacks: {
+        Row: {
+          created_at: string
+          from_user_id: string
+          id: string
+          message: string
+          professional_id: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          from_user_id: string
+          id?: string
+          message: string
+          professional_id: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          message?: string
+          professional_id?: string
+          type?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cargo: string | null

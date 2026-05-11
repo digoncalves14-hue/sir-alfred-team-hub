@@ -27,6 +27,19 @@ const dist = [
 ];
 
 export default function PNotes() {
+  const { user } = useAuth();
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("feedbacks")
+      .select("id,type,message,created_at")
+      .eq("professional_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setFeedbacks((data ?? []) as Feedback[]));
+  }, [user]);
+
   const total = dist.reduce((s, d) => s + d.count, 0);
   const avg = (dist.reduce((s, d) => s + d.star * d.count, 0) / total).toFixed(1);
   return (

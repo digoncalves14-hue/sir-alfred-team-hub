@@ -47,6 +47,42 @@ export type Database = {
         }
         Relationships: []
       }
+      checkin_rules: {
+        Row: {
+          created_at: string
+          horario_esperado: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          raio_metros: number
+          tolerancia_minutos: number
+          unidade: Database["public"]["Enums"]["unidade"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          horario_esperado?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          raio_metros?: number
+          tolerancia_minutos?: number
+          unidade: Database["public"]["Enums"]["unidade"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          horario_esperado?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          raio_metros?: number
+          tolerancia_minutos?: number
+          unidade?: Database["public"]["Enums"]["unidade"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cargo: string | null

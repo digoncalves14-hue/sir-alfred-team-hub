@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      check_ins: {
+        Row: {
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          selfie_url: string | null
+          status: string
+          unidade: Database["public"]["Enums"]["unidade"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          selfie_url?: string | null
+          status: string
+          unidade: Database["public"]["Enums"]["unidade"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          selfie_url?: string | null
+          status?: string
+          unidade?: Database["public"]["Enums"]["unidade"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cargo: string | null

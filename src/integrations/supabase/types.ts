@@ -125,6 +125,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_checkin_rules: {
+        Row: {
+          created_at: string
+          horario_esperado: string
+          id: string
+          tolerancia_minutos: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          horario_esperado?: string
+          id?: string
+          tolerancia_minutos?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          horario_esperado?: string
+          id?: string
+          tolerancia_minutos?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

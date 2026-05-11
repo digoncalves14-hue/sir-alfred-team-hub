@@ -75,6 +75,24 @@ export default function PNotes() {
           </Card>
         ))}
       </div>
+      <div className="space-y-3">
+        <p className="text-xs uppercase tracking-widest text-gold font-bold">Feedbacks do gestor</p>
+        {feedbacks.length === 0 ? (
+          <Card><p className="text-sm text-muted-foreground">Nenhum feedback recebido ainda.</p></Card>
+        ) : (
+          feedbacks.map((f) => (
+            <Card key={f.id}>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <Badge className={TYPE_COLORS[f.type]}>{TYPE_LABEL[f.type]}</Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(f.created_at).toLocaleDateString("pt-BR")}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">{f.message}</p>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 }

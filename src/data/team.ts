@@ -9,31 +9,30 @@ export type Professional = {
   rank: number;
   category: "barber" | "support";
   initials: string;
-  checkIn: { status: "present" | "late" | "absent" | "pending"; time: string };
   mood: "😁" | "😊" | "😐" | "😔" | "😤";
 };
 
 export const team: Professional[] = [
-  { id: "thiago", name: "Thiago", role: "Barbeiro", unit: "Araçatuba+Birigui", clients: 52, goal: 50, rating: 4.9, rank: 1, category: "barber", initials: "TH", checkIn: { status: "present", time: "08:02" }, mood: "😁" },
-  { id: "lucas", name: "Lucas", role: "Barbeiro", unit: "Birigui", clients: 44, goal: 50, rating: 4.9, rank: 2, category: "barber", initials: "LU", checkIn: { status: "present", time: "08:05" }, mood: "😊" },
-  { id: "diego", name: "Diego", role: "Gestor / Barbeiro", unit: "Birigui / Araçatuba", clients: 40, goal: 50, rating: 4.8, rank: 3, category: "barber", initials: "DI", checkIn: { status: "present", time: "07:58" }, mood: "😊" },
-  { id: "luizfelipe", name: "Luiz Felipe", role: "Barbeiro", unit: "Birigui", clients: 33, goal: 50, rating: 4.6, rank: 4, category: "barber", initials: "LF", checkIn: { status: "late", time: "09:20" }, mood: "😐" },
-  { id: "karitta", name: "Karitta", role: "Barbeira", unit: "Birigui", clients: 29, goal: 50, rating: 4.7, rank: 5, category: "barber", initials: "KA", checkIn: { status: "present", time: "08:10" }, mood: "😁" },
-  { id: "diegorios", name: "Diego Rios", role: "Barbeiro", unit: "Penápolis", clients: 26, goal: 40, rating: 4.5, rank: 6, category: "barber", initials: "DR", checkIn: { status: "present", time: "08:00" }, mood: "😊" },
-  { id: "rocha", name: "Rocha", role: "Barbeiro", unit: "Penápolis", clients: 21, goal: 40, rating: 4.3, rank: 7, category: "barber", initials: "RO", checkIn: { status: "absent", time: "—" }, mood: "😔" },
-  { id: "larissa", name: "Larissa", role: "Gestora / Cabeleireira", unit: "Kids", clients: 38, goal: 40, rating: 4.9, rank: 1, category: "support", initials: "LA", checkIn: { status: "present", time: "08:00" }, mood: "😁" },
-  { id: "thyffannys", name: "Thyffannys", role: "Secretaria / Manicure", unit: "Birigui", clients: 32, goal: 40, rating: 4.8, rank: 2, category: "support", initials: "TY", checkIn: { status: "pending", time: "—" }, mood: "😊" },
+  { id: "thiago", name: "Thiago", role: "Barbeiro", unit: "Araçatuba+Birigui", clients: 52, goal: 50, rating: 4.9, rank: 1, category: "barber", initials: "TH", mood: "😁" },
+  { id: "lucas", name: "Lucas", role: "Barbeiro", unit: "Birigui", clients: 44, goal: 50, rating: 4.9, rank: 2, category: "barber", initials: "LU", mood: "😊" },
+  { id: "diego", name: "Diego", role: "Gestor / Barbeiro", unit: "Birigui / Araçatuba", clients: 40, goal: 50, rating: 4.8, rank: 3, category: "barber", initials: "DI", mood: "😊" },
+  { id: "luizfelipe", name: "Luiz Felipe", role: "Barbeiro", unit: "Birigui", clients: 33, goal: 50, rating: 4.6, rank: 4, category: "barber", initials: "LF", mood: "😐" },
+  { id: "karitta", name: "Karitta", role: "Barbeira", unit: "Birigui", clients: 29, goal: 50, rating: 4.7, rank: 5, category: "barber", initials: "KA", mood: "😁" },
+  { id: "diegorios", name: "Diego Rios", role: "Barbeiro", unit: "Penápolis", clients: 26, goal: 40, rating: 4.5, rank: 6, category: "barber", initials: "DR", mood: "😊" },
+  { id: "rocha", name: "Rocha", role: "Barbeiro", unit: "Penápolis", clients: 21, goal: 40, rating: 4.3, rank: 7, category: "barber", initials: "RO", mood: "😔" },
+  { id: "larissa", name: "Larissa", role: "Gestora / Cabeleireira", unit: "Kids", clients: 38, goal: 40, rating: 4.9, rank: 1, category: "support", initials: "LA", mood: "😁" },
+  { id: "thyffannys", name: "Thyffannys", role: "Secretaria / Manicure", unit: "Birigui", clients: 32, goal: 40, rating: 4.8, rank: 2, category: "support", initials: "TY", mood: "😊" },
 ];
 
 export const announcements = [
-  { id: 1, type: "Geral", unit: "Todas", message: "Reunião geral nesta sexta às 19h, presença obrigatória.", date: "há 2h", color: "bg-gold/20 text-gold border-gold/40" },
+  { id: 1, type: "Geral", unit: "Todas", message: "Reunião geral nesta sexta às 19h. Sua participação é muito bem-vinda!", date: "há 2h", color: "bg-gold/20 text-gold border-gold/40" },
   { id: 2, type: "Urgente", unit: "Birigui", message: "Manutenção elétrica amanhã das 06h às 07h.", date: "há 1d", color: "bg-destructive/20 text-destructive border-destructive/40" },
   { id: 3, type: "Evento", unit: "Penápolis", message: "Workshop de degradê com Master Barber dia 15.", date: "há 3d", color: "bg-blue-500/20 text-blue-400 border-blue-500/40" },
 ];
 
 export const feedbacks = [
   { id: 1, pro: "Lucas", type: "Positivo", message: "Excelente atendimento ao cliente VIP nesta semana!", color: "bg-success/20 text-success border-success/40" },
-  { id: 2, pro: "Luiz Felipe", type: "Melhoria", message: "Atenção à pontualidade, atrasos recorrentes.", color: "bg-warning/20 text-warning border-warning/40" },
+  { id: 2, pro: "Luiz Felipe", type: "Melhoria", message: "Sugestão: revisar acabamento do degradê para clientes do clube.", color: "bg-warning/20 text-warning border-warning/40" },
   { id: 3, pro: "Karitta", type: "Técnico", message: "Aprimorar técnica de visagismo facial.", color: "bg-blue-500/20 text-blue-400 border-blue-500/40" },
 ];
 

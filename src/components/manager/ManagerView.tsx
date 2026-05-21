@@ -3,7 +3,6 @@ import { Logo } from "../Logo";
 import { LogOut } from "lucide-react";
 import Dashboard from "./tabs/Dashboard";
 import Team from "./tabs/Team";
-import CheckIn from "./tabs/CheckIn";
 import Goals from "./tabs/Goals";
 import Pulse from "./tabs/Pulse";
 import Announcements from "./tabs/Announcements";
@@ -18,7 +17,6 @@ import Pops from "./tabs/Pops";
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
   { id: "equipe", label: "Equipe", C: Team },
-  { id: "checkin", label: "Check-in", C: CheckIn },
   { id: "metas", label: "Metas", C: Goals },
   { id: "pulso", label: "Pulso", C: Pulse },
   { id: "avisos", label: "Avisos", C: Announcements },

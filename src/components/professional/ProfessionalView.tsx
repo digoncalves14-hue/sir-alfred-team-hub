@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Logo } from "../Logo";
-import { LogOut, Home, MapPin, Megaphone, Star, Trophy, BookOpen, Clock } from "lucide-react";
+import { LogOut, Home, Megaphone, Star, Trophy, BookOpen, Clock } from "lucide-react";
 import PHome from "./tabs/PHome";
-import PCheckIn from "./tabs/PCheckIn";
 import PAnnouncements from "./tabs/PAnnouncements";
 import PNotes from "./tabs/PNotes";
 import PAwards from "./tabs/PAwards";
@@ -11,7 +10,6 @@ import PHistory from "./tabs/PHistory";
 
 const TABS = [
   { id: "inicio", label: "Início", icon: Home, C: PHome },
-  { id: "checkin", label: "Check-in", icon: MapPin, C: PCheckIn },
   { id: "avisos", label: "Avisos", icon: Megaphone, C: PAnnouncements },
   { id: "notas", label: "Notas", icon: Star, C: PNotes },
   { id: "premios", label: "Prêmios", icon: Trophy, C: PAwards },

@@ -56,7 +56,7 @@ export default function PHome() {
       </div>
 
       <Card className="text-center">
-        <p className="text-xs uppercase tracking-widest text-gold font-bold mb-4">Meta do mês</p>
+        <p className="text-xs uppercase tracking-widest text-gold font-bold mb-4">Meta sugerida do mês</p>
         <div className="relative inline-flex items-center justify-center">
           <svg className="w-40 h-40 -rotate-90">
             <circle cx="80" cy="80" r="54" stroke="hsl(var(--secondary))" strokeWidth="12" fill="none" />

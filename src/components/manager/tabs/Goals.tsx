@@ -4,7 +4,7 @@ import { team } from "@/data/team";
 export default function Goals() {
   return (
     <div>
-      <SectionTitle title="Metas Mensais" subtitle="Acompanhe o desempenho de cada profissional" />
+      <SectionTitle title="Metas sugeridas" subtitle="Referências de desempenho — não obrigatórias" />
       <div className="grid sm:grid-cols-2 gap-4">
         {team.map((p) => {
           const pct = (p.clients / p.goal) * 100;
@@ -21,7 +21,7 @@ export default function Goals() {
               </div>
               <ProgressBar value={p.clients} max={p.goal} color={pct < 60 ? "destructive" : "gold"} />
               <p className="text-xs text-muted-foreground mt-2">
-                {pct >= 100 ? "✅ Meta batida!" : pct >= 60 ? `${Math.round(pct)}% concluído` : "⚠️ Atenção"}
+                {pct >= 100 ? "✅ Meta sugerida alcançada" : `${Math.round(pct)}% da meta sugerida`}
               </p>
             </Card>
           );

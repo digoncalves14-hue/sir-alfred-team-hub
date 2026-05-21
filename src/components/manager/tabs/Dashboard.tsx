@@ -2,7 +2,7 @@ import { Card, SectionTitle } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team, updates, birthdays } from "@/data/team";
 import { usePhotos } from "@/hooks/usePhotos";
-import { Users, Activity, Star, Trophy, Crown, Cake, Sparkles } from "lucide-react";
+import { Users, Star, Trophy, Crown, Cake, Sparkles } from "lucide-react";
 
 const Metric = ({ icon: Icon, label, value, accent }: any) => (
   <Card className="hover:border-gold/50 transition-all">
@@ -18,7 +18,6 @@ const Metric = ({ icon: Icon, label, value, accent }: any) => (
 
 export default function Dashboard() {
   const { getPhoto } = usePhotos();
-  const online = team.filter((t) => t.checkIn.status === "present").length;
   const avg = (team.reduce((s, t) => s + t.rating, 0) / team.length).toFixed(1);
   const star = team[0];
 
@@ -26,9 +25,8 @@ export default function Dashboard() {
     <div className="space-y-6">
       <SectionTitle title="Painel Geral" subtitle="Visão consolidada da rede Sir Alfred" />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Metric icon={Users} label="Profissionais" value="10" />
-        <Metric icon={Activity} label="Online agora" value={online} accent />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <Metric icon={Users} label="Profissionais" value={team.length} />
         <Metric icon={Star} label="Avaliação média" value={avg} />
         <Metric icon={Trophy} label="Premiações do mês" value="4" accent />
       </div>

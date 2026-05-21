@@ -14,75 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      check_ins: {
-        Row: {
-          created_at: string
-          id: string
-          latitude: number | null
-          longitude: number | null
-          selfie_url: string | null
-          status: string
-          unidade: Database["public"]["Enums"]["unidade"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          latitude?: number | null
-          longitude?: number | null
-          selfie_url?: string | null
-          status: string
-          unidade: Database["public"]["Enums"]["unidade"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          latitude?: number | null
-          longitude?: number | null
-          selfie_url?: string | null
-          status?: string
-          unidade?: Database["public"]["Enums"]["unidade"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-      checkin_rules: {
-        Row: {
-          created_at: string
-          horario_esperado: string
-          id: string
-          latitude: number | null
-          longitude: number | null
-          raio_metros: number
-          tolerancia_minutos: number
-          unidade: Database["public"]["Enums"]["unidade"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          horario_esperado?: string
-          id?: string
-          latitude?: number | null
-          longitude?: number | null
-          raio_metros?: number
-          tolerancia_minutos?: number
-          unidade: Database["public"]["Enums"]["unidade"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          horario_esperado?: string
-          id?: string
-          latitude?: number | null
-          longitude?: number | null
-          raio_metros?: number
-          tolerancia_minutos?: number
-          unidade?: Database["public"]["Enums"]["unidade"]
-          updated_at?: string
-        }
-        Relationships: []
-      }
       feedbacks: {
         Row: {
           created_at: string
@@ -149,33 +80,6 @@ export type Database = {
           telefone?: string | null
           unidade?: Database["public"]["Enums"]["unidade"] | null
           updated_at?: string
-        }
-        Relationships: []
-      }
-      user_checkin_rules: {
-        Row: {
-          created_at: string
-          horario_esperado: string
-          id: string
-          tolerancia_minutos: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          horario_esperado?: string
-          id?: string
-          tolerancia_minutos?: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          horario_esperado?: string
-          id?: string
-          tolerancia_minutos?: number
-          updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }

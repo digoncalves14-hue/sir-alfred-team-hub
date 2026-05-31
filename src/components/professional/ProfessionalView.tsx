@@ -31,6 +31,7 @@ export default function ProfessionalView({ onLogout }: { onLogout: () => void })
         </div>
       </header>
       <main className="container py-6 animate-fade-in">
+        <h1 className="sr-only">Sir Alfred Team Hub — Portal do profissional</h1>
         <Active />
       </main>
       <nav className="fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur border-t border-border">

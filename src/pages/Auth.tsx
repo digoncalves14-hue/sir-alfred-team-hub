@@ -80,7 +80,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-background">
+    <main className="min-h-screen flex items-center justify-center px-6 bg-background">
       <div className="absolute inset-0 opacity-30 pointer-events-none overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gold/20 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gold/10 rounded-full blur-3xl" />
@@ -88,6 +88,7 @@ export default function Auth() {
 
       <div className="relative w-full max-w-md space-y-8 animate-fade-in">
         <Logo size="lg" />
+        <h1 className="sr-only">Acesso à plataforma Sir Alfred Team Hub</h1>
 
         <div className="flex bg-card rounded-2xl p-1 border border-border">
           <button
@@ -107,26 +108,26 @@ export default function Auth() {
         <form onSubmit={handleSubmit} className="space-y-3">
           {mode === "signup" && (
             <>
-              <Input placeholder="Nome completo" value={form.nome} onChange={(v) => update("nome", v)} />
+              <Input aria-label="Nome completo" placeholder="Nome completo" value={form.nome} onChange={(v) => update("nome", v)} />
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Telefone" value={form.telefone} onChange={(v) => update("telefone", v)} />
-                <Input placeholder="Cargo (ex: Barbeiro)" value={form.cargo} onChange={(v) => update("cargo", v)} />
+                <Input aria-label="Telefone" placeholder="Telefone" value={form.telefone} onChange={(v) => update("telefone", v)} />
+                <Input aria-label="Cargo" placeholder="Cargo (ex: Barbeiro)" value={form.cargo} onChange={(v) => update("cargo", v)} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Select value={form.unidade} onChange={(v) => update("unidade", v)} options={[
+                <Select aria-label="Unidade" value={form.unidade} onChange={(v) => update("unidade", v)} options={[
                   { v: "Birigui", l: "Birigui" },
                   { v: "Aracatuba", l: "Araçatuba" },
                   { v: "Penapolis", l: "Penápolis" },
                 ]} />
-                <Select value={form.categoria} onChange={(v) => update("categoria", v)} options={[
+                <Select aria-label="Categoria" value={form.categoria} onChange={(v) => update("categoria", v)} options={[
                   { v: "barbeiro", l: "Barbeiro" },
                   { v: "recepcao", l: "Recepção" },
                 ]} />
               </div>
             </>
           )}
-          <Input type="email" placeholder="Email" value={form.email} onChange={(v) => update("email", v)} />
-          <Input type="password" placeholder="Senha" value={form.password} onChange={(v) => update("password", v)} />
+          <Input aria-label="Email" type="email" placeholder="Email" value={form.email} onChange={(v) => update("email", v)} />
+          <Input aria-label="Senha" type="password" placeholder="Senha" value={form.password} onChange={(v) => update("password", v)} />
 
           <button
             disabled={loading}
@@ -141,7 +142,7 @@ export default function Auth() {
           BIRIGUI · ARAÇATUBA · PENÁPOLIS
         </p>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -154,8 +155,9 @@ const Input = ({ value, onChange, ...rest }: any) => (
   />
 );
 
-const Select = ({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { v: string; l: string }[] }) => (
+const Select = ({ value, onChange, options, ...rest }: { value: string; onChange: (v: string) => void; options: { v: string; l: string }[]; [k: string]: any }) => (
   <select
+    {...rest}
     value={value}
     onChange={(e) => onChange(e.target.value)}
     className="w-full px-4 py-3 rounded-xl bg-card border border-border text-foreground focus:border-gold focus:outline-none transition"

@@ -1,0 +1,7 @@
+# Sir Alfred Team Hub
+
+> Plataforma interna de gestão da equipe da barbearia Sir Alfred (Birigui, Araçatuba e Penápolis), com metas sugeridas, feedbacks, comunicados, prêmios, biblioteca de treinamentos e histórico de evolução.
+
+## Pages
+
+- [Início](/): Tela de acesso e portal da equipe Sir Alfred.

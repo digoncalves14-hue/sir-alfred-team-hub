@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Auth from "./Auth";
 import ManagerView from "@/components/manager/ManagerView";
 import ProfessionalView from "@/components/professional/ProfessionalView";
+import AlfredChat from "@/components/chatbot/AlfredChat";
 import { Loader2 } from "lucide-react";
 
 const Index = () => {
@@ -17,8 +18,12 @@ const Index = () => {
 
   if (!user) return <Auth />;
 
-  if (role === "gestor") return <ManagerView onLogout={signOut} />;
-  return <ProfessionalView onLogout={signOut} />;
+  return (
+    <>
+      {role === "gestor" ? <ManagerView onLogout={signOut} /> : <ProfessionalView onLogout={signOut} />}
+      <AlfredChat />
+    </>
+  );
 };
 
 export default Index;

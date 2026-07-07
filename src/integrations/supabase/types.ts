@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      behavioral_profiles: {
+        Row: {
+          created_at: string
+          data_teste: string | null
+          id: string
+          link: string | null
+          observacoes: string | null
+          perfil: string | null
+          pontos_atencao: string | null
+          pontos_fortes: string | null
+          professional_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          data_teste?: string | null
+          id?: string
+          link?: string | null
+          observacoes?: string | null
+          perfil?: string | null
+          pontos_atencao?: string | null
+          pontos_fortes?: string | null
+          professional_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          data_teste?: string | null
+          id?: string
+          link?: string | null
+          observacoes?: string | null
+          perfil?: string | null
+          pontos_atencao?: string | null
+          pontos_fortes?: string | null
+          professional_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "behavioral_profiles_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       feedbacks: {
         Row: {
           created_at: string

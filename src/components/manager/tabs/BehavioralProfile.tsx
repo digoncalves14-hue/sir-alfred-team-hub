@@ -105,13 +105,13 @@ export default function BehavioralProfile() {
             16personalidades (MBTI)
           </a>
           <a
-            href="https://www.discprofile.com/pt-br/what-is-disc/overview/"
+            href="https://www.mydiscprofile.com/pt-pt/free-personality-test.php"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-sm font-medium hover:border-gold/50 transition-all"
           >
             <ExternalLink className="h-3.5 w-3.5 text-gold" />
-            Método DISC
+            Teste DISC grátis
           </a>
         </div>
       </div>

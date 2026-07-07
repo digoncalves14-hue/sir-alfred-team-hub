@@ -3,7 +3,7 @@ import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team } from "@/data/team";
 import { usePhotos } from "@/hooks/usePhotos";
-import { Trophy, Send, Scissors, Instagram, ShoppingBag, DollarSign, Crown } from "lucide-react";
+import { Send, Scissors, Instagram, ShoppingBag, DollarSign, Crown, Camera, X } from "lucide-react";
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
@@ -25,6 +25,7 @@ type Award = {
   winner: string;
   desc: string;
   active: boolean;
+  photo?: string;
 };
 
 const currentQuarter = () => {
@@ -46,18 +47,27 @@ export default function Awards() {
   const [quarter, setQuarter] = useState(currentQuarter());
   const [winner, setWinner] = useState(team[0]?.name ?? "");
   const [desc, setDesc] = useState("");
+  const [photo, setPhoto] = useState<string>("");
 
   const current = CATEGORIES.find((c) => c.id === tab)!;
   const CatIcon = current.icon;
   const filtered = useMemo(() => list.filter((a) => a.category === tab), [list, tab]);
 
+  const onPickPhoto = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhoto(String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
   const send = () => {
     if (!winner.trim()) return;
     setList([
-      { id: Date.now(), category: tab, quarter, winner, desc, active: true },
+      { id: Date.now(), category: tab, quarter, winner, desc, active: true, photo: photo || undefined },
       ...list.map((a) => (a.category === tab ? { ...a, active: false } : a)),
     ]);
     setDesc("");
+    setPhoto("");
   };
 
   return (
@@ -101,6 +111,25 @@ export default function Awards() {
           )}
         </div>
         <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} placeholder={tab === "trimestre" ? "Descrição do prêmio do trimestre..." : "Descrição / valor conquistado..."} className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm" />
+
+        <div className="mt-3 flex items-center gap-3">
+          {photo ? (
+            <div className="relative">
+              <img src={photo} alt="Prévia do prêmio" className="h-20 w-20 rounded-xl object-cover border border-gold/40" />
+              <button onClick={() => setPhoto("")} className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 hover:text-destructive">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <label className="h-20 w-20 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-muted-foreground hover:text-gold hover:border-gold/60 cursor-pointer transition">
+              <Camera className="h-5 w-5" />
+              <span className="text-[10px] mt-1">Foto</span>
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => onPickPhoto(e.target.files?.[0])} />
+            </label>
+          )}
+          <p className="text-xs text-muted-foreground">Tire ou envie uma foto do prêmio (opcional).</p>
+        </div>
+
         <button onClick={send} className="mt-3 gradient-gold text-background font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 hover:scale-105 transition">
           <Send className="h-4 w-4" /> Publicar premiação
         </button>
@@ -111,7 +140,10 @@ export default function Awards() {
       ) : (
         <div className="grid sm:grid-cols-2 gap-4">
           {filtered.map((a) => (
-            <Card key={a.id} className={a.active ? "border-gold/40" : ""}>
+            <Card key={a.id} className={a.active ? "border-gold/40 overflow-hidden" : "overflow-hidden"}>
+              {a.photo && (
+                <img src={a.photo} alt={`Prêmio ${a.quarter}`} className="w-full h-40 object-cover rounded-xl mb-3 border border-border" />
+              )}
               <div className="flex items-start gap-4">
                 <div className="p-3 rounded-xl bg-gold/10"><CatIcon className="h-6 w-6 text-gold" /></div>
                 <div className="flex-1">

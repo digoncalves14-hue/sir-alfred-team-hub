@@ -23,6 +23,17 @@ export default function Team() {
 
   return (
     <div className="space-y-8">
+      <div className="flex justify-end">
+        <a
+          href="/?signup=1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl gradient-gold text-background font-bold text-sm shadow-gold hover:scale-[1.02] transition-all"
+        >
+          + Cadastrar profissional
+        </a>
+      </div>
+
       {dbProfiles.length > 0 && (
         <div>
           <SectionTitle title="Profissionais cadastrados" subtitle="Toque na foto para enviar/atualizar" />

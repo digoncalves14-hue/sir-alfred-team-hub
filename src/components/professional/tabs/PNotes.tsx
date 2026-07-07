@@ -15,7 +15,7 @@ const TYPE_COLORS: Record<string, string> = {
   Melhoria: "bg-warning/20 text-warning border-warning/40",
   Tecnico: "bg-blue-500/20 text-blue-400 border-blue-500/40",
 };
-const TYPE_LABEL: Record<string, string> = { Positivo: "Positivo", Melhoria: "Melhoria", Tecnico: "Técnico" };
+const TYPE_LABEL: Record<string, string> = { Positivo: "Positivo", Melhoria: "Sugestão", Tecnico: "Técnico" };
 
 const dist = [
   { star: 5, count: 0 },

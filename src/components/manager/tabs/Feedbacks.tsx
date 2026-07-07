@@ -25,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 const TYPE_LABEL: Record<string, string> = {
   Positivo: "Positivo",
-  Melhoria: "Melhoria",
+  Melhoria: "Sugestão",
   Tecnico: "Técnico",
 };
 
@@ -74,7 +74,7 @@ export default function Feedbacks() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Feedbacks" subtitle="Reconheça e oriente sua equipe (privado para cada profissional)" />
+      <SectionTitle title="Feedbacks" subtitle="Reconheça e oriente os parceiros da unidade (privado para cada profissional)" />
       <Card>
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <select value={pro} onChange={(e) => setPro(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
@@ -82,7 +82,7 @@ export default function Feedbacks() {
           </select>
           <select value={type} onChange={(e) => setType(e.target.value as Feedback["type"])} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
             <option value="Positivo">Positivo</option>
-            <option value="Melhoria">Melhoria</option>
+            <option value="Melhoria">Sugestão</option>
             <option value="Tecnico">Técnico</option>
           </select>
         </div>

@@ -16,9 +16,13 @@ const Metric = ({ icon: Icon, label, value, accent }: any) => (
   </Card>
 );
 
+const Empty = ({ text }: { text: string }) => (
+  <p className="text-sm text-muted-foreground italic">{text}</p>
+);
+
 export default function Dashboard() {
   const { getPhoto } = usePhotos();
-  const avg = (team.reduce((s, t) => s + t.rating, 0) / team.length).toFixed(1);
+  const avg = team.length ? (team.reduce((s, t) => s + t.rating, 0) / team.length).toFixed(1) : "—";
   const star = team[0];
 
   return (
@@ -28,7 +32,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <Metric icon={Users} label="Profissionais" value={team.length} />
         <Metric icon={Star} label="Avaliação média" value={avg} />
-        <Metric icon={Trophy} label="Premiações do mês" value="4" accent />
+        <Metric icon={Trophy} label="Premiações do mês" value="0" accent />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -37,35 +41,43 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 text-gold mb-4">
             <Crown className="h-5 w-5" /> <span className="text-xs font-bold tracking-widest uppercase">Destaque da Semana</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Avatar initials={star.initials} photoUrl={getPhoto(star.name)} size="xl" />
-            <div>
-              <p className="text-2xl font-black text-foreground">{star.name}</p>
-              <p className="text-sm text-muted-foreground">{star.unit}</p>
-              <div className="flex items-center gap-3 mt-2 text-sm">
-                <span className="text-gold font-bold">{star.clients} clientes</span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-gold">{"★".repeat(5)} {star.rating}</span>
+          {star ? (
+            <div className="flex items-center gap-4">
+              <Avatar initials={star.initials} photoUrl={getPhoto(star.name)} size="xl" />
+              <div>
+                <p className="text-2xl font-black text-foreground">{star.name}</p>
+                <p className="text-sm text-muted-foreground">{star.unit}</p>
+                <div className="flex items-center gap-3 mt-2 text-sm">
+                  <span className="text-gold font-bold">{star.clients} clientes</span>
+                  <span className="text-muted-foreground">·</span>
+                  <span className="text-gold">{"★".repeat(5)} {star.rating}</span>
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <Empty text="Nenhum destaque cadastrado ainda." />
+          )}
         </Card>
 
         <Card>
           <div className="flex items-center gap-2 text-gold mb-4">
             <Cake className="h-5 w-5" /> <span className="text-xs font-bold tracking-widest uppercase">Aniversários do mês</span>
           </div>
-          <div className="space-y-3">
-            {birthdays.map((b) => (
-              <div key={b.name} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
-                <div>
-                  <p className="font-semibold">{b.name}</p>
-                  <p className="text-xs text-muted-foreground">{b.unit}</p>
+          {birthdays.length ? (
+            <div className="space-y-3">
+              {birthdays.map((b) => (
+                <div key={b.name} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
+                  <div>
+                    <p className="font-semibold">{b.name}</p>
+                    <p className="text-xs text-muted-foreground">{b.unit}</p>
+                  </div>
+                  <span className="text-sm text-gold font-bold">em {b.days} dias</span>
                 </div>
-                <span className="text-sm text-gold font-bold">em {b.days} dias</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <Empty text="Nenhum aniversário cadastrado." />
+          )}
         </Card>
       </div>
 
@@ -73,14 +85,18 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 text-gold mb-4">
           <Sparkles className="h-5 w-5" /> <span className="text-xs font-bold tracking-widest uppercase">Atualizações Recentes</span>
         </div>
-        <div className="space-y-3">
-          {updates.map((u, i) => (
-            <div key={i} className="flex items-center justify-between border-l-2 border-gold pl-4 py-1">
-              <p className="text-sm"><span className="font-bold text-foreground">{u.who}</span> <span className="text-muted-foreground">{u.what}</span></p>
-              <span className="text-xs text-muted-foreground">{u.when}</span>
-            </div>
-          ))}
-        </div>
+        {updates.length ? (
+          <div className="space-y-3">
+            {updates.map((u, i) => (
+              <div key={i} className="flex items-center justify-between border-l-2 border-gold pl-4 py-1">
+                <p className="text-sm"><span className="font-bold text-foreground">{u.who}</span> <span className="text-muted-foreground">{u.what}</span></p>
+                <span className="text-xs text-muted-foreground">{u.when}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Empty text="Nenhuma atualização registrada." />
+        )}
       </Card>
     </div>
   );

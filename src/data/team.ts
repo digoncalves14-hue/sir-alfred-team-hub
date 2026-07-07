@@ -20,6 +20,7 @@ export const team: Professional[] = [
   { id: "karitta", name: "Karitta", role: "Barbeira", unit: "Birigui", clients: 29, goal: 50, rating: 4.7, rank: 5, category: "barber", initials: "KA", mood: "😁" },
   { id: "diegorios", name: "Diego Rios", role: "Barbeiro", unit: "Penápolis", clients: 26, goal: 40, rating: 4.5, rank: 6, category: "barber", initials: "DR", mood: "😊" },
   { id: "rocha", name: "Rocha", role: "Barbeiro", unit: "Penápolis", clients: 21, goal: 40, rating: 4.3, rank: 7, category: "barber", initials: "RO", mood: "😔" },
+  { id: "matheus", name: "Matheus", role: "Barbeiro", unit: "Araçatuba", clients: 0, goal: 40, rating: 0, rank: 8, category: "barber", initials: "MA", mood: "😊" },
   { id: "larissa", name: "Larissa", role: "Gestora / Cabeleireira", unit: "Kids", clients: 38, goal: 40, rating: 4.9, rank: 1, category: "support", initials: "LA", mood: "😁" },
   { id: "thyffannys", name: "Thyffannys", role: "Secretaria / Manicure", unit: "Birigui", clients: 32, goal: 40, rating: 4.8, rank: 2, category: "support", initials: "TY", mood: "😊" },
 ];

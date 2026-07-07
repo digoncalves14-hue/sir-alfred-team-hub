@@ -13,10 +13,12 @@ import Reviews from "./tabs/Reviews";
 import Library from "./tabs/Library";
 import History from "./tabs/History";
 import Pops from "./tabs/Pops";
+import BehavioralProfile from "./tabs/BehavioralProfile";
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
   { id: "equipe", label: "Equipe", C: Team },
+  { id: "perfil-comportamental", label: "Perfil Comportamental", C: BehavioralProfile },
   { id: "metas", label: "Metas", C: Goals },
   { id: "pulso", label: "Pulso", C: Pulse },
   { id: "avisos", label: "Avisos", C: Announcements },

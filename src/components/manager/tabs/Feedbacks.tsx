@@ -82,7 +82,7 @@ export default function Feedbacks() {
           </select>
           <select value={type} onChange={(e) => setType(e.target.value as Feedback["type"])} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
             <option value="Positivo">Positivo</option>
-            <option value="Melhoria">Melhoria</option>
+            <option value="Melhoria">Sugestão</option>
             <option value="Tecnico">Técnico</option>
           </select>
         </div>

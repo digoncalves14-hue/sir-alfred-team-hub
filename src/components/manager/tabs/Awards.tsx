@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team } from "@/data/team";
@@ -54,7 +54,22 @@ export default function Awards() {
   const [winner, setWinner] = useState(team[0]?.name ?? "");
   const [desc, setDesc] = useState("");
   const [photo, setPhoto] = useState<string>("");
-  const [catalogPhotos, setCatalogPhotos] = useState<Record<string, string>>({});
+  const [catalogPhotos, setCatalogPhotos] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem("awards.catalogPhotos");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("awards.catalogPhotos", JSON.stringify(catalogPhotos));
+    } catch {
+      // ignore quota errors
+    }
+  }, [catalogPhotos]);
 
   const current = CATEGORIES.find((c) => c.id === tab)!;
   const CatIcon = current.icon;

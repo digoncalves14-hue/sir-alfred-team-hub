@@ -3,7 +3,7 @@ import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team } from "@/data/team";
 import { usePhotos } from "@/hooks/usePhotos";
-import { Trophy, Send, Scissors, Instagram, ShoppingBag, DollarSign, Crown } from "lucide-react";
+import { Send, Scissors, Instagram, ShoppingBag, DollarSign, Crown, Camera, X } from "lucide-react";
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();

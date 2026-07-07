@@ -3,7 +3,7 @@ import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team } from "@/data/team";
 import { usePhotos } from "@/hooks/usePhotos";
-import { Send, Scissors, Instagram, ShoppingBag, Crown, Camera, X, Trophy, Gift, Tv } from "lucide-react";
+import { Send, Scissors, Instagram, ShoppingBag, Crown, Camera, X, Trophy, Gift } from "lucide-react";
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
@@ -168,14 +168,14 @@ export default function Awards() {
             <div className="flex-shrink-0">
               {catalogPhotos["annual"] ? (
                 <div className="relative">
-                  <img src={catalogPhotos["annual"]} alt="TV Samsung" className="h-32 w-32 sm:h-40 sm:w-40 rounded-2xl object-cover border-2 border-gold" />
+                  <img src={catalogPhotos["annual"]} alt="Combo VGR V 640 S4" className="h-32 w-32 sm:h-40 sm:w-40 rounded-2xl object-cover border-2 border-gold" />
                   <button onClick={() => setCatalogPhotos((p) => { const n = { ...p }; delete n["annual"]; return n; })} className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 hover:text-destructive">
                     <X className="h-3 w-3" />
                   </button>
                 </div>
               ) : (
                 <label className="h-32 w-32 sm:h-40 sm:w-40 rounded-2xl border-2 border-dashed border-gold/60 flex flex-col items-center justify-center text-gold hover:bg-gold/10 cursor-pointer transition">
-                  <Tv className="h-10 w-10" />
+                  <Gift className="h-10 w-10" />
                   <span className="text-[10px] mt-2 uppercase tracking-widest">Adicionar foto</span>
                   <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickCatalogPhoto("annual", e.target.files?.[0])} />
                 </label>
@@ -183,8 +183,8 @@ export default function Awards() {
             </div>
             <div className="flex-1 text-center sm:text-left">
               <Badge className="bg-gold/20 text-gold border-gold/60 mb-2">🏆 Prêmio Anual</Badge>
-              <h4 className="text-2xl sm:text-3xl font-black text-gold">TV Samsung 50" QLED 4K</h4>
-              <p className="text-sm text-muted-foreground mt-2">Grande prêmio do ano — o destaque máximo da temporada.</p>
+              <h4 className="text-2xl sm:text-3xl font-black text-gold">Combo VGR V 640 S4 4 em 1</h4>
+              <p className="text-sm text-muted-foreground mt-2">Corte, acabamento, shaver e secador — o destaque máximo da temporada.</p>
             </div>
           </div>
         </Card>

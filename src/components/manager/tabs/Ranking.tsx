@@ -10,7 +10,7 @@ export default function Ranking() {
   const list = team.filter((t) => t.category === tab).sort((a, b) => a.rank - b.rank);
   return (
     <div>
-      <SectionTitle title="Ranking" subtitle="Performance dos profissionais" />
+      <SectionTitle title="Ranking" subtitle="Destaques positivos da rede" />
       <div className="flex gap-2 mb-6">
         {(["barber", "support"] as const).map((k) => (
           <button key={k} onClick={() => setTab(k)} className={`px-5 py-2 rounded-full text-sm font-semibold transition ${tab === k ? "gradient-gold text-background" : "bg-card text-muted-foreground hover:text-foreground"}`}>

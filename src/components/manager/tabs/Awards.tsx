@@ -25,6 +25,7 @@ type Award = {
   winner: string;
   desc: string;
   active: boolean;
+  photo?: string;
 };
 
 const currentQuarter = () => {

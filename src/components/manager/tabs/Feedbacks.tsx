@@ -25,7 +25,7 @@ const TYPE_COLORS: Record<string, string> = {
 };
 const TYPE_LABEL: Record<string, string> = {
   Positivo: "Positivo",
-  Melhoria: "Melhoria",
+  Melhoria: "Sugestão",
   Tecnico: "Técnico",
 };
 

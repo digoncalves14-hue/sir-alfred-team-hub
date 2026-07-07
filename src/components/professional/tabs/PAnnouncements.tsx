@@ -5,6 +5,9 @@ export default function PAnnouncements() {
   return (
     <div>
       <SectionTitle title="Avisos" subtitle="Comunicados da gestão" />
+      {announcements.length === 0 && (
+        <Card><p className="text-sm text-muted-foreground italic">Nenhum aviso publicado ainda.</p></Card>
+      )}
       <div className="space-y-3">
         {announcements.map((a) => (
           <Card key={a.id}>

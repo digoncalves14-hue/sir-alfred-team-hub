@@ -5,6 +5,9 @@ export default function Goals() {
   return (
     <div>
       <SectionTitle title="Metas sugeridas" subtitle="Referências de desempenho — não obrigatórias" />
+      {team.length === 0 && (
+        <Card><p className="text-sm text-muted-foreground italic">Nenhuma meta cadastrada ainda.</p></Card>
+      )}
       <div className="grid sm:grid-cols-2 gap-4">
         {team.map((p) => {
           const pct = (p.clients / p.goal) * 100;

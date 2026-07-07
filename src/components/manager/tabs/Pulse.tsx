@@ -13,6 +13,9 @@ export default function Pulse() {
           <p className="text-sm"><span className="font-bold text-warning">Atenção:</span> {low.map((l) => l.name).join(", ")} marcou humor baixo hoje.</p>
         </Card>
       )}
+      {team.length === 0 && (
+        <Card><p className="text-sm text-muted-foreground italic">Nenhum pulso registrado ainda.</p></Card>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {team.map((p) => (
           <Card key={p.id} className="text-center">

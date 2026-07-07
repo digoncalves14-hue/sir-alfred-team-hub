@@ -8,6 +8,9 @@ export default function Library() {
   return (
     <div>
       <SectionTitle title="Biblioteca" subtitle="Conteúdos e treinamentos da rede" />
+      {library.length === 0 && (
+        <Card><p className="text-sm text-muted-foreground italic">Nenhum conteúdo na biblioteca ainda.</p></Card>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {library.map((c) => {
           const Icon = icons[c.icon];

@@ -18,6 +18,9 @@ export default function Ranking() {
           </button>
         ))}
       </div>
+      {list.length === 0 && (
+        <Card><p className="text-sm text-muted-foreground italic">Nenhum profissional no ranking ainda.</p></Card>
+      )}
       <div className="space-y-3">
         {list.map((p) => (
           <Card key={p.id} className="hover:border-gold/40 transition">

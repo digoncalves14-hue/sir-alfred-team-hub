@@ -19,7 +19,8 @@ const signupSchema = loginSchema.extend({
 });
 
 export default function Auth() {
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const initialMode = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("signup") === "1" ? "signup" : "login";
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     email: "",

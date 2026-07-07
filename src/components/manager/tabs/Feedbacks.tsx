@@ -74,7 +74,7 @@ export default function Feedbacks() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle title="Feedbacks" subtitle="Reconheça e oriente sua equipe (privado para cada profissional)" />
+      <SectionTitle title="Feedbacks" subtitle="Reconheça e oriente os parceiros da unidade (privado para cada profissional)" />
       <Card>
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <select value={pro} onChange={(e) => setPro(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">

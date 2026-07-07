@@ -5,6 +5,9 @@ export default function Reviews() {
   return (
     <div>
       <SectionTitle title="Avaliações" subtitle="Feedback dos clientes" />
+      {reviews.length === 0 && (
+        <Card><p className="text-sm text-muted-foreground italic">Nenhuma avaliação registrada ainda.</p></Card>
+      )}
       <div className="space-y-3">
         {reviews.map((r) => (
           <Card key={r.id}>

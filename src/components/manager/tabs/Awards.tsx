@@ -47,18 +47,27 @@ export default function Awards() {
   const [quarter, setQuarter] = useState(currentQuarter());
   const [winner, setWinner] = useState(team[0]?.name ?? "");
   const [desc, setDesc] = useState("");
+  const [photo, setPhoto] = useState<string>("");
 
   const current = CATEGORIES.find((c) => c.id === tab)!;
   const CatIcon = current.icon;
   const filtered = useMemo(() => list.filter((a) => a.category === tab), [list, tab]);
 
+  const onPickPhoto = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setPhoto(String(reader.result));
+    reader.readAsDataURL(file);
+  };
+
   const send = () => {
     if (!winner.trim()) return;
     setList([
-      { id: Date.now(), category: tab, quarter, winner, desc, active: true },
+      { id: Date.now(), category: tab, quarter, winner, desc, active: true, photo: photo || undefined },
       ...list.map((a) => (a.category === tab ? { ...a, active: false } : a)),
     ]);
     setDesc("");
+    setPhoto("");
   };
 
   return (

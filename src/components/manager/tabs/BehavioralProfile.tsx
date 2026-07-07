@@ -86,6 +86,36 @@ export default function BehavioralProfile() {
         subtitle="Registre o resultado do teste de cada profissional (visível apenas para gestores)"
       />
 
+      <div className="rounded-2xl border border-gold/30 bg-gold/5 p-4 space-y-3">
+        <div className="flex items-center gap-2 text-gold">
+          <Brain className="h-4 w-4" />
+          <p className="text-sm font-semibold">Testes recomendados</p>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Envie um desses links para o profissional preencher. Depois, cole o link do resultado ou registre o perfil dele no card abaixo.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <a
+            href="https://www.16personalities.com/br"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-sm font-medium hover:border-gold/50 transition-all"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-gold" />
+            16personalidades (MBTI)
+          </a>
+          <a
+            href="https://www.discprofile.com/pt-br/what-is-disc/overview/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-secondary border border-border text-sm font-medium hover:border-gold/50 transition-all"
+          >
+            <ExternalLink className="h-3.5 w-3.5 text-gold" />
+            Método DISC
+          </a>
+        </div>
+      </div>
+
       {loading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
       <div className="grid lg:grid-cols-2 gap-4">

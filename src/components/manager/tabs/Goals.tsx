@@ -22,7 +22,7 @@ export default function Goals() {
                   {p.clients}<span className="text-muted-foreground text-sm">/{p.goal}</span>
                 </p>
               </div>
-              <ProgressBar value={p.clients} max={p.goal} color={pct < 60 ? "destructive" : "gold"} />
+              <ProgressBar value={p.clients} max={p.goal} color="gold" />
               <p className="text-xs text-muted-foreground mt-2">
                 {pct >= 100 ? "✅ Meta sugerida alcançada" : `${Math.round(pct)}% da meta sugerida`}
               </p>

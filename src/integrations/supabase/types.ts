@@ -41,6 +41,78 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitacoes_agendamento: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          observacoes: string | null
+          preferencia: string
+          servico: string
+          status: string
+          telefone: string
+          unidade: Database["public"]["Enums"]["unidade"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          observacoes?: string | null
+          preferencia: string
+          servico: string
+          status?: string
+          telefone: string
+          unidade: Database["public"]["Enums"]["unidade"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          preferencia?: string
+          servico?: string
+          status?: string
+          telefone?: string
+          unidade?: Database["public"]["Enums"]["unidade"]
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          ativo: boolean
+          categoria: string | null
+          created_at: string
+          duracao_min: number
+          id: string
+          nome: string
+          preco: number
+          unidade: Database["public"]["Enums"]["unidade"]
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          duracao_min: number
+          id?: string
+          nome: string
+          preco: number
+          unidade: Database["public"]["Enums"]["unidade"]
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string | null
+          created_at?: string
+          duracao_min?: number
+          id?: string
+          nome?: string
+          preco?: number
+          unidade?: Database["public"]["Enums"]["unidade"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cargo: string | null

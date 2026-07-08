@@ -2,3 +2,9 @@ project_id = "ozwpqeqcigajljkphmex"
 
 [functions.chatbot]
 verify_jwt = true
+
+[functions.customer-chat]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false

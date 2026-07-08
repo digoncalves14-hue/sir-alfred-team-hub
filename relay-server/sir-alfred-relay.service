@@ -1,0 +1,15 @@
+[Unit]
+Description=Sir Alfred - Relay AppBarber
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/sir-alfred-relay
+EnvironmentFile=/opt/sir-alfred-relay/.env
+ExecStart=/usr/bin/node /opt/sir-alfred-relay/server.js
+Restart=on-failure
+RestartSec=5
+User=nobody
+
+[Install]
+WantedBy=multi-user.target

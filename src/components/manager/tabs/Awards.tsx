@@ -3,7 +3,9 @@ import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { team } from "@/data/team";
 import { usePhotos } from "@/hooks/usePhotos";
-import { Send, Scissors, Instagram, ShoppingBag, Crown, Camera, X, Trophy, Gift } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Send, Scissors, Instagram, ShoppingBag, Crown, Camera, X, Trophy, Gift, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
@@ -54,6 +56,7 @@ export default function Awards() {
   const [winner, setWinner] = useState(team[0]?.name ?? "");
   const [desc, setDesc] = useState("");
   const [photo, setPhoto] = useState<string>("");
+  const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [catalogPhotos, setCatalogPhotos] = useState<Record<string, string>>(() => {
     try {
       const raw = localStorage.getItem("awards.catalogPhotos");
@@ -62,6 +65,33 @@ export default function Awards() {
       return {};
     }
   });
+
+  useEffect(() => {
+    const loadCatalogPhotos = async () => {
+      const { data, error } = await supabase
+        .from("award_catalog_photos" as any)
+        .select("item_key, photo_path");
+
+      if (error) return;
+
+      const entries = await Promise.all((data ?? []).map(async (row: any) => {
+        if (!row.item_key || !row.photo_path) return;
+        const { data: signed } = await supabase.storage
+          .from("award-photos")
+          .createSignedUrl(row.photo_path, 60 * 60 * 24 * 365);
+        return signed?.signedUrl ? [row.item_key, signed.signedUrl] as const : undefined;
+      }));
+
+      const next: Record<string, string> = {};
+      entries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
+      });
+
+      setCatalogPhotos((prev) => ({ ...prev, ...next }));
+    };
+
+    loadCatalogPhotos();
+  }, []);
 
   useEffect(() => {
     try {
@@ -82,11 +112,73 @@ export default function Awards() {
     reader.readAsDataURL(file);
   };
 
-  const onPickCatalogPhoto = (key: string, file?: File) => {
+  const onPickCatalogPhoto = async (key: string, file?: File) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setCatalogPhotos((p) => ({ ...p, [key]: String(reader.result) }));
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selecione uma imagem");
+      return;
+    }
+
+    setUploadingKey(key);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const safeKey = key.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9-]/g, "-").toLowerCase();
+      const path = `${safeKey}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from("award-photos")
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw upErr;
+
+      const { error: dbErr } = await supabase
+        .from("award_catalog_photos" as any)
+        .upsert({ item_key: key, photo_path: path });
+      if (dbErr) throw dbErr;
+
+      const { data: signed } = await supabase.storage
+        .from("award-photos")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (!signed?.signedUrl) throw new Error("Não foi possível carregar a foto salva");
+
+      setCatalogPhotos((p) => ({ ...p, [key]: signed.signedUrl }));
+      toast.success("Foto do prêmio salva!");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar foto do prêmio");
+    } finally {
+      setUploadingKey(null);
+    }
+  };
+
+  const removeCatalogPhoto = async (key: string) => {
+    setUploadingKey(key);
+    try {
+      const { data } = await supabase
+        .from("award_catalog_photos" as any)
+        .select("photo_path")
+        .eq("item_key", key)
+        .maybeSingle();
+
+      if ((data as any)?.photo_path) {
+        await supabase.storage.from("award-photos").remove([(data as any).photo_path]);
+      }
+
+      const { error } = await supabase
+        .from("award_catalog_photos" as any)
+        .delete()
+        .eq("item_key", key);
+      if (error) throw error;
+
+      setCatalogPhotos((p) => {
+        const n = { ...p };
+        delete n[key];
+        return n;
+      });
+      toast.success("Foto removida");
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao remover foto");
+    } finally {
+      setUploadingKey(null);
+    }
   };
 
   const send = () => {
@@ -184,15 +276,15 @@ export default function Awards() {
               {catalogPhotos["annual"] ? (
                 <div className="relative">
                   <img src={catalogPhotos["annual"]} alt="Combo VGR V 640 S4" className="h-32 w-32 sm:h-40 sm:w-40 rounded-2xl object-cover border-2 border-gold" />
-                  <button onClick={() => setCatalogPhotos((p) => { const n = { ...p }; delete n["annual"]; return n; })} className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 hover:text-destructive">
-                    <X className="h-3 w-3" />
+                  <button onClick={() => removeCatalogPhoto("annual")} disabled={uploadingKey === "annual"} className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 hover:text-destructive disabled:opacity-60">
+                    {uploadingKey === "annual" ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" />}
                   </button>
                 </div>
               ) : (
                 <label className="h-32 w-32 sm:h-40 sm:w-40 rounded-2xl border-2 border-dashed border-gold/60 flex flex-col items-center justify-center text-gold hover:bg-gold/10 cursor-pointer transition">
-                  <Gift className="h-10 w-10" />
+                  {uploadingKey === "annual" ? <Loader2 className="h-10 w-10 animate-spin" /> : <Gift className="h-10 w-10" />}
                   <span className="text-[10px] mt-2 uppercase tracking-widest">Adicionar foto</span>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickCatalogPhoto("annual", e.target.files?.[0])} />
+                  <input type="file" accept="image/*" disabled={uploadingKey === "annual"} className="hidden" onChange={(e) => onPickCatalogPhoto("annual", e.target.files?.[0])} />
                 </label>
               )}
             </div>
@@ -227,14 +319,14 @@ export default function Awards() {
                         {catalogPhotos[key] ? (
                           <div className="relative w-full">
                             <img src={catalogPhotos[key]} alt={g} className="w-full h-16 object-cover rounded-lg" />
-                            <button onClick={() => setCatalogPhotos((p) => { const n = { ...p }; delete n[key]; return n; })} className="absolute -top-1 -right-1 bg-background border border-border rounded-full p-0.5 hover:text-destructive">
-                              <X className="h-2.5 w-2.5" />
+                            <button onClick={() => removeCatalogPhoto(key)} disabled={uploadingKey === key} className="absolute -top-1 -right-1 bg-background border border-border rounded-full p-0.5 hover:text-destructive disabled:opacity-60">
+                              {uploadingKey === key ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <X className="h-2.5 w-2.5" />}
                             </button>
                           </div>
                         ) : (
                           <label className="w-full h-16 rounded-lg border border-dashed border-border flex items-center justify-center text-muted-foreground hover:text-gold hover:border-gold/60 cursor-pointer transition">
-                            <Camera className="h-4 w-4" />
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickCatalogPhoto(key, e.target.files?.[0])} />
+                            {uploadingKey === key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                            <input type="file" accept="image/*" disabled={uploadingKey === key} className="hidden" onChange={(e) => onPickCatalogPhoto(key, e.target.files?.[0])} />
                           </label>
                         )}
                         <p className="text-[11px] font-semibold mt-1.5 leading-tight">{g}</p>
@@ -256,14 +348,14 @@ export default function Awards() {
                     return catalogPhotos[key] ? (
                       <div className="relative flex-shrink-0">
                         <img src={catalogPhotos[key]} alt={q.grand} className="h-16 w-16 object-cover rounded-lg border border-gold/60" />
-                        <button onClick={() => setCatalogPhotos((p) => { const n = { ...p }; delete n[key]; return n; })} className="absolute -top-1 -right-1 bg-background border border-border rounded-full p-0.5 hover:text-destructive">
-                          <X className="h-2.5 w-2.5" />
+                        <button onClick={() => removeCatalogPhoto(key)} disabled={uploadingKey === key} className="absolute -top-1 -right-1 bg-background border border-border rounded-full p-0.5 hover:text-destructive disabled:opacity-60">
+                          {uploadingKey === key ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <X className="h-2.5 w-2.5" />}
                         </button>
                       </div>
                     ) : (
                       <label className="h-16 w-16 flex-shrink-0 rounded-lg border-2 border-dashed border-gold/50 flex items-center justify-center text-gold hover:bg-gold/10 cursor-pointer transition">
-                        <Camera className="h-5 w-5" />
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => onPickCatalogPhoto(key, e.target.files?.[0])} />
+                        {uploadingKey === key ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                        <input type="file" accept="image/*" disabled={uploadingKey === key} className="hidden" onChange={(e) => onPickCatalogPhoto(key, e.target.files?.[0])} />
                       </label>
                     );
                   })()}

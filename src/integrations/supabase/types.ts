@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      award_catalog_photos: {
+        Row: {
+          created_at: string
+          item_key: string
+          photo_path: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          item_key: string
+          photo_path: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          item_key?: string
+          photo_path?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       behavioral_profiles: {
         Row: {
           created_at: string

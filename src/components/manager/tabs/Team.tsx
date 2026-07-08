@@ -61,10 +61,27 @@ export default function Team() {
 
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(signupLink);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(signupLink);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = signupLink;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (!ok) throw new Error("execCommand failed");
+      }
       toast.success("Link de cadastro copiado!");
     } catch {
-      toast.error("Não foi possível copiar o link");
+      try {
+        window.prompt("Copie o link de cadastro:", signupLink);
+      } catch {
+        toast.error("Não foi possível copiar. Copie manualmente: " + signupLink);
+      }
     }
   };
 

@@ -63,26 +63,41 @@ export default function Team() {
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(signupLink);
-      } else {
-        const ta = document.createElement("textarea");
-        ta.value = signupLink;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-        if (!ok) throw new Error("execCommand failed");
+        toast.success("Link de cadastro copiado!");
+        return;
       }
-      toast.success("Link de cadastro copiado!");
-    } catch {
-      try {
-        window.prompt("Copie o link de cadastro:", signupLink);
-      } catch {
-        toast.error("Não foi possível copiar. Copie manualmente: " + signupLink);
+    } catch {}
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = signupLink;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "0";
+      ta.style.left = "0";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, signupLink.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      if (ok) {
+        toast.success("Link de cadastro copiado!");
+        return;
       }
-    }
+    } catch {}
+    // Last resort: select the visible link box for manual copy
+    try {
+      const el = document.getElementById("signup-link-box");
+      if (el) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    } catch {}
+    toast.info("Toque no link ao lado e use Copiar do seu navegador.", { duration: 6000 });
   };
 
   const toggleGestor = async (p: DbProfile, makeGestor: boolean) => {

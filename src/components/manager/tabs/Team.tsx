@@ -135,7 +135,17 @@ export default function Team() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="px-3 py-2 rounded-xl bg-card border border-border text-xs text-muted-foreground truncate max-w-[16rem]">
+          <div
+            id="signup-link-box"
+            onClick={(e) => {
+              const range = document.createRange();
+              range.selectNodeContents(e.currentTarget);
+              const sel = window.getSelection();
+              sel?.removeAllRanges();
+              sel?.addRange(range);
+            }}
+            className="px-3 py-2 rounded-xl bg-card border border-border text-xs text-muted-foreground truncate max-w-[16rem] cursor-text select-all"
+          >
             {signupLink}
           </div>
           <button

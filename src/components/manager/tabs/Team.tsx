@@ -57,7 +57,11 @@ export default function Team() {
     fetchProfiles();
   }, []);
 
-  const signupLink = `${typeof window !== "undefined" ? window.location.origin : ""}/?signup=1`;
+  const PUBLISHED_ORIGIN = "https://sir-alfred-aura.lovable.app";
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  // Sempre usar o domínio publicado no link de convite (não o do preview do Lovable)
+  const linkOrigin = /lovableproject\.com|lovable\.dev/.test(currentOrigin) ? PUBLISHED_ORIGIN : (currentOrigin || PUBLISHED_ORIGIN);
+  const signupLink = `${linkOrigin}/?signup=1`;
 
   const copyLink = async () => {
     try {

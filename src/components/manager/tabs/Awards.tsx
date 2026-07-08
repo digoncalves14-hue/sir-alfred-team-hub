@@ -74,13 +74,17 @@ export default function Awards() {
 
       if (error) return;
 
-      const next: Record<string, string> = {};
-      (data ?? []).forEach((row: any) => {
+      const entries = await Promise.all((data ?? []).map(async (row: any) => {
         if (!row.item_key || !row.photo_path) return;
-        const { data: signed } = supabase.storage
+        const { data: signed } = await supabase.storage
           .from("award-photos")
-          .getPublicUrl(row.photo_path);
-        next[row.item_key] = `${signed.publicUrl}?t=${Date.now()}`;
+          .createSignedUrl(row.photo_path, 60 * 60 * 24 * 365);
+        return signed?.signedUrl ? [row.item_key, signed.signedUrl] as const : undefined;
+      }));
+
+      const next: Record<string, string> = {};
+      entries.forEach((entry) => {
+        if (entry) next[entry[0]] = entry[1];
       });
 
       setCatalogPhotos((prev) => ({ ...prev, ...next }));
@@ -131,8 +135,12 @@ export default function Awards() {
         .upsert({ item_key: key, photo_path: path });
       if (dbErr) throw dbErr;
 
-      const { data } = supabase.storage.from("award-photos").getPublicUrl(path);
-      setCatalogPhotos((p) => ({ ...p, [key]: `${data.publicUrl}?t=${Date.now()}` }));
+      const { data: signed } = await supabase.storage
+        .from("award-photos")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (!signed?.signedUrl) throw new Error("Não foi possível carregar a foto salva");
+
+      setCatalogPhotos((p) => ({ ...p, [key]: signed.signedUrl }));
       toast.success("Foto do prêmio salva!");
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar foto do prêmio");

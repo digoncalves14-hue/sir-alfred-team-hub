@@ -145,52 +145,83 @@ export default function PIdeas() {
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3">Minhas sugestões</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">
+            {tab === "todas" ? "Ideias da equipe" : "Minhas sugestões"}
+          </h3>
+          <div className="flex gap-1 bg-card border border-border rounded-full p-1">
+            {(["todas", "minhas"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`px-3 py-1 text-[11px] font-semibold rounded-full transition ${
+                  tab === t ? "gradient-gold text-background" : "text-muted-foreground"
+                }`}
+              >
+                {t === "todas" ? "Todas" : "Minhas"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Vote nas ideias que você apoia — as mais votadas viram prioridade.
+        </p>
         {loading ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
-        ) : ideas.length === 0 ? (
-          <div className="text-center py-10 text-sm text-muted-foreground border border-dashed border-border rounded-2xl">
-            Nenhuma sugestão enviada ainda.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {ideas.map((i) => {
-              const st = STATUS_LABEL[i.status] || STATUS_LABEL.nova;
-              return (
-                <div key={i.id} className="bg-card border border-border rounded-2xl p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-sm">{i.title}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 capitalize">
-                        {i.category} · {new Date(i.created_at).toLocaleDateString("pt-BR")}
-                      </p>
+        ) : (() => {
+          const visible = tab === "todas" ? ideas : ideas.filter((i) => i.author_id === uid);
+          if (visible.length === 0) {
+            return (
+              <div className="text-center py-10 text-sm text-muted-foreground border border-dashed border-border rounded-2xl">
+                {tab === "todas" ? "Nenhuma ideia ainda." : "Você ainda não enviou sugestões."}
+              </div>
+            );
+          }
+          return (
+            <div className="space-y-3">
+              {visible.map((i) => {
+                const st = STATUS_LABEL[i.status] || STATUS_LABEL.nova;
+                const mine = i.author_id === uid;
+                return (
+                  <div key={i.id} className="bg-card border border-border rounded-2xl p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-sm">{i.title}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 capitalize">
+                          {i.category} · {new Date(i.created_at).toLocaleDateString("pt-BR")}
+                          {mine && " · sua ideia"}
+                        </p>
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${st.cls}`}>
+                        {st.label}
+                      </span>
                     </div>
-                    <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-full ${st.cls}`}>
-                      {st.label}
-                    </span>
+                    <p className="text-xs text-foreground/80 whitespace-pre-wrap">{i.description}</p>
+                    {i.manager_reply && (
+                      <div className="bg-background/50 border border-gold/30 rounded-lg p-2.5 text-xs">
+                        <p className="text-[10px] font-bold uppercase text-gold mb-1">Resposta</p>
+                        <p className="whitespace-pre-wrap">{i.manager_reply}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 pt-1">
+                      <VoteButton ideaId={i.id} compact />
+                      {mine && i.status === "nova" && (
+                        <button
+                          onClick={() => removeIdea(i.id)}
+                          className="ml-auto text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1"
+                        >
+                          <Trash2 className="h-3 w-3" /> Excluir
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-foreground/80 whitespace-pre-wrap">{i.description}</p>
-                  {i.manager_reply && (
-                    <div className="bg-background/50 border border-gold/30 rounded-lg p-2.5 text-xs">
-                      <p className="text-[10px] font-bold uppercase text-gold mb-1">Resposta</p>
-                      <p className="whitespace-pre-wrap">{i.manager_reply}</p>
-                    </div>
-                  )}
-                  {i.status === "nova" && (
-                    <button
-                      onClick={() => removeIdea(i.id)}
-                      className="text-[10px] text-muted-foreground hover:text-destructive flex items-center gap-1"
-                    >
-                      <Trash2 className="h-3 w-3" /> Excluir
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

@@ -205,6 +205,22 @@ export default function Team() {
                           </span>
                         ))}
                       </div>
+                      <label className="mt-3 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <Cake className="h-3 w-3 text-gold" />
+                        <span className="uppercase tracking-wider">Aniversário</span>
+                        <input
+                          type="date"
+                          value={p.data_aniversario ?? ""}
+                          onChange={async (e) => {
+                            const value = e.target.value || null;
+                            setDbProfiles((prev) => prev.map((x) => (x.id === p.id ? { ...x, data_aniversario: value } : x)));
+                            const { error } = await supabase.from("profiles").update({ data_aniversario: value }).eq("id", p.id);
+                            if (error) toast.error("Não foi possível salvar a data");
+                            else toast.success("Aniversário atualizado");
+                          }}
+                          className="bg-card border border-border rounded-md px-2 py-1 text-xs text-foreground"
+                        />
+                      </label>
                     </div>
                     <button
                       onClick={() => toggleGestor(p, !isGestor)}

@@ -1,1 +1,4 @@
 project_id = "ozwpqeqcigajljkphmex"
+
+[functions.appbarber-test]
+verify_jwt = false

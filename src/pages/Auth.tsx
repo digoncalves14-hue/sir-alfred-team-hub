@@ -16,6 +16,7 @@ const signupSchema = loginSchema.extend({
   cargo: z.string().trim().max(60).optional(),
   unidade: z.enum(["Birigui", "Aracatuba", "Penapolis"]),
   categoria: z.enum(["barbeiro", "recepcao"]),
+  data_aniversario: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de aniversário"),
 });
 
 export default function Auth() {
@@ -30,7 +31,9 @@ export default function Auth() {
     cargo: "",
     unidade: "Birigui" as "Birigui" | "Aracatuba" | "Penapolis",
     categoria: "barbeiro" as "barbeiro" | "recepcao",
+    data_aniversario: "",
   });
+
 
   const update = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -67,6 +70,7 @@ export default function Auth() {
               cargo: parsed.data.cargo,
               unidade: parsed.data.unidade,
               categoria: parsed.data.categoria,
+              data_aniversario: parsed.data.data_aniversario,
             },
           },
         });
@@ -125,6 +129,10 @@ export default function Auth() {
                   { v: "recepcao", l: "Recepção" },
                 ]} />
               </div>
+              <label className="block">
+                <span className="text-xs text-muted-foreground tracking-wider uppercase ml-1">Data de aniversário</span>
+                <Input aria-label="Data de aniversário" type="date" value={form.data_aniversario} onChange={(v) => update("data_aniversario", v)} />
+              </label>
             </>
           )}
           <Input aria-label="Email" type="email" placeholder="Email" value={form.email} onChange={(v) => update("email", v)} />

@@ -32,7 +32,7 @@ export default function Team() {
   const fetchProfiles = async () => {
     setLoading(true);
     const [{ data: profiles, error: profilesErr }, { data: roles, error: rolesErr }] = await Promise.all([
-      supabase.from("profiles").select("id, nome, cargo, unidade, foto_url"),
+      supabase.from("profiles").select("id, nome, cargo, unidade, foto_url, data_aniversario"),
       supabase.from("user_roles").select("user_id, role"),
     ]);
     if (profilesErr || rolesErr) {

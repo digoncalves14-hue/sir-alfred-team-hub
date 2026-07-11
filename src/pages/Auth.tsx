@@ -16,6 +16,7 @@ const signupSchema = loginSchema.extend({
   cargo: z.string().trim().max(60).optional(),
   unidade: z.enum(["Birigui", "Aracatuba", "Penapolis"]),
   categoria: z.enum(["barbeiro", "recepcao"]),
+  data_aniversario: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de aniversário"),
 });
 
 export default function Auth() {
@@ -30,7 +31,9 @@ export default function Auth() {
     cargo: "",
     unidade: "Birigui" as "Birigui" | "Aracatuba" | "Penapolis",
     categoria: "barbeiro" as "barbeiro" | "recepcao",
+    data_aniversario: "",
   });
+
 
   const update = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
 

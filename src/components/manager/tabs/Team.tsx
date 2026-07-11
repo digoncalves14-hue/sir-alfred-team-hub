@@ -230,6 +230,46 @@ export default function Team() {
         )}
       </div>
 
+      {(() => {
+        const currentMonth = new Date().getMonth();
+        const today = new Date();
+        const birthdays = dbProfiles
+          .filter((p) => {
+            if (!p.data_aniversario) return false;
+            const [, m] = p.data_aniversario.split("-").map(Number);
+            return m - 1 === currentMonth;
+          })
+          .sort((a, b) => Number(a.data_aniversario!.split("-")[2]) - Number(b.data_aniversario!.split("-")[2]));
+        if (birthdays.length === 0) return null;
+        return (
+          <div>
+            <SectionTitle title="Aniversariantes do mês" subtitle={new Date().toLocaleDateString("pt-BR", { month: "long" }).replace(/^./, (c) => c.toUpperCase())} />
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {birthdays.map((p) => {
+                const [, m, d] = p.data_aniversario!.split("-").map(Number);
+                const isToday = d === today.getDate() && m - 1 === currentMonth;
+                return (
+                  <Card key={p.id} className={`border-gold/40 ${isToday ? "shadow-gold" : ""}`}>
+                    <div className="flex items-center gap-4">
+                      <Avatar initials={initialsOf(p.nome)} photoUrl={p.foto_url} size="lg" />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-foreground truncate">{p.nome}</p>
+                        <p className="text-xs text-gold uppercase tracking-wider mt-0.5 flex items-center gap-1">
+                          <Cake className="h-3 w-3" />
+                          Dia {String(d).padStart(2, "0")}/{String(m).padStart(2, "0")}
+                          {isToday && <span className="ml-1 px-1.5 py-0.5 rounded-full bg-gold text-background text-[9px]">HOJE</span>}
+                        </p>
+                        {p.cargo && <p className="text-xs text-muted-foreground mt-1 truncate">{p.cargo}</p>}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       <div>
         <SectionTitle title="Equipe Sir Alfred" subtitle="Visão geral da rede" />
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">

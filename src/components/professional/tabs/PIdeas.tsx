@@ -2,15 +2,18 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb, Loader2, Send, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import VoteButton from "@/components/ideas/VoteButton";
 
 type Idea = {
   id: string;
+  author_id: string;
   category: string;
   title: string;
   description: string;
   status: string;
   manager_reply: string | null;
   created_at: string;
+  votes: number;
 };
 
 const CATEGORIES = [

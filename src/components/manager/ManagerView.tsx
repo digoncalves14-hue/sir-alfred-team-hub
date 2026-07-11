@@ -15,6 +15,7 @@ import History from "./tabs/History";
 import Pops from "./tabs/Pops";
 import BehavioralProfile from "./tabs/BehavioralProfile";
 import BestPractices from "./tabs/BestPractices";
+import Ideas from "./tabs/Ideas";
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
@@ -24,6 +25,7 @@ const TABS = [
   { id: "pulso", label: "Pulso", C: Pulse },
   { id: "avisos", label: "Avisos", C: Announcements },
   { id: "mural", label: "Mural de Boas Práticas", C: BestPractices },
+  { id: "ideias", label: "Caixa de Ideias", C: Ideas },
   { id: "feedbacks", label: "Feedbacks", C: Feedbacks },
   { id: "ranking", label: "Ranking", C: Ranking },
   { id: "premios", label: "Prêmios", C: Awards },

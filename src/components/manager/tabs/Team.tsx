@@ -7,7 +7,7 @@ import { usePhotos } from "@/hooks/usePhotos";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Crown, Link2, Loader2, User } from "lucide-react";
+import { Cake, Crown, Link2, Loader2, User } from "lucide-react";
 
 type DbProfile = {
   id: string;
@@ -15,6 +15,7 @@ type DbProfile = {
   cargo: string | null;
   unidade: string | null;
   foto_url: string | null;
+  data_aniversario: string | null;
   roles: string[];
 };
 

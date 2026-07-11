@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb, Loader2, Trash2 } from "lucide-react";
+import VoteButton from "@/components/ideas/VoteButton";
 import { toast } from "sonner";
 
 type Idea = {

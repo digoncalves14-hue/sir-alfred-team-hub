@@ -180,6 +180,7 @@ export type Database = {
           categoria: Database["public"]["Enums"]["categoria"] | null
           created_at: string
           data_admissao: string | null
+          data_aniversario: string | null
           email: string
           foto_url: string | null
           id: string
@@ -193,6 +194,7 @@ export type Database = {
           categoria?: Database["public"]["Enums"]["categoria"] | null
           created_at?: string
           data_admissao?: string | null
+          data_aniversario?: string | null
           email: string
           foto_url?: string | null
           id: string
@@ -206,6 +208,7 @@ export type Database = {
           categoria?: Database["public"]["Enums"]["categoria"] | null
           created_at?: string
           data_admissao?: string | null
+          data_aniversario?: string | null
           email?: string
           foto_url?: string | null
           id?: string

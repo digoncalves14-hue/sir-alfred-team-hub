@@ -96,7 +96,7 @@ export const biometric = {
           challenge,
           rpId: window.location.hostname,
           allowCredentials: [
-            { type: "public-key", id: b64urlDecode(stored) },
+            { type: "public-key", id: b64urlDecode(stored).buffer as ArrayBuffer },
           ],
           userVerification: "required",
           timeout: 60000,

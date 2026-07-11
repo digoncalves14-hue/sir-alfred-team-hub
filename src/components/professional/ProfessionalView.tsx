@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Logo } from "../Logo";
-import { LogOut, Home, Megaphone, Star, Trophy, BookOpen, Clock, Brain, Target, Sparkles } from "lucide-react";
+import { LogOut, Home, Megaphone, Star, Trophy, BookOpen, Clock, Brain, Target, Sparkles, Lightbulb } from "lucide-react";
 import PHome from "./tabs/PHome";
 import PAnnouncements from "./tabs/PAnnouncements";
 import PNotes from "./tabs/PNotes";
@@ -9,6 +9,7 @@ import PLibrary from "./tabs/PLibrary";
 import PHistory from "./tabs/PHistory";
 import PBehavioral from "./tabs/PBehavioral";
 import PGoals from "./tabs/PGoals";
+import PIdeas from "./tabs/PIdeas";
 import BestPractices from "@/components/manager/tabs/BestPractices";
 
 const TABS = [
@@ -17,6 +18,7 @@ const TABS = [
   { id: "perfil", label: "Perfil", icon: Brain, C: PBehavioral },
   { id: "metas", label: "Metas", icon: Target, C: PGoals },
   { id: "mural", label: "Mural", icon: Sparkles, C: BestPractices },
+  { id: "ideias", label: "Ideias", icon: Lightbulb, C: PIdeas },
   { id: "notas", label: "Notas", icon: Star, C: PNotes },
   { id: "premios", label: "Prêmios", icon: Trophy, C: PAwards },
   { id: "biblioteca", label: "Biblioteca", icon: BookOpen, C: PLibrary },

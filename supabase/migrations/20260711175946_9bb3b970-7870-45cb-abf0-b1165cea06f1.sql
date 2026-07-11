@@ -1,0 +1,1 @@
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.feedbacks TO authenticated; GRANT ALL ON public.feedbacks TO service_role;

@@ -56,7 +56,7 @@ export default function PIdeas() {
     (counts || []).forEach((c: any) => {
       countMap[c.idea_id] = Number(c.votes) || 0;
     });
-    const enriched: Idea[] = (data || []).map((i: any) => ({ ...i, votes: counts[i.id] || 0 }));
+    const enriched: Idea[] = (data || []).map((i: any) => ({ ...i, votes: countMap[i.id] || 0 }));
     enriched.sort((a, b) => b.votes - a.votes || +new Date(b.created_at) - +new Date(a.created_at));
     setIdeas(enriched);
     setLoading(false);

@@ -40,14 +40,17 @@ export default function Feedbacks() {
 
   useEffect(() => {
     (async () => {
-      const [p, f] = await Promise.all([
+      const [p, f, r] = await Promise.all([
         supabase.from("profiles").select("id,nome,foto_url").order("nome"),
         supabase.from("feedbacks").select("*").order("created_at", { ascending: false }),
+        supabase.from("user_roles").select("user_id").eq("role", "gestor"),
       ]);
       if (p.error) toast.error(p.error.message);
       else {
-        setProfiles((p.data ?? []) as Profile[]);
-        if (p.data?.[0]) setPro(p.data[0].id);
+        const gestorIds = new Set((r.data ?? []).map((x: { user_id: string }) => x.user_id));
+        const filtered = ((p.data ?? []) as Profile[]).filter((x) => !gestorIds.has(x.id));
+        setProfiles(filtered);
+        if (filtered[0]) setPro(filtered[0].id);
       }
       if (f.error) toast.error(f.error.message);
       else setList((f.data ?? []) as Feedback[]);

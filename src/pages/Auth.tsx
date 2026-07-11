@@ -70,6 +70,7 @@ export default function Auth() {
               cargo: parsed.data.cargo,
               unidade: parsed.data.unidade,
               categoria: parsed.data.categoria,
+              data_aniversario: parsed.data.data_aniversario,
             },
           },
         });

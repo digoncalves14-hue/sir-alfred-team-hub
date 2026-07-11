@@ -17,14 +17,17 @@ export default function VoteButton({ ideaId, compact }: Props) {
     (async () => {
       const { data: userRes } = await supabase.auth.getUser();
       const userId = userRes.user?.id ?? null;
-      const { data: votes } = await supabase
-        .from("idea_votes")
-        .select("user_id")
-        .eq("idea_id", ideaId);
+      const [{ data: counts }, { data: mine }] = await Promise.all([
+        supabase.rpc("get_idea_vote_counts"),
+        userId
+          ? supabase.from("idea_votes").select("idea_id").eq("idea_id", ideaId).eq("user_id", userId)
+          : Promise.resolve({ data: [] as any[] }),
+      ]);
       if (!active) return;
+      const row = (counts || []).find((c: any) => c.idea_id === ideaId);
       setUid(userId);
-      setCount(votes?.length ?? 0);
-      setVoted(!!votes?.some((v) => v.user_id === userId));
+      setCount(row ? Number(row.votes) : 0);
+      setVoted((mine?.length ?? 0) > 0);
       setLoading(false);
     })();
     return () => {

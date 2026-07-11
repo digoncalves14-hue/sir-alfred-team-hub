@@ -129,6 +129,10 @@ export default function Auth() {
                   { v: "recepcao", l: "Recepção" },
                 ]} />
               </div>
+              <label className="block">
+                <span className="text-xs text-muted-foreground tracking-wider uppercase ml-1">Data de aniversário</span>
+                <Input aria-label="Data de aniversário" type="date" value={form.data_aniversario} onChange={(v) => update("data_aniversario", v)} />
+              </label>
             </>
           )}
           <Input aria-label="Email" type="email" placeholder="Email" value={form.email} onChange={(v) => update("email", v)} />

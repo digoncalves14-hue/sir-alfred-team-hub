@@ -40,13 +40,25 @@ export default function PIdeas() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("geral");
 
+  const [uid, setUid] = useState<string | null>(null);
+  const [tab, setTab] = useState<"todas" | "minhas">("todas");
+
   const load = async () => {
     setLoading(true);
+    const { data: userRes } = await supabase.auth.getUser();
+    setUid(userRes.user?.id ?? null);
     const { data } = await supabase
       .from("ideas")
       .select("*")
       .order("created_at", { ascending: false });
-    setIdeas(data || []);
+    const { data: votes } = await supabase.from("idea_votes").select("idea_id");
+    const counts: Record<string, number> = {};
+    (votes || []).forEach((v: any) => {
+      counts[v.idea_id] = (counts[v.idea_id] || 0) + 1;
+    });
+    const enriched: Idea[] = (data || []).map((i: any) => ({ ...i, votes: counts[i.id] || 0 }));
+    enriched.sort((a, b) => b.votes - a.votes || +new Date(b.created_at) - +new Date(a.created_at));
+    setIdeas(enriched);
     setLoading(false);
   };
 

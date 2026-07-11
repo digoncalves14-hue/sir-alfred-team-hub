@@ -27,7 +27,7 @@ const Index = () => {
       setBioSupported(supported);
       if (supported && biometric.hasCredential(user.id)) {
         if (!biometric.isUnlockedForSession(user.id)) setNeedsUnlock(true);
-      } else if (supported && !biometric.hasSkipped(user.id)) {
+      } else if (supported) {
         setShowSetup(true);
       }
       setChecked(true);

@@ -151,7 +151,8 @@ export default function Ideas() {
                   </div>
                 )}
 
-                <div className="flex flex-wrap gap-2 pt-1">
+                <div className="flex flex-wrap gap-2 pt-1 items-center">
+                  <VoteButton ideaId={idea.id} />
                   {STATUS.map((s) => (
                     <button
                       key={s.v}

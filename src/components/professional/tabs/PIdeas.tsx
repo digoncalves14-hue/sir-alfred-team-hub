@@ -51,12 +51,12 @@ export default function PIdeas() {
       .from("ideas")
       .select("*")
       .order("created_at", { ascending: false });
-    const { data: votes } = await supabase.from("idea_votes").select("idea_id");
-    const counts: Record<string, number> = {};
-    (votes || []).forEach((v: any) => {
-      counts[v.idea_id] = (counts[v.idea_id] || 0) + 1;
+    const { data: counts } = await supabase.rpc("get_idea_vote_counts");
+    const countMap: Record<string, number> = {};
+    (counts || []).forEach((c: any) => {
+      countMap[c.idea_id] = Number(c.votes) || 0;
     });
-    const enriched: Idea[] = (data || []).map((i: any) => ({ ...i, votes: counts[i.id] || 0 }));
+    const enriched: Idea[] = (data || []).map((i: any) => ({ ...i, votes: countMap[i.id] || 0 }));
     enriched.sort((a, b) => b.votes - a.votes || +new Date(b.created_at) - +new Date(a.created_at));
     setIdeas(enriched);
     setLoading(false);

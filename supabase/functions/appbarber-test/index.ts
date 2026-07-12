@@ -30,13 +30,15 @@ async function call(path: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const results: Record<string, unknown> = {};
-  for (const [unit, code] of Object.entries(UNITS)) {
-    results[unit] = {
-      services: await call(`/v1/services?establishment_code=${code}`),
-      professionals: await call(`/v1/professionals?establishment_code=${code}`),
-    };
-  }
+  const results = {
+    establishment_data: await call('/v1/establishment/data'),
+    branches: await call('/v1/establishment/branches'),
+    services_no_param: await call('/v1/services'),
+    services_birigui: await call('/v1/services?establishment_code=709052'),
+    professionals_no_param: await call('/v1/professionals'),
+    professional_list: await call('/v1/professional-list'),
+    payment_types: await call('/v1/payment-types'),
+  };
 
   return new Response(JSON.stringify(results, null, 2), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },

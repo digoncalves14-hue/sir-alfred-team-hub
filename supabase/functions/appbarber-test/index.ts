@@ -1,12 +1,20 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const API_KEY = Deno.env.get('APPBARBER_API_KEY')!;
-const BASE = 'https://api.appbarber.com';
+const PROXY_URL = Deno.env.get('APPBARBER_PROXY_URL')?.replace(/\/$/, '');
+const PROXY_TOKEN = Deno.env.get('APPBARBER_PROXY_TOKEN');
 const UNITS: Record<string, number> = { Birigui: 709052, Aracatuba: 18653137 };
 
 async function call(path: string) {
-  const r = await fetch(BASE + path, {
-    headers: { 'X-API-Key': API_KEY, 'Accept': 'application/json' },
+  if (!PROXY_URL || !PROXY_TOKEN) {
+    return {
+      path,
+      status: 500,
+      body: { error: 'Proxy AppBarber não configurado' },
+    };
+  }
+
+  const r = await fetch(PROXY_URL + path, {
+    headers: { 'X-Proxy-Token': PROXY_TOKEN, 'Accept': 'application/json' },
   });
   const text = await r.text();
   let body: unknown = text;

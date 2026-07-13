@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Logo } from "../Logo";
-import { LogOut } from "lucide-react";
+import { LogOut, RefreshCw } from "lucide-react";
 import Dashboard from "./tabs/Dashboard";
 import Team from "./tabs/Team";
 import Goals from "./tabs/Goals";

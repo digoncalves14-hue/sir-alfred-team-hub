@@ -1,8 +1,12 @@
+import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
-import { team, updates, birthdays } from "@/data/team";
+import { team, updates } from "@/data/team";
 import { usePhotos } from "@/hooks/usePhotos";
+import { supabase } from "@/integrations/supabase/client";
 import { Users, Star, Trophy, Crown, Cake, Sparkles } from "lucide-react";
+
+type Birthday = { id: string; nome: string; unidade: string | null; data_aniversario: string; day: number; month: number };
 
 const Metric = ({ icon: Icon, label, value, accent }: any) => (
   <Card className="hover:border-gold/50 transition-all">

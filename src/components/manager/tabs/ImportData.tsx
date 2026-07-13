@@ -8,6 +8,15 @@ import { toast } from "sonner";
 import { deleteWithUndo } from "@/lib/deleteWithUndo";
 
 type Row = { Comanda: string | number; Profissional: string; Serviço?: string; Servico?: string; Valor: string | number };
+type ProductRow = {
+  Profissional: string;
+  Produto?: string;
+  Item?: string;
+  Serviço?: string;
+  Servico?: string;
+  Quantidade?: string | number;
+  Valor: string | number;
+};
 
 type Agg = {
   professional_name: string;
@@ -15,6 +24,13 @@ type Agg = {
   comandas_count: number;
   revenue_cents: number;
   top_service: string;
+};
+
+type ProductAgg = {
+  professional_name: string;
+  quantity: number;
+  revenue_cents: number;
+  top_product: string;
 };
 
 const parseValor = (v: string | number): number => {

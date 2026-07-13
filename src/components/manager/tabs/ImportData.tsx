@@ -58,6 +58,12 @@ export default function ImportData() {
   const [saved, setSaved] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Produtos
+  const [productAggs, setProductAggs] = useState<ProductAgg[] | null>(null);
+  const [productFileName, setProductFileName] = useState<string>("");
+  const [savingProducts, setSavingProducts] = useState(false);
+  const productInputRef = useRef<HTMLInputElement>(null);
+
   const loadSaved = useCallback(async () => {
     const { data } = await supabase
       .from("performance_snapshots")
@@ -70,6 +76,54 @@ export default function ImportData() {
   useEffect(() => {
     loadSaved();
   }, [loadSaved]);
+
+  const handleProductFile = async (file: File) => {
+    setProductFileName(file.name);
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<ProductRow>(ws, { defval: "" });
+
+    const byPro = new Map<string, { qty: number; cents: number; prod: Map<string, number> }>();
+    for (const r of rows) {
+      const name = String(r.Profissional || "").trim();
+      if (!name) continue;
+      const produto = String(r.Produto || r.Item || r.Serviço || r.Servico || "").trim();
+      const qty = Number(r.Quantidade ?? 1) || 1;
+      const cents = parseValor(r.Valor);
+      const cur = byPro.get(name) || { qty: 0, cents: 0, prod: new Map<string, number>() };
+      cur.qty += qty;
+      cur.cents += cents;
+      if (produto) cur.prod.set(produto, (cur.prod.get(produto) || 0) + qty);
+      byPro.set(name, cur);
+    }
+
+    const result: ProductAgg[] = Array.from(byPro.entries())
+      .map(([professional_name, v]) => {
+        let top = "";
+        let topN = 0;
+        v.prod.forEach((n, s) => { if (n > topN) { topN = n; top = s; } });
+        return { professional_name, quantity: v.qty, revenue_cents: v.cents, top_product: top };
+      })
+      .sort((a, b) => b.revenue_cents - a.revenue_cents);
+
+    setProductAggs(result);
+    toast.success(`Planilha de produtos lida: ${result.length} profissionais`);
+  };
+
+  const saveProducts = async () => {
+    if (!productAggs || !user) return;
+    setSavingProducts(true);
+    await supabase.from("product_sales_snapshots" as any).delete().eq("period_label", period);
+    const rows = productAggs.map((a) => ({ ...a, period_label: period, created_by: user.id }));
+    const { error } = await supabase.from("product_sales_snapshots" as any).insert(rows);
+    setSavingProducts(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Vendas de produtos de ${period} salvas!`);
+    setProductAggs(null);
+    setProductFileName("");
+    if (productInputRef.current) productInputRef.current.value = "";
+  };
 
   const handleFile = async (file: File) => {
     setFileName(file.name);

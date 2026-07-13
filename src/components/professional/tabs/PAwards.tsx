@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { Crown, Gift, Trophy } from "lucide-react";
+import AutoRankings from "@/components/awards/AutoRankings";
 
 const CATALOG: { quarter: string; gifts: string[]; grand: string }[] = [
   { quarter: "1º Trimestre", gifts: ["Moletom", "Boné", "Camiseta"], grand: "Tesoura Tondeo" },
@@ -40,6 +41,9 @@ export default function PAwards() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Suas premiações" />
+
+      <AutoRankings />
+
       <Card className="text-center border-gold/40">
         <Trophy className="h-12 w-12 text-gold mx-auto mb-2" />
         <p className="text-5xl font-black text-gold">0</p>

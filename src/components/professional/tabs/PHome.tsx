@@ -175,21 +175,26 @@ export default function PHome() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { icon: Target, label: "Clientes mês", v: "—" },
-          { icon: Star, label: "Avaliação", v: "—" },
-          { icon: TrendingUp, label: "Ranking", v: "—" },
-          { icon: Trophy, label: "Premiações", v: 0 },
+          { icon: Target, label: "Clientes mês", v: perf ? String(perf.comandas_count) : "—" },
+          { icon: TrendingUp, label: "Atendimentos", v: perf ? String(perf.services_count) : "—" },
+          { icon: Trophy, label: "Ranking", v: rankPos ? `#${rankPos}` : "—" },
+          { icon: Star, label: "Faturamento", v: perf ? (perf.revenue_cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }) : "—" },
         ].map((m, i) => {
           const Icon = m.icon;
           return (
             <Card key={i} className="text-center">
               <Icon className="h-5 w-5 text-gold mx-auto mb-2" />
-              <p className="text-2xl font-black text-foreground">{m.v}</p>
+              <p className="text-xl font-black text-foreground">{m.v}</p>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{m.label}</p>
             </Card>
           );
         })}
       </div>
+      {perf && (
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground text-center -mt-2">
+          Período: {perf.period_label}{perf.top_service ? ` · Top: ${perf.top_service}` : ""}
+        </p>
+      )}
 
       {birthdays.length > 0 && (
         <Card>

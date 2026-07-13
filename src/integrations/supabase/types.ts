@@ -243,6 +243,42 @@ export type Database = {
         }
         Relationships: []
       }
+      product_sales_snapshots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          period_label: string
+          professional_name: string
+          quantity: number
+          revenue_cents: number
+          top_product: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_label: string
+          professional_name: string
+          quantity?: number
+          revenue_cents?: number
+          top_product?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_label?: string
+          professional_name?: string
+          quantity?: number
+          revenue_cents?: number
+          top_product?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cargo: string | null
@@ -309,6 +345,39 @@ export type Database = {
           id?: string
           mood?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      social_posts_snapshots: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          period_label: string
+          posts_count: number
+          professional_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          period_label: string
+          posts_count?: number
+          professional_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          period_label?: string
+          posts_count?: number
+          professional_name?: string
+          updated_at?: string
         }
         Relationships: []
       }

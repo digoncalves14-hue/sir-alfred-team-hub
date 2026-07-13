@@ -8,6 +8,15 @@ import { toast } from "sonner";
 import { deleteWithUndo } from "@/lib/deleteWithUndo";
 
 type Row = { Comanda: string | number; Profissional: string; Serviço?: string; Servico?: string; Valor: string | number };
+type ProductRow = {
+  Profissional: string;
+  Produto?: string;
+  Item?: string;
+  Serviço?: string;
+  Servico?: string;
+  Quantidade?: string | number;
+  Valor: string | number;
+};
 
 type Agg = {
   professional_name: string;
@@ -15,6 +24,13 @@ type Agg = {
   comandas_count: number;
   revenue_cents: number;
   top_service: string;
+};
+
+type ProductAgg = {
+  professional_name: string;
+  quantity: number;
+  revenue_cents: number;
+  top_product: string;
 };
 
 const parseValor = (v: string | number): number => {
@@ -42,6 +58,12 @@ export default function ImportData() {
   const [saved, setSaved] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Produtos
+  const [productAggs, setProductAggs] = useState<ProductAgg[] | null>(null);
+  const [productFileName, setProductFileName] = useState<string>("");
+  const [savingProducts, setSavingProducts] = useState(false);
+  const productInputRef = useRef<HTMLInputElement>(null);
+
   const loadSaved = useCallback(async () => {
     const { data } = await supabase
       .from("performance_snapshots")
@@ -54,6 +76,54 @@ export default function ImportData() {
   useEffect(() => {
     loadSaved();
   }, [loadSaved]);
+
+  const handleProductFile = async (file: File) => {
+    setProductFileName(file.name);
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<ProductRow>(ws, { defval: "" });
+
+    const byPro = new Map<string, { qty: number; cents: number; prod: Map<string, number> }>();
+    for (const r of rows) {
+      const name = String(r.Profissional || "").trim();
+      if (!name) continue;
+      const produto = String(r.Produto || r.Item || r.Serviço || r.Servico || "").trim();
+      const qty = Number(r.Quantidade ?? 1) || 1;
+      const cents = parseValor(r.Valor);
+      const cur = byPro.get(name) || { qty: 0, cents: 0, prod: new Map<string, number>() };
+      cur.qty += qty;
+      cur.cents += cents;
+      if (produto) cur.prod.set(produto, (cur.prod.get(produto) || 0) + qty);
+      byPro.set(name, cur);
+    }
+
+    const result: ProductAgg[] = Array.from(byPro.entries())
+      .map(([professional_name, v]) => {
+        let top = "";
+        let topN = 0;
+        v.prod.forEach((n, s) => { if (n > topN) { topN = n; top = s; } });
+        return { professional_name, quantity: v.qty, revenue_cents: v.cents, top_product: top };
+      })
+      .sort((a, b) => b.revenue_cents - a.revenue_cents);
+
+    setProductAggs(result);
+    toast.success(`Planilha de produtos lida: ${result.length} profissionais`);
+  };
+
+  const saveProducts = async () => {
+    if (!productAggs || !user) return;
+    setSavingProducts(true);
+    await supabase.from("product_sales_snapshots" as any).delete().eq("period_label", period);
+    const rows = productAggs.map((a) => ({ ...a, period_label: period, created_by: user.id }));
+    const { error } = await supabase.from("product_sales_snapshots" as any).insert(rows);
+    setSavingProducts(false);
+    if (error) return toast.error(error.message);
+    toast.success(`Vendas de produtos de ${period} salvas!`);
+    setProductAggs(null);
+    setProductFileName("");
+    if (productInputRef.current) productInputRef.current.value = "";
+  };
 
   const handleFile = async (file: File) => {
     setFileName(file.name);
@@ -183,6 +253,75 @@ export default function ImportData() {
           </div>
         </div>
       </Card>
+
+      {/* Uploader de Produtos */}
+      <Card className="mb-4 border-gold/30">
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gold mb-1">Vendas de produtos</p>
+            <p className="text-xs text-muted-foreground">2º Excel do AppBarber (Relatório de Vendas de Produtos) — alimenta o ranking "Maior venda de produtos" na aba Prêmios.</p>
+          </div>
+
+          <div>
+            <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gold/40 rounded-lg p-6 cursor-pointer hover:border-gold hover:bg-gold/5 transition">
+              <Upload className="h-5 w-5 text-gold" />
+              <span className="text-sm font-semibold">
+                {productFileName || "Escolher planilha de produtos .xlsx"}
+              </span>
+              <input
+                ref={productInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleProductFile(e.target.files[0])}
+              />
+            </label>
+          </div>
+
+          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
+            <FileSpreadsheet className="h-4 w-4 text-gold shrink-0 mt-0.5" />
+            <p>Colunas aceitas: <strong>Profissional</strong>, <strong>Produto</strong> (ou Item/Serviço), <strong>Quantidade</strong> (opcional) e <strong>Valor</strong>. Usa o mesmo período de referência acima.</p>
+          </div>
+
+          {productAggs && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">{productAggs.length} profissionais · <strong>{period}</strong></p>
+                <button
+                  onClick={saveProducts}
+                  disabled={savingProducts}
+                  className="gradient-gold text-background font-bold px-4 py-1.5 rounded-full text-xs disabled:opacity-50"
+                >
+                  {savingProducts ? "Salvando..." : "Salvar produtos"}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase text-muted-foreground border-b border-border">
+                      <th className="py-2">Profissional</th>
+                      <th className="py-2 text-right">Qtd</th>
+                      <th className="py-2 text-right">Faturamento</th>
+                      <th className="py-2">Top produto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productAggs.map((a) => (
+                      <tr key={a.professional_name} className="border-b border-border/50">
+                        <td className="py-2 font-semibold">{a.professional_name}</td>
+                        <td className="py-2 text-right">{a.quantity}</td>
+                        <td className="py-2 text-right text-gold font-bold">{fmtBRL(a.revenue_cents)}</td>
+                        <td className="py-2 text-xs text-muted-foreground">{a.top_product || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
 
       {aggs && (
         <Card>

@@ -6,6 +6,8 @@ import { usePhotos } from "@/hooks/usePhotos";
 import { supabase } from "@/integrations/supabase/client";
 import { Send, Scissors, Instagram, ShoppingBag, Crown, Camera, X, Trophy, Gift, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import AutoRankings from "@/components/awards/AutoRankings";
+import SocialPostsForm from "@/components/awards/SocialPostsForm";
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
@@ -194,6 +196,9 @@ export default function Awards() {
   return (
     <div className="space-y-6">
       <SectionTitle title="Prêmios" subtitle="Premiações trimestrais por categoria" />
+
+      <AutoRankings />
+      <SocialPostsForm />
 
       <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
         {CATEGORIES.map((c) => {

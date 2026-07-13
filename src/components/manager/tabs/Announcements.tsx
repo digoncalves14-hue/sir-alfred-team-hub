@@ -22,7 +22,7 @@ export default function Announcements() {
       <Card>
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <select value={unit} onChange={(e) => setUnit(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
-            <option>Todas</option><option>Birigui</option><option>Araçatuba</option><option>Penápolis</option><option>Kids</option>
+            <option>Todas</option><option>Birigui</option><option>Araçatuba</option><option>Kids</option>
           </select>
           <select value={type} onChange={(e) => setType(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
             <option>Geral</option><option>Urgente</option><option>Evento</option>

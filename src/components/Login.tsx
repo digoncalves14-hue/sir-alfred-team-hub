@@ -34,7 +34,7 @@ export default function Login({ onSelect }: { onSelect: (v: "manager" | "profess
         </div>
 
         <p className="text-center text-xs text-muted-foreground tracking-widest">
-          BIRIGUI · ARAÇATUBA · PENÁPOLIS
+          BIRIGUI · ARAÇATUBA
         </p>
       </div>
     </div>

@@ -35,16 +35,6 @@ const SEED: Post[] = [
     date: "há 4 dias",
     likes: 27,
   },
-  {
-    id: 3,
-    author: "Diego Martins",
-    unit: "Penápolis",
-    category: "Produtos",
-    title: "Dica de venda: kit pós-corte",
-    content: "Passei a mostrar o produto durante o corte, explicando o uso. A venda passou a ser natural, sem parecer forçada. O cliente sai feliz e volta pra reposição.",
-    date: "há 1 semana",
-    likes: 18,
-  },
 ];
 
 const CATEGORIES = ["Atendimento", "Técnica", "Produtos", "Redes Sociais", "Experiência"];
@@ -117,7 +107,7 @@ export default function BestPractices() {
                 className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm"
               />
               <select value={unit} onChange={(e) => setUnit(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
-                <option>Birigui</option><option>Araçatuba</option><option>Penápolis</option><option>Kids</option>
+                <option>Birigui</option><option>Araçatuba</option><option>Kids</option>
               </select>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
                 {CATEGORIES.map((c) => <option key={c}>{c}</option>)}

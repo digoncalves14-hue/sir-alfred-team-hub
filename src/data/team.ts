@@ -18,8 +18,6 @@ export const team: Professional[] = [
   { id: "diego", name: "Diego", role: "Gestor / Barbeiro", unit: "Birigui / Araçatuba", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "DI", mood: "😐" },
   { id: "luizfelipe", name: "Luiz Felipe", role: "Barbeiro", unit: "Birigui", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "LF", mood: "😐" },
   { id: "karitta", name: "Karitta", role: "Barbeira", unit: "Birigui", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "KA", mood: "😐" },
-  { id: "diegorios", name: "Diego Rios", role: "Barbeiro", unit: "Penápolis", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "DR", mood: "😐" },
-  { id: "rocha", name: "Rocha", role: "Barbeiro", unit: "Penápolis", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "RO", mood: "😐" },
   { id: "matheus", name: "Matheus", role: "Barbeiro", unit: "Araçatuba", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "MA", mood: "😐" },
   { id: "larissa", name: "Larissa", role: "Gestora / Cabeleireira", unit: "Kids", clients: 0, goal: 0, rating: 0, rank: 0, category: "support", initials: "LA", mood: "😐" },
   { id: "thyffannys", name: "Thyffannys", role: "Secretaria / Manicure", unit: "Birigui", clients: 0, goal: 0, rating: 0, rank: 0, category: "support", initials: "TY", mood: "😐" },

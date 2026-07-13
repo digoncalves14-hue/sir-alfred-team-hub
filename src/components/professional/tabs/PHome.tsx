@@ -111,6 +111,34 @@ export default function PHome() {
       .then(({ data }) => {
         if (data?.mood) setPulse(data.mood);
       });
+
+    // Desempenho importado do AppBarber (mais recente)
+    supabase
+      .from("performance_snapshots")
+      .select("period_label, professional_name, services_count, comandas_count, revenue_cents, top_service, created_at")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const latestPeriod = data[0].period_label;
+        const rows = data.filter((r) => r.period_label === latestPeriod);
+        supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle().then(({ data: p }) => {
+          const myName = normalize(p?.nome ?? "");
+          if (!myName) return;
+          const sorted = [...rows].sort((a, b) => b.comandas_count - a.comandas_count);
+          const mineIdx = sorted.findIndex((r) => normalize(r.professional_name).includes(myName) || myName.includes(normalize(r.professional_name).split(" ")[0]));
+          if (mineIdx >= 0) {
+            const mine = sorted[mineIdx];
+            setPerf({
+              period_label: mine.period_label,
+              services_count: mine.services_count,
+              comandas_count: mine.comandas_count,
+              revenue_cents: mine.revenue_cents,
+              top_service: mine.top_service,
+            });
+            setRankPos(mineIdx + 1);
+          }
+        });
+      });
   }, [user]);
 
   const savePulse = async (m: string) => {

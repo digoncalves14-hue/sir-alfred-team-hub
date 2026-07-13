@@ -254,6 +254,75 @@ export default function ImportData() {
         </div>
       </Card>
 
+      {/* Uploader de Produtos */}
+      <Card className="mb-4 border-gold/30">
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-gold mb-1">Vendas de produtos</p>
+            <p className="text-xs text-muted-foreground">2º Excel do AppBarber (Relatório de Vendas de Produtos) — alimenta o ranking "Maior venda de produtos" na aba Prêmios.</p>
+          </div>
+
+          <div>
+            <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gold/40 rounded-lg p-6 cursor-pointer hover:border-gold hover:bg-gold/5 transition">
+              <Upload className="h-5 w-5 text-gold" />
+              <span className="text-sm font-semibold">
+                {productFileName || "Escolher planilha de produtos .xlsx"}
+              </span>
+              <input
+                ref={productInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleProductFile(e.target.files[0])}
+              />
+            </label>
+          </div>
+
+          <div className="flex items-start gap-2 text-xs text-muted-foreground bg-secondary/50 rounded-lg p-3">
+            <FileSpreadsheet className="h-4 w-4 text-gold shrink-0 mt-0.5" />
+            <p>Colunas aceitas: <strong>Profissional</strong>, <strong>Produto</strong> (ou Item/Serviço), <strong>Quantidade</strong> (opcional) e <strong>Valor</strong>. Usa o mesmo período de referência acima.</p>
+          </div>
+
+          {productAggs && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">{productAggs.length} profissionais · <strong>{period}</strong></p>
+                <button
+                  onClick={saveProducts}
+                  disabled={savingProducts}
+                  className="gradient-gold text-background font-bold px-4 py-1.5 rounded-full text-xs disabled:opacity-50"
+                >
+                  {savingProducts ? "Salvando..." : "Salvar produtos"}
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs uppercase text-muted-foreground border-b border-border">
+                      <th className="py-2">Profissional</th>
+                      <th className="py-2 text-right">Qtd</th>
+                      <th className="py-2 text-right">Faturamento</th>
+                      <th className="py-2">Top produto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productAggs.map((a) => (
+                      <tr key={a.professional_name} className="border-b border-border/50">
+                        <td className="py-2 font-semibold">{a.professional_name}</td>
+                        <td className="py-2 text-right">{a.quantity}</td>
+                        <td className="py-2 text-right text-gold font-bold">{fmtBRL(a.revenue_cents)}</td>
+                        <td className="py-2 text-xs text-muted-foreground">{a.top_product || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+
       {aggs && (
         <Card>
           <div className="flex items-center justify-between mb-4">

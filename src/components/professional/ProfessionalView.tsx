@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Logo } from "../Logo";
-import { LogOut, Home, Megaphone, Star, Trophy, BookOpen, Clock, Brain, Target, Sparkles, Lightbulb } from "lucide-react";
+import { LogOut, Home, Megaphone, Star, Trophy, BookOpen, Clock, Brain, Target, Sparkles, Lightbulb, RefreshCw } from "lucide-react";
 import PHome from "./tabs/PHome";
 import PAnnouncements from "./tabs/PAnnouncements";
 import PNotes from "./tabs/PNotes";

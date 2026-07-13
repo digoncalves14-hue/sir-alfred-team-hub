@@ -34,6 +34,7 @@ const TABS = [
   { id: "biblioteca", label: "Biblioteca", C: Library },
   { id: "historico", label: "Histórico", C: History },
   { id: "pops", label: "POPs", C: Pops },
+  { id: "importar", label: "Importar dados", C: ImportData },
 ];
 
 export default function ManagerView({ onLogout }: { onLogout: () => void }) {

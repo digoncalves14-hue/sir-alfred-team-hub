@@ -15,7 +15,7 @@ export type Professional = {
 export const team: Professional[] = [
   { id: "thiago", name: "Thiago", role: "Barbeiro", unit: "Araçatuba+Birigui", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "TH", mood: "😐" },
   { id: "lucas", name: "Lucas", role: "Barbeiro", unit: "Birigui", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "LU", mood: "😐" },
-  { id: "diego", name: "Diego", role: "Gestor / Barbeiro", unit: "Birigui / Araçatuba", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "DI", mood: "😐" },
+  
   { id: "luizfelipe", name: "Luiz Felipe", role: "Barbeiro", unit: "Birigui", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "LF", mood: "😐" },
   { id: "karitta", name: "Karitta", role: "Barbeira", unit: "Birigui", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "KA", mood: "😐" },
   { id: "matheus", name: "Matheus", role: "Barbeiro", unit: "Araçatuba", clients: 0, goal: 0, rating: 0, rank: 0, category: "barber", initials: "MA", mood: "😐" },

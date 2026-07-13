@@ -248,6 +248,18 @@ export default function PHome() {
         </Card>
       </div>
 
+      <Card className="border-gold/30 bg-gold/5">
+        <div className="flex items-start gap-3">
+          <HelpCircle className="h-5 w-5 text-gold shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-gold">Como marcar meu pulso do dia</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Toque no emoji que melhor representa como você está hoje (abaixo). Você pode alterar a qualquer momento até o fim do dia.
+            </p>
+          </div>
+        </div>
+      </Card>
+
       <Card>
         <p className="text-sm font-bold mb-3">Como você está hoje?</p>
         <div className="flex justify-between gap-2">

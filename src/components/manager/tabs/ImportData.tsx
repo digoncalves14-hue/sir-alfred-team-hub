@@ -110,7 +110,36 @@ export default function ImportData() {
       setAggs(null);
       setFileName("");
       if (inputRef.current) inputRef.current.value = "";
+      loadSaved();
     }
+  };
+
+  const removeSnapshot = async (row: any) => {
+    if (!confirm(`Excluir "${row.professional_name}" (${row.period_label})?`)) return;
+    await deleteWithUndo({
+      table: "performance_snapshots",
+      rows: [row],
+      onDeleted: () => setSaved((prev) => prev.filter((r) => r.id !== row.id)),
+      onRestored: (rows) => setSaved((prev) => [...(rows as any[]), ...prev]),
+      label: `${row.professional_name} excluído`,
+      description: `Toque em "Desfazer" para recuperar (${row.period_label}).`,
+      duration: 12000,
+    });
+  };
+
+  const removePeriod = async (periodLabel: string) => {
+    const rows = saved.filter((r) => r.period_label === periodLabel);
+    if (!rows.length) return;
+    if (!confirm(`Excluir todos os ${rows.length} registros de ${periodLabel}?`)) return;
+    await deleteWithUndo({
+      table: "performance_snapshots",
+      rows,
+      onDeleted: () => setSaved((prev) => prev.filter((r) => r.period_label !== periodLabel)),
+      onRestored: (rows) => setSaved((prev) => [...(rows as any[]), ...prev]),
+      label: `Período ${periodLabel} excluído`,
+      description: "Toque em \"Desfazer\" para recuperar.",
+      duration: 12000,
+    });
   };
 
   return (

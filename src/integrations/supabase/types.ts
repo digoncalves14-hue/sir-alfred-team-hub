@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          author_id: string
+          created_at: string
+          id: string
+          message: string
+          type: string
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          id?: string
+          message: string
+          type?: string
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          id?: string
+          message?: string
+          type?: string
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       award_catalog_photos: {
         Row: {
           created_at: string
@@ -216,6 +246,30 @@ export type Database = {
           telefone?: string | null
           unidade?: Database["public"]["Enums"]["unidade"] | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      pulses: {
+        Row: {
+          created_at: string
+          day: string
+          id: string
+          mood: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day?: string
+          id?: string
+          mood: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          id?: string
+          mood?: string
+          user_id?: string
         }
         Relationships: []
       }

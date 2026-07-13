@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui-kit";
-import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake } from "lucide-react";
+import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake, HelpCircle } from "lucide-react";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { usePhotos } from "@/hooks/usePhotos";

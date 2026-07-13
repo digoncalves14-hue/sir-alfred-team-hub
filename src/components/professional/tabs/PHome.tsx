@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui-kit";
-import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake } from "lucide-react";
+import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake, HelpCircle } from "lucide-react";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { usePhotos } from "@/hooks/usePhotos";
@@ -247,6 +247,18 @@ export default function PHome() {
           )}
         </Card>
       </div>
+
+      <Card className="border-gold/30 bg-gold/5">
+        <div className="flex items-start gap-3">
+          <HelpCircle className="h-5 w-5 text-gold shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-gold">Como marcar meu pulso do dia</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Toque no emoji que melhor representa como você está hoje (abaixo). Você pode alterar a qualquer momento até o fim do dia.
+            </p>
+          </div>
+        </div>
+      </Card>
 
       <Card>
         <p className="text-sm font-bold mb-3">Como você está hoje?</p>

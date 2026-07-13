@@ -4,6 +4,7 @@ import { Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { deleteWithUndo } from "@/lib/deleteWithUndo";
 
 type Announcement = {
   id: string;
@@ -60,9 +61,16 @@ export default function Announcements() {
   };
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from("announcements").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    setList((prev) => prev.filter((a) => a.id !== id));
+    const row = list.find((a) => a.id === id);
+    if (!row) return;
+    const snapshot = list;
+    await deleteWithUndo({
+      table: "announcements",
+      rows: [row],
+      onDeleted: () => setList((prev) => prev.filter((a) => a.id !== id)),
+      onRestored: () => setList(snapshot),
+      label: "Comunicado excluído",
+    });
   };
 
   return (

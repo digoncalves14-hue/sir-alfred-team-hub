@@ -16,6 +16,7 @@ import Pops from "./tabs/Pops";
 import BehavioralProfile from "./tabs/BehavioralProfile";
 import BestPractices from "./tabs/BestPractices";
 import Ideas from "./tabs/Ideas";
+import ImportData from "./tabs/ImportData";
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },

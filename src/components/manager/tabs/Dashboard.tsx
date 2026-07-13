@@ -90,12 +90,14 @@ export default function Dashboard() {
           {birthdays.length ? (
             <div className="space-y-3">
               {birthdays.map((b) => (
-                <div key={b.name} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
+                <div key={b.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
                   <div>
-                    <p className="font-semibold">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">{b.unit}</p>
+                    <p className="font-semibold">{b.nome}</p>
+                    <p className="text-xs text-muted-foreground">{b.unidade ?? ""}</p>
                   </div>
-                  <span className="text-sm text-gold font-bold">em {b.days} dias</span>
+                  <span className="text-sm text-gold font-bold">
+                    {String(b.day).padStart(2, "0")}/{String(b.month).padStart(2, "0")}
+                  </span>
                 </div>
               ))}
             </div>

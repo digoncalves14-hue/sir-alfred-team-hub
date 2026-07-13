@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Lightbulb, Loader2, Trash2 } from "lucide-react";
 import VoteButton from "@/components/ideas/VoteButton";
 import { toast } from "sonner";
+import { deleteWithUndo } from "@/lib/deleteWithUndo";
 
 type Idea = {
   id: string;
@@ -82,9 +83,15 @@ export default function Ideas() {
 
   const removeIdea = async (id: string) => {
     if (!confirm("Excluir esta sugestão?")) return;
-    const { error } = await supabase.from("ideas").delete().eq("id", id);
-    if (error) return toast.error("Erro ao excluir");
-    setIdeas((prev) => prev.filter((i) => i.id !== id));
+    const row = ideas.find((i) => i.id === id);
+    if (!row) return;
+    await deleteWithUndo({
+      table: "ideas",
+      rows: [row],
+      onDeleted: () => setIdeas((prev) => prev.filter((i) => i.id !== id)),
+      onRestored: (rows) => setIdeas((prev) => [...rows as any, ...prev]),
+      label: "Sugestão excluída",
+    });
   };
 
   const visible = filter === "todas" ? ideas : ideas.filter((i) => i.status === filter);

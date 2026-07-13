@@ -4,6 +4,7 @@ import { Send, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { deleteWithUndo } from "@/lib/deleteWithUndo";
 
 type Announcement = {
   id: string;

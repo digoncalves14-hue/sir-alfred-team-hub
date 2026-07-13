@@ -22,7 +22,7 @@ const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
   { id: "equipe", label: "Equipe", C: Team },
   { id: "perfil-comportamental", label: "Perfil Comportamental", C: BehavioralProfile },
-  { id: "metas", label: "Metas", C: Goals },
+  { id: "metas", label: "Desempenho", C: Goals },
   { id: "pulso", label: "Pulso", C: Pulse },
   { id: "avisos", label: "Avisos", C: Announcements },
   { id: "mural", label: "Mural de Boas Práticas", C: BestPractices },

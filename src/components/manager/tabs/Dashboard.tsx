@@ -1,8 +1,12 @@
+import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
-import { team, updates, birthdays } from "@/data/team";
+import { team, updates } from "@/data/team";
 import { usePhotos } from "@/hooks/usePhotos";
+import { supabase } from "@/integrations/supabase/client";
 import { Users, Star, Trophy, Crown, Cake, Sparkles } from "lucide-react";
+
+type Birthday = { id: string; nome: string; unidade: string | null; data_aniversario: string; day: number; month: number };
 
 const Metric = ({ icon: Icon, label, value, accent }: any) => (
   <Card className="hover:border-gold/50 transition-all">
@@ -22,12 +26,32 @@ const Empty = ({ text }: { text: string }) => (
 
 export default function Dashboard() {
   const { getPhoto } = usePhotos();
+  const [birthdays, setBirthdays] = useState<Birthday[]>([]);
   const avg = team.length ? (team.reduce((s, t) => s + t.rating, 0) / team.length).toFixed(1) : "—";
   const star = team[0];
+
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("id, nome, unidade, data_aniversario")
+      .not("data_aniversario", "is", null)
+      .then(({ data }) => {
+        const month = new Date().getMonth() + 1;
+        const list = (data ?? [])
+          .filter((p) => p.data_aniversario && Number(p.data_aniversario.split("-")[1]) === month)
+          .map((p) => {
+            const [, m, d] = p.data_aniversario!.split("-").map(Number);
+            return { id: p.id, nome: p.nome, unidade: p.unidade, data_aniversario: p.data_aniversario!, day: d, month: m };
+          })
+          .sort((a, b) => a.day - b.day);
+        setBirthdays(list);
+      });
+  }, []);
 
   return (
     <div className="space-y-6">
       <SectionTitle title="Painel Geral" subtitle="Visão consolidada da rede Sir Alfred" />
+
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <Metric icon={Users} label="Profissionais" value={team.length} />
@@ -66,12 +90,14 @@ export default function Dashboard() {
           {birthdays.length ? (
             <div className="space-y-3">
               {birthdays.map((b) => (
-                <div key={b.name} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
+                <div key={b.id} className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl">
                   <div>
-                    <p className="font-semibold">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">{b.unit}</p>
+                    <p className="font-semibold">{b.nome}</p>
+                    <p className="text-xs text-muted-foreground">{b.unidade ?? ""}</p>
                   </div>
-                  <span className="text-sm text-gold font-bold">em {b.days} dias</span>
+                  <span className="text-sm text-gold font-bold">
+                    {String(b.day).padStart(2, "0")}/{String(b.month).padStart(2, "0")}
+                  </span>
                 </div>
               ))}
             </div>

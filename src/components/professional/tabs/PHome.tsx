@@ -5,7 +5,7 @@ import { AvatarUpload } from "@/components/AvatarUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { usePhotos } from "@/hooks/usePhotos";
 import { supabase } from "@/integrations/supabase/client";
-import { announcements } from "@/data/team";
+import { toast } from "sonner";
 
 const moods = ["😁", "😊", "😐", "😔", "😤"];
 
@@ -20,6 +20,15 @@ const TYPE_LABEL: Record<string, string> = {
 
 type BirthdayProfile = { id: string; nome: string; foto_url: string | null; data_aniversario: string };
 type LastFeedback = { type: string; message: string; created_at: string };
+type LastAnnouncement = { unit: string; type: string; message: string; created_at: string };
+
+const todayBR = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 
 export default function PHome() {
   const { user } = useAuth();
@@ -29,7 +38,9 @@ export default function PHome() {
   const [unit, setUnit] = useState<string>("");
   const [birthdays, setBirthdays] = useState<BirthdayProfile[]>([]);
   const [lastFeedback, setLastFeedback] = useState<LastFeedback | null>(null);
+  const [lastAnnouncement, setLastAnnouncement] = useState<LastAnnouncement | null>(null);
   const [pulse, setPulse] = useState<string | null>(null);
+  const [savingPulse, setSavingPulse] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -56,6 +67,16 @@ export default function PHome() {
       });
 
     supabase
+      .from("announcements")
+      .select("unit, type, message, created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setLastAnnouncement(data as LastAnnouncement);
+      });
+
+    supabase
       .from("profiles")
       .select("id, nome, foto_url, data_aniversario")
       .not("data_aniversario", "is", null)
@@ -74,9 +95,28 @@ export default function PHome() {
           ) as BirthdayProfile[];
         setBirthdays(list);
       });
+
+    supabase
+      .from("pulses")
+      .select("mood")
+      .eq("user_id", user.id)
+      .eq("day", todayBR())
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.mood) setPulse(data.mood);
+      });
   }, [user]);
 
-  const lastAnnouncement = announcements[0];
+  const savePulse = async (m: string) => {
+    if (!user) return;
+    setPulse(m);
+    setSavingPulse(true);
+    const { error } = await supabase
+      .from("pulses")
+      .upsert({ user_id: user.id, day: todayBR(), mood: m }, { onConflict: "user_id,day" });
+    setSavingPulse(false);
+    if (error) toast.error(error.message);
+  };
 
   return (
     <div className="space-y-6">
@@ -145,9 +185,9 @@ export default function PHome() {
           {lastAnnouncement ? (
             <div>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                {lastAnnouncement.unit} · {lastAnnouncement.date}
+                {lastAnnouncement.type} · {lastAnnouncement.unit} · {new Date(lastAnnouncement.created_at).toLocaleDateString("pt-BR")}
               </p>
-              <p className="text-sm">{lastAnnouncement.message}</p>
+              <p className="text-sm whitespace-pre-wrap">{lastAnnouncement.message}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground italic">Nenhum aviso publicado ainda.</p>
@@ -161,7 +201,7 @@ export default function PHome() {
                 {TYPE_LABEL[lastFeedback.type] ?? lastFeedback.type} ·{" "}
                 {new Date(lastFeedback.created_at).toLocaleDateString("pt-BR")}
               </p>
-              <p className="text-sm">{lastFeedback.message}</p>
+              <p className="text-sm whitespace-pre-wrap">{lastFeedback.message}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground italic">Nenhum feedback recebido ainda.</p>
@@ -173,10 +213,17 @@ export default function PHome() {
         <p className="text-sm font-bold mb-3">Como você está hoje?</p>
         <div className="flex justify-between gap-2">
           {moods.map((m) => (
-            <button key={m} onClick={() => setPulse(m)} className={`text-3xl sm:text-4xl p-3 rounded-2xl flex-1 transition-all ${pulse === m ? "bg-gold/20 scale-110 ring-2 ring-gold" : "bg-secondary hover:bg-secondary/80"}`}>{m}</button>
+            <button
+              key={m}
+              onClick={() => savePulse(m)}
+              disabled={savingPulse}
+              className={`text-3xl sm:text-4xl p-3 rounded-2xl flex-1 transition-all ${pulse === m ? "bg-gold/20 scale-110 ring-2 ring-gold" : "bg-secondary hover:bg-secondary/80"}`}
+            >
+              {m}
+            </button>
           ))}
         </div>
-        {pulse && <p className="text-center text-xs text-success mt-3 animate-fade-in">✓ Pulso registrado</p>}
+        {pulse && <p className="text-center text-xs text-success mt-3 animate-fade-in">✓ Pulso registrado hoje</p>}
       </Card>
     </div>
   );

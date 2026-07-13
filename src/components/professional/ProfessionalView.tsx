@@ -16,7 +16,7 @@ const TABS = [
   { id: "inicio", label: "Início", icon: Home, C: PHome },
   { id: "avisos", label: "Avisos", icon: Megaphone, C: PAnnouncements },
   { id: "perfil", label: "Perfil", icon: Brain, C: PBehavioral },
-  { id: "metas", label: "Meu Desempenho", icon: Target, C: PGoals },
+  { id: "metas", label: "Desempenho", icon: Target, C: PGoals },
   { id: "mural", label: "Mural", icon: Sparkles, C: BestPractices },
   { id: "ideias", label: "Ideias", icon: Lightbulb, C: PIdeas },
   { id: "notas", label: "Notas", icon: Star, C: PNotes },

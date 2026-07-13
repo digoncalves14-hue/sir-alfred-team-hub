@@ -16,6 +16,7 @@ import Pops from "./tabs/Pops";
 import BehavioralProfile from "./tabs/BehavioralProfile";
 import BestPractices from "./tabs/BestPractices";
 import Ideas from "./tabs/Ideas";
+import ImportData from "./tabs/ImportData";
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
@@ -33,6 +34,7 @@ const TABS = [
   { id: "biblioteca", label: "Biblioteca", C: Library },
   { id: "historico", label: "Histórico", C: History },
   { id: "pops", label: "POPs", C: Pops },
+  { id: "importar", label: "Importar dados", C: ImportData },
 ];
 
 export default function ManagerView({ onLogout }: { onLogout: () => void }) {

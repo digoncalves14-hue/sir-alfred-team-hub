@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<string, string> = {
 type BirthdayProfile = { id: string; nome: string; foto_url: string | null; data_aniversario: string };
 type LastFeedback = { type: string; message: string; created_at: string };
 type LastAnnouncement = { unit: string; type: string; message: string; created_at: string };
+type Perf = { period_label: string; services_count: number; comandas_count: number; revenue_cents: number; top_service: string | null };
 
 const todayBR = () => {
   const d = new Date();
@@ -29,6 +30,9 @@ const todayBR = () => {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
+
+const normalize = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 export default function PHome() {
   const { user } = useAuth();
@@ -41,6 +45,8 @@ export default function PHome() {
   const [lastAnnouncement, setLastAnnouncement] = useState<LastAnnouncement | null>(null);
   const [pulse, setPulse] = useState<string | null>(null);
   const [savingPulse, setSavingPulse] = useState(false);
+  const [perf, setPerf] = useState<Perf | null>(null);
+  const [rankPos, setRankPos] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -105,6 +111,34 @@ export default function PHome() {
       .then(({ data }) => {
         if (data?.mood) setPulse(data.mood);
       });
+
+    // Desempenho importado do AppBarber (mais recente)
+    supabase
+      .from("performance_snapshots")
+      .select("period_label, professional_name, services_count, comandas_count, revenue_cents, top_service, created_at")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const latestPeriod = data[0].period_label;
+        const rows = data.filter((r) => r.period_label === latestPeriod);
+        supabase.from("profiles").select("nome").eq("id", user.id).maybeSingle().then(({ data: p }) => {
+          const myName = normalize(p?.nome ?? "");
+          if (!myName) return;
+          const sorted = [...rows].sort((a, b) => b.comandas_count - a.comandas_count);
+          const mineIdx = sorted.findIndex((r) => normalize(r.professional_name).includes(myName) || myName.includes(normalize(r.professional_name).split(" ")[0]));
+          if (mineIdx >= 0) {
+            const mine = sorted[mineIdx];
+            setPerf({
+              period_label: mine.period_label,
+              services_count: mine.services_count,
+              comandas_count: mine.comandas_count,
+              revenue_cents: mine.revenue_cents,
+              top_service: mine.top_service,
+            });
+            setRankPos(mineIdx + 1);
+          }
+        });
+      });
   }, [user]);
 
   const savePulse = async (m: string) => {
@@ -141,21 +175,26 @@ export default function PHome() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { icon: Target, label: "Clientes mês", v: "—" },
-          { icon: Star, label: "Avaliação", v: "—" },
-          { icon: TrendingUp, label: "Ranking", v: "—" },
-          { icon: Trophy, label: "Premiações", v: 0 },
+          { icon: Target, label: "Clientes mês", v: perf ? String(perf.comandas_count) : "—" },
+          { icon: TrendingUp, label: "Atendimentos", v: perf ? String(perf.services_count) : "—" },
+          { icon: Trophy, label: "Ranking", v: rankPos ? `#${rankPos}` : "—" },
+          { icon: Star, label: "Faturamento", v: perf ? (perf.revenue_cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }) : "—" },
         ].map((m, i) => {
           const Icon = m.icon;
           return (
             <Card key={i} className="text-center">
               <Icon className="h-5 w-5 text-gold mx-auto mb-2" />
-              <p className="text-2xl font-black text-foreground">{m.v}</p>
+              <p className="text-xl font-black text-foreground">{m.v}</p>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1">{m.label}</p>
             </Card>
           );
         })}
       </div>
+      {perf && (
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground text-center -mt-2">
+          Período: {perf.period_label}{perf.top_service ? ` · Top: ${perf.top_service}` : ""}
+        </p>
+      )}
 
       {birthdays.length > 0 && (
         <Card>

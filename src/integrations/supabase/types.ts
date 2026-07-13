@@ -204,6 +204,45 @@ export type Database = {
         }
         Relationships: []
       }
+      performance_snapshots: {
+        Row: {
+          comandas_count: number
+          created_at: string
+          created_by: string | null
+          id: string
+          period_label: string
+          professional_name: string
+          revenue_cents: number
+          services_count: number
+          top_service: string | null
+          updated_at: string
+        }
+        Insert: {
+          comandas_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_label: string
+          professional_name: string
+          revenue_cents?: number
+          services_count?: number
+          top_service?: string | null
+          updated_at?: string
+        }
+        Update: {
+          comandas_count?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          period_label?: string
+          professional_name?: string
+          revenue_cents?: number
+          services_count?: number
+          top_service?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cargo: string | null

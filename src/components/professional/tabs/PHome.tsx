@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui-kit";
-import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle } from "lucide-react";
+import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake } from "lucide-react";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { usePhotos } from "@/hooks/usePhotos";
 import { supabase } from "@/integrations/supabase/client";
+import { announcements } from "@/data/team";
 
 const moods = ["😁", "😊", "😐", "😔", "😤"];
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "SA";
+
+const TYPE_LABEL: Record<string, string> = {
+  Positivo: "Positivo",
+  Melhoria: "Sugestão",
+  Tecnico: "Técnico",
+};
+
+type BirthdayProfile = { id: string; nome: string; foto_url: string | null; data_aniversario: string };
+type LastFeedback = { type: string; message: string; created_at: string };
 
 export default function PHome() {
   const { user } = useAuth();
@@ -17,6 +27,9 @@ export default function PHome() {
   const [profileName, setProfileName] = useState<string>("");
   const [role, setRole] = useState<string>("");
   const [unit, setUnit] = useState<string>("");
+  const [birthdays, setBirthdays] = useState<BirthdayProfile[]>([]);
+  const [lastFeedback, setLastFeedback] = useState<LastFeedback | null>(null);
+  const [pulse, setPulse] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -30,9 +43,40 @@ export default function PHome() {
         if (data?.cargo) setRole(data.cargo);
         if (data?.unidade) setUnit(data.unidade);
       });
+
+    supabase
+      .from("feedbacks")
+      .select("type, message, created_at")
+      .eq("professional_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setLastFeedback(data as LastFeedback);
+      });
+
+    supabase
+      .from("profiles")
+      .select("id, nome, foto_url, data_aniversario")
+      .not("data_aniversario", "is", null)
+      .then(({ data }) => {
+        const month = new Date().getMonth() + 1;
+        const list = (data ?? [])
+          .filter((p) => {
+            if (!p.data_aniversario) return false;
+            const [, m] = p.data_aniversario.split("-").map(Number);
+            return m === month;
+          })
+          .sort(
+            (a, b) =>
+              Number(a.data_aniversario!.split("-")[2]) -
+              Number(b.data_aniversario!.split("-")[2])
+          ) as BirthdayProfile[];
+        setBirthdays(list);
+      });
   }, [user]);
 
-  const [pulse, setPulse] = useState<string | null>(null);
+  const lastAnnouncement = announcements[0];
 
   return (
     <div className="space-y-6">
@@ -73,14 +117,55 @@ export default function PHome() {
         })}
       </div>
 
+      {birthdays.length > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 text-gold mb-3">
+            <Cake className="h-4 w-4" />
+            <span className="text-xs font-bold uppercase tracking-widest">Aniversariantes do mês</span>
+          </div>
+          <div className="space-y-2">
+            {birthdays.map((b) => {
+              const [, m, d] = b.data_aniversario.split("-").map(Number);
+              return (
+                <div key={b.id} className="flex items-center justify-between text-sm">
+                  <span className="font-semibold">{b.nome}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {String(d).padStart(2, "0")}/{String(m).padStart(2, "0")}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>
           <div className="flex items-center gap-2 text-gold mb-3"><Megaphone className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-widest">Último aviso</span></div>
-          <p className="text-sm text-muted-foreground italic">Nenhum aviso publicado ainda.</p>
+          {lastAnnouncement ? (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                {lastAnnouncement.unit} · {lastAnnouncement.date}
+              </p>
+              <p className="text-sm">{lastAnnouncement.message}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">Nenhum aviso publicado ainda.</p>
+          )}
         </Card>
         <Card>
           <div className="flex items-center gap-2 text-gold mb-3"><MessageCircle className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-widest">Último feedback</span></div>
-          <p className="text-sm text-muted-foreground italic">Nenhum feedback recebido ainda.</p>
+          {lastFeedback ? (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-gold mb-1">
+                {TYPE_LABEL[lastFeedback.type] ?? lastFeedback.type} ·{" "}
+                {new Date(lastFeedback.created_at).toLocaleDateString("pt-BR")}
+              </p>
+              <p className="text-sm">{lastFeedback.message}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">Nenhum feedback recebido ainda.</p>
+          )}
         </Card>
       </div>
 

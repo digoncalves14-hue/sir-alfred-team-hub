@@ -49,7 +49,7 @@ export default function AutoRankings() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <RankingCard title="Maior nº de cortes" icon={<Scissors className="h-4 w-4" />} block={cortes} emptyHint="Importe o Excel de profissionais." />
+        <RankingCard title="Maior nº de serviços" icon={<Scissors className="h-4 w-4" />} block={cortes} emptyHint="Importe o Excel de profissionais." />
         <RankingCard title="Maior venda de produtos" icon={<ShoppingBag className="h-4 w-4" />} block={vendas} emptyHint="Importe o Excel de produtos." />
         <RankingCard title="Maior postagem em redes" icon={<Instagram className="h-4 w-4" />} block={redes} emptyHint="Registre os posts do mês." />
       </div>

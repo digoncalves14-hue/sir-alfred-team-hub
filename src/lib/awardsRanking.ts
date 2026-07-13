@@ -34,7 +34,7 @@ export async function fetchCortesRanking(): Promise<{ period: string | null; row
     rows: (data ?? []).map((r: any) => ({
       professional_name: r.professional_name,
       value: r.services_count,
-      suffix: "cortes",
+      suffix: "serviços",
     })),
   };
 }

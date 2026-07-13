@@ -13,7 +13,7 @@ const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
 
 const CATEGORIES = [
-  { id: "cortes", label: "Maior nº de cortes", icon: Scissors },
+  { id: "cortes", label: "Maior nº de serviços", icon: Scissors },
   { id: "redes", label: "Maior postagem em redes", icon: Instagram },
   { id: "vendas", label: "Maior venda de produtos", icon: ShoppingBag },
   { id: "trimestre", label: "Prêmio do trimestre", icon: Crown },

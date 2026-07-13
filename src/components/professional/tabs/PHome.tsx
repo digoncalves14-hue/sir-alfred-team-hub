@@ -21,6 +21,7 @@ const TYPE_LABEL: Record<string, string> = {
 type BirthdayProfile = { id: string; nome: string; foto_url: string | null; data_aniversario: string };
 type LastFeedback = { type: string; message: string; created_at: string };
 type LastAnnouncement = { unit: string; type: string; message: string; created_at: string };
+type Perf = { period_label: string; services_count: number; comandas_count: number; revenue_cents: number; top_service: string | null };
 
 const todayBR = () => {
   const d = new Date();
@@ -29,6 +30,9 @@ const todayBR = () => {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 };
+
+const normalize = (s: string) =>
+  s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 export default function PHome() {
   const { user } = useAuth();
@@ -41,6 +45,8 @@ export default function PHome() {
   const [lastAnnouncement, setLastAnnouncement] = useState<LastAnnouncement | null>(null);
   const [pulse, setPulse] = useState<string | null>(null);
   const [savingPulse, setSavingPulse] = useState(false);
+  const [perf, setPerf] = useState<Perf | null>(null);
+  const [rankPos, setRankPos] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;

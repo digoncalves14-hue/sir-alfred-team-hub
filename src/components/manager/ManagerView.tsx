@@ -46,9 +46,25 @@ export default function ManagerView({ onLogout }: { onLogout: () => void }) {
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
         <div className="container flex items-center justify-between py-4">
           <Logo size="sm" />
-          <button onClick={onLogout} className="text-muted-foreground hover:text-gold transition flex items-center gap-2 text-sm">
-            <LogOut className="h-4 w-4" /> Sair
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={async () => {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  await Promise.all(regs.map((r) => r.update()));
+                }
+                window.location.reload();
+              }}
+              className="text-muted-foreground hover:text-gold transition flex items-center gap-2 text-sm"
+              aria-label="Atualizar"
+              title="Atualizar app"
+            >
+              <RefreshCw className="h-4 w-4" /> Atualizar
+            </button>
+            <button onClick={onLogout} className="text-muted-foreground hover:text-gold transition flex items-center gap-2 text-sm">
+              <LogOut className="h-4 w-4" /> Sair
+            </button>
+          </div>
         </div>
         <nav className="container overflow-x-auto scrollbar-hide">
           <div className="flex gap-1 pb-3 min-w-max">

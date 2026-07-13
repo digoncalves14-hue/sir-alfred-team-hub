@@ -65,22 +65,8 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 text-gold mb-4">
             <Crown className="h-5 w-5" /> <span className="text-xs font-bold tracking-widest uppercase">Destaque da Semana</span>
           </div>
-          {star ? (
-            <div className="flex items-center gap-4">
-              <Avatar initials={star.initials} photoUrl={getPhoto(star.name)} size="xl" />
-              <div>
-                <p className="text-2xl font-black text-foreground">{star.name}</p>
-                <p className="text-sm text-muted-foreground">{star.unit}</p>
-                <div className="flex items-center gap-3 mt-2 text-sm">
-                  <span className="text-gold font-bold">{star.clients} clientes</span>
-                  <span className="text-muted-foreground">·</span>
-                  <span className="text-gold">{"★".repeat(5)} {star.rating}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Empty text="Nenhum destaque cadastrado ainda." />
-          )}
+          <Empty text="Nenhum destaque cadastrado ainda." />
+
         </Card>
 
         <Card>

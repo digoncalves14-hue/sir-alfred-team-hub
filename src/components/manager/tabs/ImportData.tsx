@@ -238,6 +238,53 @@ export default function ImportData() {
           <p>Dica: importe 1x por semana ou por mês, conforme o ritmo da equipe.</p>
         </div>
       )}
+
+      {saved.length > 0 && (
+        <Card className="mt-4">
+          <div className="mb-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-gold">Períodos salvos</p>
+            <p className="text-sm text-muted-foreground">
+              Exclua registros individuais ou o período inteiro — dá para desfazer imediatamente.
+            </p>
+          </div>
+
+          {Array.from(new Set(saved.map((s) => s.period_label))).map((pl) => {
+            const rows = saved.filter((s) => s.period_label === pl);
+            return (
+              <div key={pl} className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-bold">{pl} <span className="text-muted-foreground font-normal">· {rows.length} registros</span></p>
+                  <button
+                    onClick={() => removePeriod(pl)}
+                    className="text-xs text-danger hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Excluir período
+                  </button>
+                </div>
+                <div className="space-y-1">
+                  {rows.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between bg-secondary/50 rounded-lg px-3 py-2 text-sm">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">{r.professional_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {r.comandas_count} comandas · {fmtBRL(r.revenue_cents)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeSnapshot(r)}
+                        className="text-muted-foreground hover:text-danger p-1"
+                        title="Excluir"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
     </div>
   );
 }

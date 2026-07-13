@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 import { Card, SectionTitle } from "@/components/ui-kit";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { deleteWithUndo } from "@/lib/deleteWithUndo";
 
 type Row = { Comanda: string | number; Profissional: string; Serviço?: string; Servico?: string; Valor: string | number };
 
@@ -38,7 +39,21 @@ export default function ImportData() {
   const [aggs, setAggs] = useState<Agg[] | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const loadSaved = useCallback(async () => {
+    const { data } = await supabase
+      .from("performance_snapshots")
+      .select("*")
+      .order("period_label", { ascending: false })
+      .order("revenue_cents", { ascending: false });
+    setSaved(data ?? []);
+  }, []);
+
+  useEffect(() => {
+    loadSaved();
+  }, [loadSaved]);
 
   const handleFile = async (file: File) => {
     setFileName(file.name);

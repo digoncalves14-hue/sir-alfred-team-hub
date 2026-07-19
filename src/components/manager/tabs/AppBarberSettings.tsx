@@ -200,11 +200,27 @@ export default function AppBarberSettings() {
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Testar agora
             </button>
+            <button
+              onClick={diagnoseProxy}
+              disabled={diagnosing}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-background transition disabled:opacity-60"
+              title="Envia uma URL base falsa ao proxy para verificar se ele respeita o header X-Target-Base"
+            >
+              {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
+              Diagnosticar proxy
+            </button>
           </div>
+
+          {diagnosis && (
+            <Card className="border-gold/40">
+              <p className="font-bold mb-2">Diagnóstico do proxy</p>
+              <p className="text-sm leading-relaxed">{diagnosis}</p>
+            </Card>
+          )}
 
           {result !== null && (
             <Card>
-              <p className="font-bold mb-3">Resultado do teste</p>
+              <p className="font-bold mb-3">Resultado</p>
               <pre className="text-xs bg-background rounded-lg p-4 overflow-auto max-h-[500px] whitespace-pre-wrap break-all">
                 {JSON.stringify(result, null, 2)}
               </pre>

@@ -32,23 +32,32 @@ async function callProxy(baseUrl: string, path: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
-  const { data: cfg, error } = await admin
-    .from('appbarber_config')
-    .select('base_url, endpoints')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !cfg) {
-    return new Response(
-      JSON.stringify({ error: 'Configuração não encontrada. Salve na aba Configurações AppBarber.' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    );
+  let override: { base_url?: string; endpoints?: Endpoint[] } = {};
+  if (req.method === 'POST') {
+    try { override = await req.json(); } catch { /* ignore */ }
   }
 
-  const baseUrl = String(cfg.base_url ?? '').replace(/\/$/, '');
-  const endpoints = Array.isArray(cfg.endpoints) ? (cfg.endpoints as Endpoint[]) : [];
+  let baseUrl = String(override.base_url ?? '').replace(/\/$/, '');
+  let endpoints: Endpoint[] = Array.isArray(override.endpoints) ? override.endpoints : [];
+
+  if (!baseUrl || endpoints.length === 0) {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const { data: cfg, error } = await admin
+      .from('appbarber_config')
+      .select('base_url, endpoints')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !cfg) {
+      return new Response(
+        JSON.stringify({ error: 'Configuração não encontrada. Salve na aba Configurações AppBarber.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+    if (!baseUrl) baseUrl = String(cfg.base_url ?? '').replace(/\/$/, '');
+    if (endpoints.length === 0) endpoints = Array.isArray(cfg.endpoints) ? (cfg.endpoints as Endpoint[]) : [];
+  }
 
   const results: Record<string, unknown> = { base_url: baseUrl };
   for (const ep of endpoints) {

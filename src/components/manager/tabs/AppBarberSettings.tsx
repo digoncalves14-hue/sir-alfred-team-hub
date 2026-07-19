@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2, Play, Save, Loader2 } from "lucide-react";
+import { Plus, Trash2, Play, Save, Loader2, ShieldAlert } from "lucide-react";
 
 type Endpoint = { name: string; path: string };
 

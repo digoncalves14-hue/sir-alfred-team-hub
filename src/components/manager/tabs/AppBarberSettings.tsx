@@ -13,7 +13,9 @@ export default function AppBarberSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
   const [result, setResult] = useState<unknown>(null);
+  const [diagnosis, setDiagnosis] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {

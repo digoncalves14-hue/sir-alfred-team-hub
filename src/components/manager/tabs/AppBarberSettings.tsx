@@ -60,6 +60,7 @@ export default function AppBarberSettings() {
   const test = async () => {
     setTesting(true);
     setResult(null);
+    setDiagnosis(null);
     const { data, error } = await supabase.functions.invoke("appbarber-test");
     setTesting(false);
     if (error) {
@@ -69,6 +70,44 @@ export default function AppBarberSettings() {
     }
     setResult(data);
     toast.success("Teste concluído. Confira os resultados abaixo.");
+  };
+
+  const diagnoseProxy = async () => {
+    setDiagnosing(true);
+    setResult(null);
+    setDiagnosis(null);
+    const fakeBase = "https://exemplo-invalido-lovable-diagnostico-xyz.com";
+    const probePath = endpoints[0]?.path || "/v1/ping";
+    const { data, error } = await supabase.functions.invoke("appbarber-test", {
+      body: {
+        base_url: fakeBase,
+        endpoints: [{ name: "Diagnóstico", path: probePath }],
+      },
+    });
+    setDiagnosing(false);
+    if (error) {
+      toast.error(error.message);
+      setResult({ error: error.message });
+      return;
+    }
+    setResult(data);
+    const probe = (data as Record<string, { status?: number; body?: unknown }> | null)?.["Diagnóstico"];
+    const status = probe?.status;
+    const bodyStr = JSON.stringify(probe?.body ?? "").toLowerCase();
+    if (status === 0 || /getaddrinfo|enotfound|dns|econnrefused|failed to fetch|network|resolve/.test(bodyStr)) {
+      setDiagnosis(
+        "✅ Proxy está RESPEITANDO o header X-Target-Base (deu erro de conexão porque a URL é inválida). Logo, o problema com a AppBarber é a URL base real ou os caminhos dos endpoints — não o proxy.",
+      );
+    } else if (status && status >= 200 && status < 500) {
+      setDiagnosis(
+        `❌ Proxy está IGNORANDO o header X-Target-Base. Retornou HTTP ${status} para uma URL inexistente, ou seja, mandou a chamada para outro destino fixo. Ajuste na VPS: leia o header 'X-Target-Base' e use-o como origem da requisição.`,
+      );
+    } else {
+      setDiagnosis(
+        `Resultado ambíguo (HTTP ${status ?? "?"}). Veja o corpo abaixo — se citar DNS/conexão, o proxy está OK; se parecer resposta de servidor, está ignorando o header.`,
+      );
+    }
+    toast.success("Diagnóstico concluído.");
   };
 
   return (

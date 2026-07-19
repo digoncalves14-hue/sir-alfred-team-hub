@@ -1,44 +1,60 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const PROXY_URL = Deno.env.get('APPBARBER_PROXY_URL')?.replace(/\/$/, '');
 const PROXY_TOKEN = Deno.env.get('APPBARBER_PROXY_TOKEN');
-const UNITS: Record<string, number> = { Birigui: 709052, Aracatuba: 18653137 };
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-async function call(path: string) {
+type Endpoint = { name: string; path: string };
+
+async function callProxy(baseUrl: string, path: string) {
   if (!PROXY_URL || !PROXY_TOKEN) {
-    return {
-      path,
-      status: 500,
-      body: { error: 'Proxy AppBarber não configurado' },
-    };
+    return { status: 500, rate_remaining: null, body: { error: 'Proxy AppBarber não configurado' } };
   }
-
-  const r = await fetch(PROXY_URL + path, {
-    headers: { 'X-Proxy-Token': PROXY_TOKEN, 'Accept': 'application/json' },
-  });
-  const text = await r.text();
-  let body: unknown = text;
-  try { body = JSON.parse(text); } catch {}
-  return {
-    path,
-    status: r.status,
-    rate_remaining: r.headers.get('X-RateLimit-Remaining'),
-    body,
-  };
+  try {
+    const r = await fetch(PROXY_URL + path, {
+      headers: {
+        'X-Proxy-Token': PROXY_TOKEN,
+        'X-Target-Base': baseUrl,
+        'Accept': 'application/json',
+      },
+    });
+    const text = await r.text();
+    let body: unknown = text;
+    try { body = JSON.parse(text); } catch { /* keep text */ }
+    return { status: r.status, rate_remaining: r.headers.get('X-RateLimit-Remaining'), body };
+  } catch (err) {
+    return { status: 0, rate_remaining: null, body: { error: String(err) } };
+  }
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  const results = {
-    establishment_data: await call('/v1/establishment/data'),
-    branches: await call('/v1/establishment/branches'),
-    services_no_param: await call('/v1/services'),
-    services_birigui: await call('/v1/services?establishment_code=709052'),
-    professionals_no_param: await call('/v1/professionals'),
-    professional_list: await call('/v1/professional-list'),
-    payment_types: await call('/v1/payment-types'),
-  };
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+  const { data: cfg, error } = await admin
+    .from('appbarber_config')
+    .select('base_url, endpoints')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !cfg) {
+    return new Response(
+      JSON.stringify({ error: 'Configuração não encontrada. Salve na aba Configurações AppBarber.' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const baseUrl = String(cfg.base_url ?? '').replace(/\/$/, '');
+  const endpoints = Array.isArray(cfg.endpoints) ? (cfg.endpoints as Endpoint[]) : [];
+
+  const results: Record<string, unknown> = { base_url: baseUrl };
+  for (const ep of endpoints) {
+    if (!ep?.path) continue;
+    results[ep.name || ep.path] = { path: ep.path, ...(await callProxy(baseUrl, ep.path)) };
+  }
 
   return new Response(JSON.stringify(results, null, 2), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },

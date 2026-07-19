@@ -17,6 +17,7 @@ import BehavioralProfile from "./tabs/BehavioralProfile";
 import BestPractices from "./tabs/BestPractices";
 import Ideas from "./tabs/Ideas";
 import ImportData from "./tabs/ImportData";
+import AppBarberSettings from "./tabs/AppBarberSettings";
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
@@ -35,7 +36,9 @@ const TABS = [
   { id: "historico", label: "Histórico", C: History },
   { id: "pops", label: "POPs", C: Pops },
   { id: "importar", label: "Importar dados", C: ImportData },
+  { id: "appbarber", label: "AppBarber", C: AppBarberSettings },
 ];
+
 
 export default function ManagerView({ onLogout }: { onLogout: () => void }) {
   const [active, setActive] = useState("painel");

@@ -44,6 +44,30 @@ export type Database = {
         }
         Relationships: []
       }
+      appbarber_config: {
+        Row: {
+          base_url: string
+          endpoints: Json
+          id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          base_url?: string
+          endpoints?: Json
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          base_url?: string
+          endpoints?: Json
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       award_catalog_photos: {
         Row: {
           created_at: string

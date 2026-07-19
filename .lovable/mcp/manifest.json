@@ -1,0 +1,169 @@
+{
+  "version": 1,
+  "sdk_version": "0.23.0",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://ozwpqeqcigajljkphmex.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "sir-alfred-equipe-mcp",
+      "version": "0.1.0",
+      "title": "Sir Alfred Equipe"
+    },
+    "tools": [
+      {
+        "name": "get_my_profile",
+        "title": "Ver meu perfil",
+        "description": "Retorna o perfil do usuário autenticado (nome, unidade, cargo, papel).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_announcements",
+        "title": "Listar avisos",
+        "description": "Lista os avisos/comunicados mais recentes do painel da equipe.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Máximo de avisos (padrão 20).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_my_ideas",
+        "title": "Minhas ideias",
+        "description": "Lista as sugestões que o usuário autenticado enviou para a Caixa de Ideias.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "submit_idea",
+        "title": "Enviar ideia",
+        "description": "Envia uma nova sugestão para a Caixa de Ideias em nome do usuário autenticado.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 120,
+              "description": "Título curto da ideia."
+            },
+            "description": {
+              "type": "string",
+              "minLength": 5,
+              "maxLength": 2000,
+              "description": "Descrição detalhada."
+            },
+            "category": {
+              "description": "Categoria opcional (ex: atendimento, produtos).",
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          "required": [
+            "title",
+            "description"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "log_pulse",
+        "title": "Registrar humor do dia",
+        "description": "Registra ou atualiza o pulso (humor) do usuário para o dia de hoje.",
+        "annotations": {
+          "readOnlyHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "mood": {
+              "type": "string",
+              "enum": [
+                "otimo",
+                "bom",
+                "ok",
+                "cansado",
+                "ruim"
+              ],
+              "description": "Humor de hoje."
+            }
+          },
+          "required": [
+            "mood"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "my_performance",
+        "title": "Meu desempenho",
+        "description": "Retorna os snapshots de desempenho (serviços, comandas, faturamento) do usuário autenticado, filtrando pelo nome do perfil.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "limit": {
+              "description": "Máximo de períodos (padrão 6).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24
+            }
+          }
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

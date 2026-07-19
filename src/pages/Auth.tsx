@@ -44,7 +44,7 @@ export default function Auth() {
       if (mode === "login") {
         const parsed = loginSchema.safeParse(form);
         if (!parsed.success) {
-          toast.error(parsed.error.errors[0].message);
+          toast.error(parsed.error.issues[0].message);
           return;
         }
         const { error } = await supabase.auth.signInWithPassword({
@@ -56,7 +56,7 @@ export default function Auth() {
       } else {
         const parsed = signupSchema.safeParse(form);
         if (!parsed.success) {
-          toast.error(parsed.error.errors[0].message);
+          toast.error(parsed.error.issues[0].message);
           return;
         }
         const { error } = await supabase.auth.signUp({

@@ -142,15 +142,26 @@ export default function PHome() {
   }, [user]);
 
   const savePulse = async (m: string) => {
-    if (!user) return;
+    if (!user) {
+      toast.error("Você precisa estar logado para registrar seu pulso.");
+      return;
+    }
+    const prev = pulse;
     setPulse(m);
     setSavingPulse(true);
     const { error } = await supabase
       .from("pulses")
       .upsert({ user_id: user.id, day: todayBR(), mood: m }, { onConflict: "user_id,day" });
     setSavingPulse(false);
-    if (error) toast.error(error.message);
+    if (error) {
+      setPulse(prev);
+      console.error("[pulses] save error", error);
+      toast.error(`Não foi possível registrar: ${error.message}`);
+      return;
+    }
+    toast.success("Pulso registrado! O gestor já pode ver.");
   };
+
 
   return (
     <div className="space-y-6">

@@ -21,33 +21,47 @@ export default function Pulse() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const load = async () => {
+    const today = todayBR();
+    const { data: pulses } = await supabase
+      .from("pulses")
+      .select("user_id, mood, day")
+      .eq("day", today);
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, nome, unidade");
+
+    const profMap = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const merged: Row[] = (pulses ?? []).map((p) => {
+      const prof = profMap.get(p.user_id);
+      return {
+        user_id: p.user_id,
+        mood: p.mood,
+        day: p.day,
+        nome: prof?.nome ?? null,
+        unidade: (prof?.unidade as string | null) ?? null,
+      };
+    });
+    setRows(merged);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      const today = todayBR();
-      const { data: pulses } = await supabase
-        .from("pulses")
-        .select("user_id, mood, day")
-        .eq("day", today);
-
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, nome, unidade");
-
-      const profMap = new Map((profiles ?? []).map((p) => [p.id, p]));
-      const merged: Row[] = (pulses ?? []).map((p) => {
-        const prof = profMap.get(p.user_id);
-        return {
-          user_id: p.user_id,
-          mood: p.mood,
-          day: p.day,
-          nome: prof?.nome ?? null,
-          unidade: (prof?.unidade as string | null) ?? null,
-        };
-      });
-      setRows(merged);
-      setLoading(false);
-    })();
+    void load();
+    const ch = supabase
+      .channel("pulses-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pulses" },
+        () => void load(),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(ch);
+    };
   }, []);
+
 
   const low = rows.filter((r) => r.mood === "😔" || r.mood === "😤");
 

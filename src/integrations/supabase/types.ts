@@ -68,6 +68,30 @@ export type Database = {
         }
         Relationships: []
       }
+      appbarber_credentials: {
+        Row: {
+          api_key: string
+          created_at: string
+          id: string
+          key_hint: string
+          updated_at: string
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          id?: string
+          key_hint?: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          id?: string
+          key_hint?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       award_catalog_photos: {
         Row: {
           created_at: string

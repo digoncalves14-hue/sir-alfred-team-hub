@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Fingerprint, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { biometric } from "@/hooks/useBiometric";
@@ -13,6 +13,8 @@ interface Props {
 const BiometricLock = ({ userId, onUnlocked, onUsePassword }: Props) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [failures, setFailures] = useState(0);
+  const tried = useRef(false);
 
   const unlock = async () => {
     setBusy(true);
@@ -23,8 +25,25 @@ const BiometricLock = ({ userId, onUnlocked, onUsePassword }: Props) => {
       onUnlocked();
       return;
     }
+    setFailures((f) => f + 1);
     setError(reason);
     toast.error(reason);
+  };
+
+  // Tenta automaticamente ao abrir a tela (iOS às vezes exige toque; nesse caso o botão resolve)
+  useEffect(() => {
+    if (tried.current) return;
+    tried.current = true;
+    unlock();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const continueWithoutBiometrics = () => {
+    // A sessão já está válida — só liberamos o app e removemos o cadastro quebrado.
+    biometric.clear(userId);
+    biometric.markSkipped(userId);
+    biometric.markUnlocked(userId);
+    onUnlocked();
   };
 
   return (
@@ -48,12 +67,26 @@ const BiometricLock = ({ userId, onUnlocked, onUsePassword }: Props) => {
       {error && (
         <p className="mt-4 text-xs text-destructive text-center max-w-xs">{error}</p>
       )}
+
+      <button
+        onClick={continueWithoutBiometrics}
+        className="mt-6 text-sm text-gold underline underline-offset-4 hover:text-gold/80"
+      >
+        Entrar sem biometria
+      </button>
+      {failures > 0 && (
+        <p className="mt-2 text-[11px] text-muted-foreground text-center max-w-xs">
+          Se o Face ID não abrir, use "Entrar sem biometria" — você continua logado e pode
+          cadastrar de novo depois.
+        </p>
+      )}
+
       <button
         onClick={onUsePassword}
         className="mt-6 text-sm text-muted-foreground flex items-center gap-2 hover:text-foreground"
       >
         <LogOut className="w-4 h-4" />
-        Usar email e senha
+        Sair e usar email e senha
       </button>
     </div>
   );

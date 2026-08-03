@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui-kit";
-import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake, HelpCircle } from "lucide-react";
+import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake, HelpCircle, Users } from "lucide-react";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { usePhotos } from "@/hooks/usePhotos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-import { MOOD_OPTIONS } from "@/lib/moods";
+import { MOOD_OPTIONS, moodLabels } from "@/lib/moods";
 
 const moods = MOOD_OPTIONS;
 
@@ -49,6 +49,41 @@ export default function PHome() {
   const [savingPulse, setSavingPulse] = useState(false);
   const [perf, setPerf] = useState<Perf | null>(null);
   const [rankPos, setRankPos] = useState<number | null>(null);
+  const [teamPulses, setTeamPulses] = useState<{ id: string; nome: string; mood: string }[]>([]);
+
+  const loadTeamPulses = async () => {
+    const { data: rows } = await supabase
+      .from("pulses")
+      .select("user_id, mood")
+      .eq("day", todayBR());
+    if (!rows || rows.length === 0) {
+      setTeamPulses([]);
+      return;
+    }
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, nome")
+      .in("id", rows.map((r) => r.user_id));
+    const nameById = new Map((profs ?? []).map((p) => [p.id, p.nome as string]));
+    setTeamPulses(
+      rows
+        .map((r) => ({ id: r.user_id, nome: nameById.get(r.user_id) ?? "Profissional", mood: r.mood }))
+        .sort((a, b) => a.nome.localeCompare(b.nome)),
+    );
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    loadTeamPulses();
+    const ch = supabase
+      .channel("team-pulses-home")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pulses" }, () => loadTeamPulses())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [user]);
+
 
   useEffect(() => {
     if (!user) return;
@@ -161,7 +196,8 @@ export default function PHome() {
       toast.error(`Não foi possível registrar: ${error.message}`);
       return;
     }
-    toast.success("Pulso registrado! O gestor já pode ver.");
+    toast.success("Pulso registrado! A equipe já pode ver.");
+    loadTeamPulses();
   };
 
 
@@ -290,6 +326,34 @@ export default function PHome() {
         </div>
         {pulse && <p className="text-center text-xs text-success mt-3 animate-fade-in">✓ Pulso registrado hoje</p>}
       </Card>
+
+      <Card>
+        <div className="flex items-center gap-2 text-gold mb-3">
+          <Users className="h-4 w-4" />
+          <span className="text-xs font-bold uppercase tracking-widest">Humor da equipe hoje</span>
+        </div>
+        {teamPulses.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">Ninguém registrou o pulso hoje ainda.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {teamPulses.map((t) => (
+              <div key={t.id} className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2">
+                <span className="text-2xl leading-none">{t.mood}</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold truncate">{t.nome}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {moodLabels[t.mood] ?? "—"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[10px] text-muted-foreground mt-3">
+          Saber como cada um está ajuda a equipe a se apoiar melhor no dia a dia.
+        </p>
+      </Card>
+
     </div>
   );
 }

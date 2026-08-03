@@ -1,0 +1,1 @@
+CREATE POLICY "team read pulses" ON public.pulses FOR SELECT TO authenticated USING (true);

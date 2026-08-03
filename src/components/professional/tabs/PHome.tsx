@@ -7,7 +7,20 @@ import { usePhotos } from "@/hooks/usePhotos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const moods = ["😁", "😊", "😐", "😔", "😤"];
+const moods = [
+  { emoji: "😁", label: "Feliz" },
+  { emoji: "😊", label: "Bem" },
+  { emoji: "😐", label: "Neutro" },
+  { emoji: "😔", label: "Triste" },
+  { emoji: "😤", label: "Nervoso" },
+];
+export const moodLabels: Record<string, string> = {
+  "😁": "Feliz",
+  "😊": "Bem",
+  "😐": "Neutro",
+  "😔": "Triste",
+  "😤": "Nervoso",
+};
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "SA";
@@ -276,12 +289,13 @@ export default function PHome() {
         <div className="flex justify-between gap-2">
           {moods.map((m) => (
             <button
-              key={m}
-              onClick={() => savePulse(m)}
+              key={m.emoji}
+              onClick={() => savePulse(m.emoji)}
               disabled={savingPulse}
-              className={`text-3xl sm:text-4xl p-3 rounded-2xl flex-1 transition-all ${pulse === m ? "bg-gold/20 scale-110 ring-2 ring-gold" : "bg-secondary hover:bg-secondary/80"}`}
+              className={`p-3 rounded-2xl flex-1 flex flex-col items-center gap-1 transition-all ${pulse === m.emoji ? "bg-gold/20 scale-110 ring-2 ring-gold" : "bg-secondary hover:bg-secondary/80"}`}
             >
-              {m}
+              <span className="text-3xl sm:text-4xl leading-none">{m.emoji}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{m.label}</span>
             </button>
           ))}
         </div>

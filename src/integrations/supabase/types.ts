@@ -160,6 +160,39 @@ export type Database = {
           },
         ]
       }
+      client_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          professional_name: string
+          review_date: string
+          stars: number
+          updated_at: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          professional_name: string
+          review_date?: string
+          stars: number
+          updated_at?: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          professional_name?: string
+          review_date?: string
+          stars?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       feedbacks: {
         Row: {
           created_at: string
@@ -425,6 +458,42 @@ export type Database = {
           period_label?: string
           posts_count?: number
           professional_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      timeline_events: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          event_date: string
+          event_type: string
+          id: string
+          professional_name: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          event_date?: string
+          event_type?: string
+          id?: string
+          professional_name: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          event_date?: string
+          event_type?: string
+          id?: string
+          professional_name?: string
+          title?: string
           updated_at?: string
         }
         Relationships: []

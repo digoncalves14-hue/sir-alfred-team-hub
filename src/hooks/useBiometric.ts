@@ -110,8 +110,11 @@ export const biometric = {
       const name = e?.name ?? "";
       if (name === "NotAllowedError")
         return "Face ID / digital cancelado ou expirado. Toque em Desbloquear e confirme.";
-      if (name === "InvalidStateError" || name === "NotSupportedError")
-        return "Este aparelho não reconheceu o cadastro. Use email e senha e ative a biometria de novo.";
+      if (name === "InvalidStateError" || name === "NotSupportedError") {
+        localStorage.removeItem(CRED_KEY(userId));
+        return "Este aparelho não reconheceu o cadastro. Toque em 'Entrar sem biometria' e ative de novo.";
+      }
+
       if (name === "SecurityError")
         return "A biometria só funciona no endereço onde foi cadastrada (https).";
       return e?.message || "Não foi possível desbloquear.";

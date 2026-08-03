@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Fingerprint, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { biometric } from "@/hooks/useBiometric";

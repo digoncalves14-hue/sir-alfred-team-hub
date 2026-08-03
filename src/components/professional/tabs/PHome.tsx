@@ -7,7 +7,20 @@ import { usePhotos } from "@/hooks/usePhotos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const moods = ["😁", "😊", "😐", "😔", "😤"];
+const moods = [
+  { emoji: "😁", label: "Feliz" },
+  { emoji: "😊", label: "Bem" },
+  { emoji: "😐", label: "Neutro" },
+  { emoji: "😔", label: "Triste" },
+  { emoji: "😤", label: "Nervoso" },
+];
+export const moodLabels: Record<string, string> = {
+  "😁": "Feliz",
+  "😊": "Bem",
+  "😐": "Neutro",
+  "😔": "Triste",
+  "😤": "Nervoso",
+};
 
 const initialsOf = (name: string) =>
   name.split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase() || "SA";

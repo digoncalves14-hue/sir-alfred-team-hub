@@ -48,7 +48,15 @@ export default function BehavioralProfile() {
 
   useEffect(() => {
     load();
+    const channel = supabase
+      .channel("behavioral-manager")
+      .on("postgres_changes", { event: "*", schema: "public", table: "behavioral_profiles" }, () => load())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
 
   const startEdit = (pid: string) => {
     setEditingId(pid);
@@ -83,7 +91,7 @@ export default function BehavioralProfile() {
     <div className="space-y-6">
       <SectionTitle
         title="Perfil Comportamental"
-        subtitle="Registre o resultado do teste de cada profissional (visível apenas para gestores)"
+        subtitle="Resultados registrados pelos profissionais — você também pode registrar ou editar por aqui"
       />
 
       <div className="rounded-2xl border border-gold/30 bg-gold/5 p-4 space-y-3">

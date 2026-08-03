@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const PROXY_URL = Deno.env.get('APPBARBER_PROXY_URL')?.replace(/\/$/, '');
 const PROXY_TOKEN = Deno.env.get('APPBARBER_PROXY_TOKEN');
-const API_KEY = Deno.env.get('APPBARBER_API_KEY') ?? '';
+let API_KEY = Deno.env.get('APPBARBER_API_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -48,6 +48,18 @@ async function callProxy(baseUrl: string, path: string, method = 'GET', extraBod
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // Chave cadastrada pelo gestor na tela de configurações tem prioridade sobre a variável de ambiente.
+  try {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const { data: cred } = await admin
+      .from('appbarber_credentials')
+      .select('api_key')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (cred?.api_key) API_KEY = cred.api_key;
+  } catch { /* mantém a chave do ambiente */ }
 
   let override: { base_url?: string; endpoints?: Endpoint[] } = {};
   if (req.method === 'POST') {

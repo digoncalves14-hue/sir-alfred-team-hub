@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2, Play, Save, Loader2, ShieldAlert } from "lucide-react";
+import { Plus, Trash2, Play, Save, Loader2, ShieldAlert, KeyRound, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
 type Endpoint = { name: string; path: string };
 
@@ -16,6 +16,52 @@ export default function AppBarberSettings() {
   const [diagnosing, setDiagnosing] = useState(false);
   const [result, setResult] = useState<unknown>(null);
   const [diagnosis, setDiagnosis] = useState<string | null>(null);
+
+  // Chave da API
+  const [credId, setCredId] = useState<string | null>(null);
+  const [keyHint, setKeyHint] = useState<string | null>(null);
+  const [keyUpdatedAt, setKeyUpdatedAt] = useState<string | null>(null);
+  const [apiKey, setApiKey] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [savingKey, setSavingKey] = useState(false);
+
+  const keyError = (() => {
+    const v = apiKey.trim();
+    if (!v) return null;
+    if (/\s/.test(v)) return "A chave não pode conter espaços.";
+    if (v.length < 12) return "Chave muito curta — confira se copiou tudo.";
+    if (!/^[A-Za-z0-9._\-:]+$/.test(v)) return "A chave contém caracteres inválidos.";
+    return null;
+  })();
+  const keyValid = apiKey.trim().length > 0 && !keyError;
+
+  const saveKey = async () => {
+    if (!keyValid) return;
+    const value = apiKey.trim();
+    const hint = `••••${value.slice(-4)}`;
+    setSavingKey(true);
+    const payload = { api_key: value, key_hint: hint, updated_at: new Date().toISOString() };
+    const { error } = credId
+      ? await supabase.from("appbarber_credentials").update(payload).eq("id", credId)
+      : await supabase.from("appbarber_credentials").insert(payload);
+    setSavingKey(false);
+    if (error) return toast.error(error.message);
+    setApiKey("");
+    setShowKey(false);
+    const { data } = await supabase
+      .from("appbarber_credentials")
+      .select("id, key_hint, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) {
+      setCredId(data.id);
+      setKeyHint(data.key_hint);
+      setKeyUpdatedAt(data.updated_at);
+    }
+    toast.success("Chave salva com segurança.");
+  };
+
 
   useEffect(() => {
     (async () => {
@@ -31,7 +77,19 @@ export default function AppBarberSettings() {
         setBaseUrl(data.base_url ?? "");
         setEndpoints(Array.isArray(data.endpoints) ? (data.endpoints as unknown as Endpoint[]) : []);
       }
+      const { data: cred } = await supabase
+        .from("appbarber_credentials")
+        .select("id, key_hint, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cred) {
+        setCredId(cred.id);
+        setKeyHint(cred.key_hint);
+        setKeyUpdatedAt(cred.updated_at);
+      }
       setLoading(false);
+
     })();
   }, []);
 
@@ -123,6 +181,73 @@ export default function AppBarberSettings() {
         </div>
       ) : (
         <>
+          <Card className="space-y-4 border-gold/40">
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-gold" />
+              <p className="font-bold">Chave da API (API_KEY)</p>
+            </div>
+
+            {keyHint ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-gold" />
+                Chave cadastrada <span className="font-mono text-foreground">{keyHint}</span>
+                {keyUpdatedAt && <> · atualizada em {new Date(keyUpdatedAt).toLocaleDateString("pt-BR")}</>}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhuma chave cadastrada ainda.</p>
+            )}
+
+            <div className="relative">
+              <input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={keyHint ? "Cole uma nova chave para substituir" : "Cole aqui a chave fornecida pela AppBarber"}
+                className={`w-full px-4 py-3 pr-12 rounded-xl bg-background border text-sm font-mono focus:outline-none ${
+                  keyError ? "border-destructive" : "border-border focus:border-gold"
+                }`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showKey ? "Ocultar chave" : "Mostrar chave"}
+              >
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+
+            {keyError ? (
+              <p className="text-xs text-destructive">{keyError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                A chave é guardada com segurança no backend e nunca é exibida de volta — só os 4 últimos caracteres.
+              </p>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={saveKey}
+                disabled={!keyValid || savingKey}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl gradient-gold text-background font-bold shadow-gold disabled:opacity-50"
+              >
+                {savingKey ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Salvar chave
+              </button>
+              <button
+                onClick={test}
+                disabled={testing}
+                className="flex items-center gap-2 px-5 py-3 rounded-xl border border-gold text-gold font-semibold hover:bg-gold/10 transition disabled:opacity-60"
+              >
+                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Testar conexão
+              </button>
+            </div>
+          </Card>
+
+
           <Card className="space-y-4">
             <div>
               <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">URL base</label>

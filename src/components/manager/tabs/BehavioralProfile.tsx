@@ -48,7 +48,15 @@ export default function BehavioralProfile() {
 
   useEffect(() => {
     load();
+    const channel = supabase
+      .channel("behavioral-manager")
+      .on("postgres_changes", { event: "*", schema: "public", table: "behavioral_profiles" }, () => load())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
+
 
   const startEdit = (pid: string) => {
     setEditingId(pid);

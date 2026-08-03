@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui-kit";
 import { AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { moodLabels } from "@/components/professional/tabs/PHome";
+import { moodLabels } from "@/lib/moods";
 
 type Row = {
   user_id: string;

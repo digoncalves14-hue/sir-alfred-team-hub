@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Fingerprint, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { biometric } from "@/hooks/useBiometric";
@@ -12,20 +12,20 @@ interface Props {
 
 const BiometricLock = ({ userId, onUnlocked, onUsePassword }: Props) => {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const unlock = async () => {
     setBusy(true);
-    const ok = await biometric.verify(userId);
+    setError(null);
+    const reason = await biometric.verify(userId);
     setBusy(false);
-    if (ok) onUnlocked();
-    else toast.error("Não foi possível desbloquear. Tente novamente.");
+    if (!reason) {
+      onUnlocked();
+      return;
+    }
+    setError(reason);
+    toast.error(reason);
   };
-
-  // Auto-prompt on mount
-  useEffect(() => {
-    unlock();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-6">
@@ -34,7 +34,7 @@ const BiometricLock = ({ userId, onUnlocked, onUsePassword }: Props) => {
       </div>
       <h1 className="text-xl font-semibold text-foreground mb-2">Sir Alfred Equipe</h1>
       <p className="text-sm text-muted-foreground mb-8 text-center">
-        Toque para desbloquear com biometria
+        Toque no botão abaixo para desbloquear com Face ID / digital
       </p>
       <Button
         onClick={unlock}
@@ -45,6 +45,9 @@ const BiometricLock = ({ userId, onUnlocked, onUsePassword }: Props) => {
         <Fingerprint className="w-5 h-5 mr-2" />
         {busy ? "Aguardando..." : "Desbloquear"}
       </Button>
+      {error && (
+        <p className="mt-4 text-xs text-destructive text-center max-w-xs">{error}</p>
+      )}
       <button
         onClick={onUsePassword}
         className="mt-6 text-sm text-muted-foreground flex items-center gap-2 hover:text-foreground"

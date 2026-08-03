@@ -86,9 +86,10 @@ export const biometric = {
     sessionStorage.setItem(UNLOCKED_SESSION_KEY(userId), "1");
   },
 
-  async verify(userId: string): Promise<boolean> {
+  // Returns null on success, or a human-readable reason on failure.
+  async verify(userId: string): Promise<string | null> {
     const stored = localStorage.getItem(CRED_KEY(userId));
-    if (!stored) return false;
+    if (!stored) return "Nenhuma biometria cadastrada neste aparelho.";
     try {
       const challenge = crypto.getRandomValues(new Uint8Array(32));
       const assertion = await navigator.credentials.get({
@@ -102,11 +103,18 @@ export const biometric = {
           timeout: 60000,
         },
       });
-      if (!assertion) return false;
+      if (!assertion) return "Autenticação cancelada.";
       sessionStorage.setItem(UNLOCKED_SESSION_KEY(userId), "1");
-      return true;
-    } catch {
-      return false;
+      return null;
+    } catch (e: any) {
+      const name = e?.name ?? "";
+      if (name === "NotAllowedError")
+        return "Face ID / digital cancelado ou expirado. Toque em Desbloquear e confirme.";
+      if (name === "InvalidStateError" || name === "NotSupportedError")
+        return "Este aparelho não reconheceu o cadastro. Use email e senha e ative a biometria de novo.";
+      if (name === "SecurityError")
+        return "A biometria só funciona no endereço onde foi cadastrada (https).";
+      return e?.message || "Não foi possível desbloquear.";
     }
   },
 

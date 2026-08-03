@@ -36,14 +36,17 @@ export default function Ideas() {
     setLoading(true);
     const { data, error } = await supabase
       .from("ideas")
-      .select("*")
+      .select("id, author_id, category, title, description, status, created_at, updated_at")
       .order("created_at", { ascending: false });
     if (error) {
       toast.error("Erro ao carregar sugestões");
       setLoading(false);
       return;
     }
-    setIdeas(data || []);
+    const { data: replyRows } = await supabase.rpc("get_idea_replies");
+    const replyMap: Record<string, string> = {};
+    (replyRows || []).forEach((r: any) => (replyMap[r.idea_id] = r.manager_reply));
+    setIdeas((data || []).map((i: any) => ({ ...i, manager_reply: replyMap[i.id] ?? null })));
     const ids = Array.from(new Set((data || []).map((i) => i.author_id)));
     if (ids.length) {
       const { data: profs } = await supabase

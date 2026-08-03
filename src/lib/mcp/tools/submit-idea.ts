@@ -31,7 +31,7 @@ export default defineTool({
         description,
         category: category ?? "geral",
       })
-      .select()
+      .select("id, title, description, category, status, created_at")
       .single();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return {

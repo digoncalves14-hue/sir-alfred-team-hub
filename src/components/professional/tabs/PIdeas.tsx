@@ -50,14 +50,17 @@ export default function PIdeas() {
     setUid(userRes.user?.id ?? null);
     const { data } = await supabase
       .from("ideas")
-      .select("*")
+      .select("id, author_id, category, title, description, status, created_at, updated_at")
       .order("created_at", { ascending: false });
     const { data: counts } = await supabase.rpc("get_idea_vote_counts");
+    const { data: replyRows } = await supabase.rpc("get_idea_replies");
+    const replyMap: Record<string, string> = {};
+    (replyRows || []).forEach((r: any) => (replyMap[r.idea_id] = r.manager_reply));
     const countMap: Record<string, number> = {};
     (counts || []).forEach((c: any) => {
       countMap[c.idea_id] = Number(c.votes) || 0;
     });
-    const enriched: Idea[] = (data || []).map((i: any) => ({ ...i, votes: countMap[i.id] || 0 }));
+    const enriched: Idea[] = (data || []).map((i: any) => ({ ...i, votes: countMap[i.id] || 0, manager_reply: replyMap[i.id] ?? null }));
     enriched.sort((a, b) => b.votes - a.votes || +new Date(b.created_at) - +new Date(a.created_at));
     setIdeas(enriched);
     setLoading(false);

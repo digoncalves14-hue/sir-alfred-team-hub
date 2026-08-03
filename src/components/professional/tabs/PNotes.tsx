@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle, Stars, Badge } from "@/components/ui-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { fetchMyName, normalizeName } from "@/lib/teamNames";
 
 type Feedback = {
   id: string;
@@ -10,6 +11,8 @@ type Feedback = {
   created_at: string;
 };
 
+type Review = { id: string; stars: number; comment: string | null; review_date: string };
+
 const TYPE_COLORS: Record<string, string> = {
   Positivo: "bg-success/20 text-success border-success/40",
   Melhoria: "bg-warning/20 text-warning border-warning/40",
@@ -17,17 +20,10 @@ const TYPE_COLORS: Record<string, string> = {
 };
 const TYPE_LABEL: Record<string, string> = { Positivo: "Positivo", Melhoria: "Sugestão", Tecnico: "Técnico" };
 
-const dist = [
-  { star: 5, count: 0 },
-  { star: 4, count: 0 },
-  { star: 3, count: 0 },
-  { star: 2, count: 0 },
-  { star: 1, count: 0 },
-];
-
 export default function PNotes() {
   const { user } = useAuth();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -37,10 +33,28 @@ export default function PNotes() {
       .eq("professional_id", user.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => setFeedbacks((data ?? []) as Feedback[]));
+
+    (async () => {
+      const nome = await fetchMyName(user.id);
+      const { data } = await supabase
+        .from("client_reviews")
+        .select("id, stars, comment, review_date, professional_name")
+        .order("review_date", { ascending: false });
+      setReviews(
+        ((data ?? []) as any[])
+          .filter((r) => normalizeName(r.professional_name) === normalizeName(nome))
+          .map((r) => ({ id: r.id, stars: r.stars, comment: r.comment, review_date: r.review_date }))
+      );
+    })();
   }, [user]);
 
-  const total = dist.reduce((s, d) => s + d.count, 0);
-  const avg = total ? (dist.reduce((s, d) => s + d.star * d.count, 0) / total).toFixed(1) : "—";
+  const dist = [5, 4, 3, 2, 1].map((star) => ({
+    star,
+    count: reviews.filter((r) => r.stars === star).length,
+  }));
+  const total = reviews.length;
+  const avg = total ? (reviews.reduce((s, r) => s + r.stars, 0) / total).toFixed(1) : "—";
+
   return (
     <div className="space-y-6">
       <SectionTitle title="Suas notas" subtitle="Avaliações dos clientes" />

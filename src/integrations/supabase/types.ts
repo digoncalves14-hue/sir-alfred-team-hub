@@ -455,6 +455,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_idea_replies: {
+        Args: never
+        Returns: {
+          idea_id: string
+          manager_reply: string
+        }[]
+      }
       get_idea_vote_counts: {
         Args: never
         Returns: {

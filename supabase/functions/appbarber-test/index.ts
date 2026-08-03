@@ -3,20 +3,36 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const PROXY_URL = Deno.env.get('APPBARBER_PROXY_URL')?.replace(/\/$/, '');
 const PROXY_TOKEN = Deno.env.get('APPBARBER_PROXY_TOKEN');
+const API_KEY = Deno.env.get('APPBARBER_API_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-type Endpoint = { name: string; path: string };
+type Endpoint = { name: string; path: string; method?: string; body?: Record<string, unknown> };
 
-async function callProxy(baseUrl: string, path: string) {
+async function callProxy(baseUrl: string, path: string, method = 'GET', extraBody?: Record<string, unknown>) {
   if (!PROXY_URL || !PROXY_TOKEN) {
     return { status: 500, rate_remaining: null, body: { error: 'Proxy AppBarber não configurado' } };
   }
   try {
-    const r = await fetch(PROXY_URL + path, {
+    // A API da AppBarber espera a chave como parâmetro API_KEY; mandamos também nos headers.
+    const withKey = API_KEY
+      ? path + (path.includes('?') ? '&' : '?') + 'API_KEY=' + encodeURIComponent(API_KEY)
+      : path;
+
+    const isPost = method.toUpperCase() === 'POST';
+    const form = new URLSearchParams();
+    if (API_KEY) form.set('API_KEY', API_KEY);
+    for (const [k, v] of Object.entries(extraBody ?? {})) form.set(k, String(v));
+
+    const r = await fetch(PROXY_URL + withKey, {
+      method: method.toUpperCase(),
+      body: isPost ? form.toString() : undefined,
       headers: {
+        ...(isPost ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
         'X-Proxy-Token': PROXY_TOKEN,
         'X-Target-Base': baseUrl,
+        'API_KEY': API_KEY,
+        'X-API-Key': API_KEY,
         'Accept': 'application/json',
       },
     });
@@ -28,6 +44,7 @@ async function callProxy(baseUrl: string, path: string) {
     return { status: 0, rate_remaining: null, body: { error: String(err) } };
   }
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -62,7 +79,7 @@ Deno.serve(async (req) => {
   const results: Record<string, unknown> = { base_url: baseUrl };
   for (const ep of endpoints) {
     if (!ep?.path) continue;
-    results[ep.name || ep.path] = { path: ep.path, ...(await callProxy(baseUrl, ep.path)) };
+    results[ep.name || ep.path] = { path: ep.path, method: ep.method ?? 'GET', ...(await callProxy(baseUrl, ep.path, ep.method ?? 'GET', ep.body)) };
   }
 
   return new Response(JSON.stringify(results, null, 2), {

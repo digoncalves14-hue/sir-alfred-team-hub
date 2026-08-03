@@ -49,6 +49,41 @@ export default function PHome() {
   const [savingPulse, setSavingPulse] = useState(false);
   const [perf, setPerf] = useState<Perf | null>(null);
   const [rankPos, setRankPos] = useState<number | null>(null);
+  const [teamPulses, setTeamPulses] = useState<{ id: string; nome: string; mood: string }[]>([]);
+
+  const loadTeamPulses = async () => {
+    const { data: rows } = await supabase
+      .from("pulses")
+      .select("user_id, mood")
+      .eq("day", todayBR());
+    if (!rows || rows.length === 0) {
+      setTeamPulses([]);
+      return;
+    }
+    const { data: profs } = await supabase
+      .from("profiles")
+      .select("id, nome")
+      .in("id", rows.map((r) => r.user_id));
+    const nameById = new Map((profs ?? []).map((p) => [p.id, p.nome as string]));
+    setTeamPulses(
+      rows
+        .map((r) => ({ id: r.user_id, nome: nameById.get(r.user_id) ?? "Profissional", mood: r.mood }))
+        .sort((a, b) => a.nome.localeCompare(b.nome)),
+    );
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    loadTeamPulses();
+    const ch = supabase
+      .channel("team-pulses-home")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pulses" }, () => loadTeamPulses())
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [user]);
+
 
   useEffect(() => {
     if (!user) return;

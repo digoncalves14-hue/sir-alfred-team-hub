@@ -14,7 +14,7 @@ const signupSchema = loginSchema.extend({
   nome: z.string().trim().min(2, "Informe seu nome").max(100),
   telefone: z.string().trim().max(20).optional(),
   cargo: z.string().trim().max(60).optional(),
-  unidade: z.enum(["Birigui", "Aracatuba"]),
+  unidade: z.enum(["Birigui", "Kids"]),
   categoria: z.enum(["barbeiro", "recepcao"]),
   data_aniversario: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Informe a data de aniversário"),
 });
@@ -29,7 +29,7 @@ export default function Auth() {
     nome: "",
     telefone: "",
     cargo: "",
-    unidade: "Birigui" as "Birigui" | "Aracatuba",
+    unidade: "Birigui" as "Birigui" | "Kids",
     categoria: "barbeiro" as "barbeiro" | "recepcao",
     data_aniversario: "",
   });
@@ -121,7 +121,7 @@ export default function Auth() {
               <div className="grid grid-cols-2 gap-3">
                 <Select aria-label="Unidade" value={form.unidade} onChange={(v) => update("unidade", v)} options={[
                   { v: "Birigui", l: "Birigui" },
-                  { v: "Aracatuba", l: "Araçatuba" },
+                  { v: "Kids", l: "Kids" },
                 ]} />
                 <Select aria-label="Categoria" value={form.categoria} onChange={(v) => update("categoria", v)} options={[
                   { v: "barbeiro", l: "Barbeiro" },
@@ -147,7 +147,7 @@ export default function Auth() {
         </form>
 
         <p className="text-center text-xs text-muted-foreground tracking-widest">
-          BIRIGUI · ARAÇATUBA
+          BIRIGUI · KIDS
         </p>
       </div>
     </main>

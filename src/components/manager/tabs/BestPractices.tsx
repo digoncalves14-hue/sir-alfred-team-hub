@@ -28,7 +28,7 @@ const SEED: Post[] = [
   {
     id: 2,
     author: "Bruno Alves",
-    unit: "Araçatuba",
+    unit: "Kids",
     category: "Técnica",
     title: "Degradê com pente aberto para cabelos crespos",
     content: "Testei uma variação da técnica de degradê usando o pente aberto no início. Ficou muito mais uniforme em cabelos crespos. Compartilho para quem quiser experimentar.",
@@ -107,7 +107,7 @@ export default function BestPractices() {
                 className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm"
               />
               <select value={unit} onChange={(e) => setUnit(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
-                <option>Birigui</option><option>Araçatuba</option><option>Kids</option>
+                <option>Birigui</option><option>Kids</option>
               </select>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className="bg-secondary border border-border rounded-xl px-4 py-3 text-sm">
                 {CATEGORIES.map((c) => <option key={c}>{c}</option>)}

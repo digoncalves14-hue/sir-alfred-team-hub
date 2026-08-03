@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle } from "@/components/ui-kit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Trash2, Play, Save, Loader2, ShieldAlert, KeyRound, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Play, Save, Loader2, KeyRound, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
 type Endpoint = { name: string; path: string };
 
@@ -13,9 +13,7 @@ export default function AppBarberSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [diagnosing, setDiagnosing] = useState(false);
   const [result, setResult] = useState<unknown>(null);
-  const [diagnosis, setDiagnosis] = useState<string | null>(null);
 
   // Chave da API
   const [credId, setCredId] = useState<string | null>(null);
@@ -118,7 +116,6 @@ export default function AppBarberSettings() {
   const test = async () => {
     setTesting(true);
     setResult(null);
-    setDiagnosis(null);
     const { data, error } = await supabase.functions.invoke("appbarber-test");
     setTesting(false);
     if (error) {
@@ -128,44 +125,6 @@ export default function AppBarberSettings() {
     }
     setResult(data);
     toast.success("Teste concluído. Confira os resultados abaixo.");
-  };
-
-  const diagnoseProxy = async () => {
-    setDiagnosing(true);
-    setResult(null);
-    setDiagnosis(null);
-    const fakeBase = "https://exemplo-invalido-lovable-diagnostico-xyz.com";
-    const probePath = endpoints[0]?.path || "/v1/ping";
-    const { data, error } = await supabase.functions.invoke("appbarber-test", {
-      body: {
-        base_url: fakeBase,
-        endpoints: [{ name: "Diagnóstico", path: probePath }],
-      },
-    });
-    setDiagnosing(false);
-    if (error) {
-      toast.error(error.message);
-      setResult({ error: error.message });
-      return;
-    }
-    setResult(data);
-    const probe = (data as Record<string, { status?: number; body?: unknown }> | null)?.["Diagnóstico"];
-    const status = probe?.status;
-    const bodyStr = JSON.stringify(probe?.body ?? "").toLowerCase();
-    if (status === 0 || /getaddrinfo|enotfound|dns|econnrefused|failed to fetch|network|resolve/.test(bodyStr)) {
-      setDiagnosis(
-        "✅ Proxy está RESPEITANDO o header X-Target-Base (deu erro de conexão porque a URL é inválida). Logo, o problema com a AppBarber é a URL base real ou os caminhos dos endpoints — não o proxy.",
-      );
-    } else if (status && status >= 200 && status < 500) {
-      setDiagnosis(
-        `❌ Proxy está IGNORANDO o header X-Target-Base. Retornou HTTP ${status} para uma URL inexistente, ou seja, mandou a chamada para outro destino fixo. Ajuste na VPS: leia o header 'X-Target-Base' e use-o como origem da requisição.`,
-      );
-    } else {
-      setDiagnosis(
-        `Resultado ambíguo (HTTP ${status ?? "?"}). Veja o corpo abaixo — se citar DNS/conexão, o proxy está OK; se parecer resposta de servidor, está ignorando o header.`,
-      );
-    }
-    toast.success("Diagnóstico concluído.");
   };
 
   return (
@@ -325,23 +284,7 @@ export default function AppBarberSettings() {
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Testar agora
             </button>
-            <button
-              onClick={diagnoseProxy}
-              disabled={diagnosing}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl border border-border text-foreground font-semibold hover:bg-background transition disabled:opacity-60"
-              title="Envia uma URL base falsa ao proxy para verificar se ele respeita o header X-Target-Base"
-            >
-              {diagnosing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
-              Diagnosticar proxy
-            </button>
           </div>
-
-          {diagnosis && (
-            <Card className="border-gold/40">
-              <p className="font-bold mb-2">Diagnóstico do proxy</p>
-              <p className="text-sm leading-relaxed">{diagnosis}</p>
-            </Card>
-          )}
 
           {result !== null && (
             <Card>

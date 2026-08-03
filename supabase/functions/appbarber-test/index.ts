@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const PROXY_URL = Deno.env.get('APPBARBER_PROXY_URL')?.replace(/\/$/, '');
 const PROXY_TOKEN = Deno.env.get('APPBARBER_PROXY_TOKEN');
+const API_KEY = Deno.env.get('APPBARBER_API_KEY') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -13,10 +14,17 @@ async function callProxy(baseUrl: string, path: string) {
     return { status: 500, rate_remaining: null, body: { error: 'Proxy AppBarber não configurado' } };
   }
   try {
-    const r = await fetch(PROXY_URL + path, {
+    // A API da AppBarber espera a chave como parâmetro API_KEY; mandamos também nos headers.
+    const withKey = API_KEY
+      ? path + (path.includes('?') ? '&' : '?') + 'API_KEY=' + encodeURIComponent(API_KEY)
+      : path;
+
+    const r = await fetch(PROXY_URL + withKey, {
       headers: {
         'X-Proxy-Token': PROXY_TOKEN,
         'X-Target-Base': baseUrl,
+        'API_KEY': API_KEY,
+        'X-API-Key': API_KEY,
         'Accept': 'application/json',
       },
     });
@@ -28,6 +36,7 @@ async function callProxy(baseUrl: string, path: string) {
     return { status: 0, rate_remaining: null, body: { error: String(err) } };
   }
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

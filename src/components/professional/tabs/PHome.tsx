@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui-kit";
-import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake, HelpCircle } from "lucide-react";
+import { Trophy, Target, Star, TrendingUp, Megaphone, MessageCircle, Cake, HelpCircle, Users } from "lucide-react";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { useAuth } from "@/hooks/useAuth";
 import { usePhotos } from "@/hooks/usePhotos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-import { MOOD_OPTIONS } from "@/lib/moods";
+import { MOOD_OPTIONS, moodLabels } from "@/lib/moods";
 
 const moods = MOOD_OPTIONS;
 
@@ -196,7 +196,8 @@ export default function PHome() {
       toast.error(`Não foi possível registrar: ${error.message}`);
       return;
     }
-    toast.success("Pulso registrado! O gestor já pode ver.");
+    toast.success("Pulso registrado! A equipe já pode ver.");
+    loadTeamPulses();
   };
 
 

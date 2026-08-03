@@ -134,7 +134,7 @@ var submit_idea_default = defineTool4({
       title,
       description,
       category: category ?? "geral"
-    }).select().single();
+    }).select("id, title, description, category, status, created_at").single();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return {
       content: [{ type: "text", text: `Ideia registrada (id: ${data.id}).` }],

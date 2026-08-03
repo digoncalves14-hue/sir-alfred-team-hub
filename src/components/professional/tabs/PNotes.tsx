@@ -79,6 +79,25 @@ export default function PNotes() {
           })}
         </div>
       </Card>
+      {reviews.some((r) => r.comment) && (
+        <div className="space-y-3">
+          <p className="text-xs uppercase tracking-widest text-gold font-bold">Comentários de clientes</p>
+          {reviews
+            .filter((r) => r.comment)
+            .map((r) => (
+              <Card key={r.id}>
+                <div className="flex items-center justify-between mb-2">
+                  <Stars n={r.stars} />
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(r.review_date + "T00:00:00").toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground italic">"{r.comment}"</p>
+              </Card>
+            ))}
+        </div>
+      )}
+
       <div className="space-y-3">
         <p className="text-xs uppercase tracking-widest text-gold font-bold">Feedbacks do gestor</p>
         {feedbacks.length === 0 ? (

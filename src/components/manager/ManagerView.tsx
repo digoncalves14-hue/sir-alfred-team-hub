@@ -87,8 +87,9 @@ export default function ManagerView({ onLogout }: { onLogout: () => void }) {
       </header>
       <main className="container py-8 animate-fade-in">
         <h1 className="sr-only">Sir Alfred Team Hub — Painel do gestor</h1>
-        <Active />
+        <Active onNavigate={setActive} />
       </main>
+
     </div>
   );
 }

@@ -77,7 +77,19 @@ export default function AppBarberSettings() {
         setBaseUrl(data.base_url ?? "");
         setEndpoints(Array.isArray(data.endpoints) ? (data.endpoints as unknown as Endpoint[]) : []);
       }
+      const { data: cred } = await supabase
+        .from("appbarber_credentials")
+        .select("id, key_hint, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cred) {
+        setCredId(cred.id);
+        setKeyHint(cred.key_hint);
+        setKeyUpdatedAt(cred.updated_at);
+      }
       setLoading(false);
+
     })();
   }, []);
 

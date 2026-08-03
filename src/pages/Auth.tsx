@@ -144,7 +144,28 @@ export default function Auth() {
             {loading && <Loader2 className="h-4 w-4 animate-spin" />}
             {mode === "login" ? "ENTRAR" : "CRIAR CONTA"}
           </button>
+
+          {mode === "login" && (
+            <button
+              type="button"
+              onClick={async () => {
+                const email = form.email.trim();
+                if (!email) return toast.error("Digite seu email acima primeiro");
+                setLoading(true);
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                  redirectTo: `${window.location.origin}/reset-password`,
+                });
+                setLoading(false);
+                if (error) return toast.error(error.message);
+                toast.success("Enviamos um link de redefinição para seu email.");
+              }}
+              className="w-full text-center text-xs text-gold underline underline-offset-4 hover:text-gold/80"
+            >
+              Esqueci minha senha
+            </button>
+          )}
         </form>
+
 
         <p className="text-center text-xs text-muted-foreground tracking-widest">
           BIRIGUI · KIDS

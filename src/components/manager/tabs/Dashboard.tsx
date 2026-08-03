@@ -5,7 +5,7 @@ import { Users, Star, Trophy, Crown, Cake, Sparkles, ChevronRight } from "lucide
 
 type Birthday = { id: string; nome: string; unidade: string | null; day: number; month: number };
 type Update = { who: string; what: string; when: string };
-type Star = { name: string; detail: string } | null;
+type Highlight = { name: string; detail: string } | null;
 
 const relative = (iso: string) => {
   const diff = Date.now() - new Date(iso).getTime();
@@ -17,13 +17,14 @@ const relative = (iso: string) => {
 };
 
 const Metric = ({ icon: Icon, label, value, accent, onClick }: any) => (
-  <Card
+  <div
     onClick={onClick}
     role={onClick ? "button" : undefined}
     tabIndex={onClick ? 0 : undefined}
     onKeyDown={(e: any) => onClick && (e.key === "Enter" || e.key === " ") && onClick()}
-    className={`transition-all ${onClick ? "cursor-pointer hover:border-gold/50 hover:-translate-y-0.5" : ""}`}
+    className={onClick ? "cursor-pointer transition-all hover:-translate-y-0.5" : ""}
   >
+    <Card className={onClick ? "hover:border-gold/50 transition-all" : ""}>
     <div className="flex items-start justify-between">
       <div>
         <p className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
@@ -31,7 +32,8 @@ const Metric = ({ icon: Icon, label, value, accent, onClick }: any) => (
       </div>
       <div className="p-3 rounded-xl bg-gold/10 text-gold"><Icon className="h-5 w-5" /></div>
     </div>
-  </Card>
+    </Card>
+  </div>
 );
 
 const Empty = ({ text }: { text: string }) => (
@@ -56,7 +58,7 @@ export default function Dashboard({ onNavigate }: { onNavigate?: (tab: string) =
   const [updates, setUpdates] = useState<Update[]>([]);
   const [proCount, setProCount] = useState<number | "—">("—");
   const [awardCount, setAwardCount] = useState(0);
-  const [star, setStar] = useState<Star>(null);
+  const [star, setStar] = useState<Highlight>(null);
   const [avg, setAvg] = useState("—");
 
   useEffect(() => {

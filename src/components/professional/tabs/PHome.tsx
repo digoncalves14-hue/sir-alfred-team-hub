@@ -325,6 +325,34 @@ export default function PHome() {
         </div>
         {pulse && <p className="text-center text-xs text-success mt-3 animate-fade-in">✓ Pulso registrado hoje</p>}
       </Card>
+
+      <Card>
+        <div className="flex items-center gap-2 text-gold mb-3">
+          <Users className="h-4 w-4" />
+          <span className="text-xs font-bold uppercase tracking-widest">Humor da equipe hoje</span>
+        </div>
+        {teamPulses.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic">Ninguém registrou o pulso hoje ainda.</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {teamPulses.map((t) => (
+              <div key={t.id} className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2">
+                <span className="text-2xl leading-none">{t.mood}</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold truncate">{t.nome}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {moodLabels[t.mood] ?? "—"}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[10px] text-muted-foreground mt-3">
+          Saber como cada um está ajuda a equipe a se apoiar melhor no dia a dia.
+        </p>
+      </Card>
+
     </div>
   );
 }

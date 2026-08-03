@@ -87,7 +87,10 @@ export default function Pulse() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {rows.map((p) => (
           <Card key={p.user_id} className="text-center">
-            <p className="text-5xl mb-2">{p.mood}</p>
+            <p className="text-5xl mb-1">{p.mood}</p>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-gold mb-2">
+              {moodLabels[p.mood] ?? ""}
+            </p>
             <p className="font-semibold text-sm">{p.nome ?? "—"}</p>
             <p className="text-xs text-muted-foreground truncate">{p.unidade ?? ""}</p>
           </Card>

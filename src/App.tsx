@@ -7,6 +7,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import OAuthConsent from "./pages/OAuthConsent.tsx";
+import ResetPassword from "./pages/ResetPassword.tsx";
+
 
 const queryClient = new QueryClient();
 

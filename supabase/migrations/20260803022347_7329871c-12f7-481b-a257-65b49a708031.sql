@@ -1,0 +1,1 @@
+ALTER TYPE public.unidade ADD VALUE IF NOT EXISTS 'Kids';

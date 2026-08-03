@@ -91,11 +91,16 @@ var list_my_ideas_default = defineTool3({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "N\xE3o autenticado" }], isError: true };
     }
-    const { data, error } = await db3(ctx).from("ideas").select("id, title, description, category, status, manager_reply, created_at").eq("author_id", ctx.getUserId()).order("created_at", { ascending: false });
+    const supabase = db3(ctx);
+    const { data, error } = await supabase.from("ideas").select("id, title, description, category, status, created_at").eq("author_id", ctx.getUserId()).order("created_at", { ascending: false });
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const { data: replyRows } = await supabase.rpc("get_idea_replies");
+    const replyMap = {};
+    (replyRows ?? []).forEach((r) => replyMap[r.idea_id] = r.manager_reply);
+    const ideas = (data ?? []).map((i) => ({ ...i, manager_reply: replyMap[i.id] ?? null }));
     return {
-      content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-      structuredContent: { ideas: data ?? [] }
+      content: [{ type: "text", text: JSON.stringify(ideas, null, 2) }],
+      structuredContent: { ideas }
     };
   }
 });

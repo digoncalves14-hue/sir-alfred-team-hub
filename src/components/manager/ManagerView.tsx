@@ -18,6 +18,8 @@ import BestPractices from "./tabs/BestPractices";
 import Ideas from "./tabs/Ideas";
 import ImportData from "./tabs/ImportData";
 import AppBarberSettings from "./tabs/AppBarberSettings";
+import NotificationBell from "@/components/NotificationBell";
+
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
@@ -50,7 +52,9 @@ export default function ManagerView({ onLogout }: { onLogout: () => void }) {
         <div className="container flex items-center justify-between py-4">
           <Logo size="sm" />
           <div className="flex items-center gap-4">
+            <NotificationBell onNavigate={(tab) => setActive(TABS.some((t) => t.id === tab) ? tab : "painel")} />
             <button
+
               onClick={async () => {
                 if ('serviceWorker' in navigator) {
                   const regs = await navigator.serviceWorker.getRegistrations();

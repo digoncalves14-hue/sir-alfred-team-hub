@@ -36,8 +36,10 @@ export default function ProfessionalView({ onLogout }: { onLogout: () => void })
         <div className="container flex items-center justify-between py-4">
           <Logo size="sm" />
           <div className="flex items-center gap-4">
+            <NotificationBell onNavigate={(tab) => setActive(TABS.some((t) => t.id === tab) ? tab : "inicio")} />
             <button
               onClick={async () => {
+
                 if ('serviceWorker' in navigator) {
                   const regs = await navigator.serviceWorker.getRegistrations();
                   await Promise.all(regs.map((r) => r.update()));

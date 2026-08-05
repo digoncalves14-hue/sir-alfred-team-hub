@@ -285,6 +285,39 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          read_at: string | null
+          tab: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          kind: string
+          read_at?: string | null
+          tab?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          read_at?: string | null
+          tab?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       performance_snapshots: {
         Row: {
           comandas_count: number
@@ -429,6 +462,33 @@ export type Database = {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       social_posts_snapshots: {
         Row: {
           created_at: string
@@ -544,6 +604,26 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      notify_all: {
+        Args: {
+          _body: string
+          _except: string
+          _kind: string
+          _tab: string
+          _title: string
+        }
+        Returns: undefined
+      }
+      notify_one: {
+        Args: {
+          _body: string
+          _kind: string
+          _tab: string
+          _title: string
+          _user: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

@@ -199,6 +199,7 @@ export type Database = {
           from_user_id: string
           id: string
           message: string
+          photo_paths: string[]
           professional_id: string
           type: string
         }
@@ -207,6 +208,7 @@ export type Database = {
           from_user_id: string
           id?: string
           message: string
+          photo_paths?: string[]
           professional_id: string
           type: string
         }
@@ -215,6 +217,7 @@ export type Database = {
           from_user_id?: string
           id?: string
           message?: string
+          photo_paths?: string[]
           professional_id?: string
           type?: string
         }
@@ -317,6 +320,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      payment_receipts: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          created_by: string | null
+          file_path: string
+          id: string
+          note: string | null
+          period_label: string
+          professional_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          file_path: string
+          id?: string
+          note?: string | null
+          period_label: string
+          professional_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          file_path?: string
+          id?: string
+          note?: string | null
+          period_label?: string
+          professional_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_receipts_professional_id_fkey"
+            columns: ["professional_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       performance_snapshots: {
         Row: {

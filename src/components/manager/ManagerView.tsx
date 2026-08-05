@@ -18,6 +18,8 @@ import BestPractices from "./tabs/BestPractices";
 import Ideas from "./tabs/Ideas";
 import ImportData from "./tabs/ImportData";
 import AppBarberSettings from "./tabs/AppBarberSettings";
+import NotificationBell from "@/components/NotificationBell";
+
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },

@@ -11,6 +11,8 @@ import PBehavioral from "./tabs/PBehavioral";
 import PGoals from "./tabs/PGoals";
 import PIdeas from "./tabs/PIdeas";
 import BestPractices from "@/components/manager/tabs/BestPractices";
+import NotificationBell from "@/components/NotificationBell";
+
 
 const TABS = [
   { id: "inicio", label: "Início", icon: Home, C: PHome },

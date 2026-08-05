@@ -50,7 +50,9 @@ export default function ManagerView({ onLogout }: { onLogout: () => void }) {
         <div className="container flex items-center justify-between py-4">
           <Logo size="sm" />
           <div className="flex items-center gap-4">
+            <NotificationBell onNavigate={(tab) => setActive(TABS.some((t) => t.id === tab) ? tab : "painel")} />
             <button
+
               onClick={async () => {
                 if ('serviceWorker' in navigator) {
                   const regs = await navigator.serviceWorker.getRegistrations();

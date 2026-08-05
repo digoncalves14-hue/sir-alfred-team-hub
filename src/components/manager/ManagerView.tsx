@@ -18,6 +18,8 @@ import BestPractices from "./tabs/BestPractices";
 import Ideas from "./tabs/Ideas";
 import ImportData from "./tabs/ImportData";
 import AppBarberSettings from "./tabs/AppBarberSettings";
+import Receipts from "./tabs/Receipts";
+
 import NotificationBell from "@/components/NotificationBell";
 
 
@@ -31,6 +33,8 @@ const TABS = [
   { id: "mural", label: "Mural de Boas Práticas", C: BestPractices },
   { id: "ideias", label: "Caixa de Ideias", C: Ideas },
   { id: "feedbacks", label: "Feedbacks", C: Feedbacks },
+  { id: "comprovantes", label: "Comprovantes", C: Receipts },
+
   { id: "ranking", label: "Ranking", C: Ranking },
   { id: "premios", label: "Prêmios", C: Awards },
   { id: "avaliacoes", label: "Avaliações", C: Reviews },

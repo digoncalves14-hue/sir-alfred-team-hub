@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card, SectionTitle, Stars, Badge } from "@/components/ui-kit";
+import { FeedbackPhotos } from "@/components/FeedbackPhotos";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchMyName, normalizeName } from "@/lib/teamNames";
@@ -9,7 +10,9 @@ type Feedback = {
   type: "Positivo" | "Melhoria" | "Tecnico";
   message: string;
   created_at: string;
+  photo_paths: string[] | null;
 };
+
 
 type Review = { id: string; stars: number; comment: string | null; review_date: string };
 
@@ -29,10 +32,11 @@ export default function PNotes() {
     if (!user) return;
     supabase
       .from("feedbacks")
-      .select("id,type,message,created_at")
+      .select("id,type,message,created_at,photo_paths")
       .eq("professional_id", user.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => setFeedbacks((data ?? []) as Feedback[]));
+
 
     (async () => {
       const nome = await fetchMyName(user.id);
@@ -112,6 +116,8 @@ export default function PNotes() {
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">{f.message}</p>
+              <FeedbackPhotos paths={f.photo_paths ?? []} />
+
             </Card>
           ))
         )}

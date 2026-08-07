@@ -36,7 +36,7 @@ export default function ProfessionalView({ onLogout }: { onLogout: () => void })
   const Active = TABS.find((t) => t.id === active)!.C;
   return (
     <div className="min-h-screen bg-background pb-24">
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border">
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <div className="container flex items-center justify-between py-4">
           <Logo size="sm" />
           <div className="flex items-center gap-4">

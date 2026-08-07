@@ -21,8 +21,11 @@ function todayBR() {
 }
 
 export default function Pulse() {
+  const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
 
   const load = async () => {
     const today = todayBR();

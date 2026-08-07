@@ -11,7 +11,7 @@ type Profile = { id: string; nome: string; foto_url: string | null };
 type Feedback = {
   id: string;
   professional_id: string;
-  type: "Positivo" | "Melhoria" | "Tecnico";
+  type: "Positivo" | "Melhoria" | "Tecnico" | "Critica";
   message: string;
   created_at: string;
   photo_paths: string[] | null;
@@ -24,11 +24,13 @@ const TYPE_COLORS: Record<string, string> = {
   Positivo: "bg-success/20 text-success border-success/40",
   Melhoria: "bg-warning/20 text-warning border-warning/40",
   Tecnico: "bg-blue-500/20 text-blue-400 border-blue-500/40",
+  Critica: "bg-destructive/20 text-destructive border-destructive/40",
 };
 const TYPE_LABEL: Record<string, string> = {
   Positivo: "Positivo",
   Melhoria: "Sugestão",
   Tecnico: "Técnico",
+  Critica: "Crítica construtiva",
 };
 
 export default function Feedbacks() {
@@ -119,6 +121,7 @@ export default function Feedbacks() {
             <option value="Positivo">Positivo</option>
             <option value="Melhoria">Sugestão</option>
             <option value="Tecnico">Técnico</option>
+            <option value="Critica">Crítica construtiva</option>
           </select>
         </div>
         <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder="Descreva o feedback..." className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm" />

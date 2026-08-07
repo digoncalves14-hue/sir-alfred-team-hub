@@ -52,10 +52,10 @@ export default function ManagerView({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border pt-[calc(0.75rem+env(safe-area-inset-top))]">
-        <div className="container flex items-center justify-between py-4">
-          <Logo size="sm" />
-          <div className="flex items-center gap-4">
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border pt-[max(3.5rem,env(safe-area-inset-top))] sm:pt-4">
+        <div className="container flex items-center justify-between py-2">
+          <Logo size="sm" showSubtitle={false} />
+          <div className="flex items-center gap-2 sm:gap-4">
             <NotificationBell onNavigate={(tab) => setActive(TABS.some((t) => t.id === tab) ? tab : "painel")} />
             <button
 
@@ -66,14 +66,14 @@ export default function ManagerView({ onLogout }: { onLogout: () => void }) {
                 }
                 window.location.reload();
               }}
-              className="text-muted-foreground hover:text-gold transition flex items-center gap-2 text-sm"
+              className="text-muted-foreground hover:text-gold transition flex h-10 w-10 items-center justify-center text-sm sm:h-auto sm:w-auto sm:gap-2"
               aria-label="Atualizar"
               title="Atualizar app"
             >
-              <RefreshCw className="h-4 w-4" /> Atualizar
+              <RefreshCw className="h-5 w-5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Atualizar</span>
             </button>
-            <button onClick={onLogout} className="text-muted-foreground hover:text-gold transition flex items-center gap-2 text-sm">
-              <LogOut className="h-4 w-4" /> Sair
+            <button onClick={onLogout} aria-label="Sair" title="Sair" className="text-muted-foreground hover:text-gold transition flex h-10 w-10 items-center justify-center text-sm sm:h-auto sm:w-auto sm:gap-2">
+              <LogOut className="h-5 w-5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Sair</span>
             </button>
           </div>
         </div>

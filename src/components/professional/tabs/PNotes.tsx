@@ -28,15 +28,35 @@ export default function PNotes() {
   const { user } = useAuth();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("feedbacks")
-      .select("id,type,message,created_at,photo_paths")
-      .eq("professional_id", user.id)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setFeedbacks((data ?? []) as Feedback[]));
+    const key = `pnotes:lastSeenFeedback:${user.id}`;
+    setLastSeen(localStorage.getItem(key));
+
+    const loadFeedbacks = () =>
+      supabase
+        .from("feedbacks")
+        .select("id,type,message,created_at,photo_paths")
+        .eq("professional_id", user.id)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => {
+          const rows = (data ?? []) as Feedback[];
+          setFeedbacks(rows);
+          if (rows[0]) localStorage.setItem(key, rows[0].created_at);
+        });
+
+    loadFeedbacks();
+
+    const channel = supabase
+      .channel("pnotes-feedbacks")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "feedbacks", filter: `professional_id=eq.${user.id}` },
+        () => loadFeedbacks(),
+      )
+      .subscribe();
 
 
     (async () => {

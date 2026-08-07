@@ -71,7 +71,14 @@ export default function PNotes() {
           .map((r) => ({ id: r.id, stars: r.stars, comment: r.comment, review_date: r.review_date }))
       );
     })();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
+
+  const isNew = (iso: string) => !lastSeen || new Date(iso) > new Date(lastSeen);
+  const newCount = feedbacks.filter((f) => isNew(f.created_at)).length;
 
   const dist = [5, 4, 3, 2, 1].map((star) => ({
     star,

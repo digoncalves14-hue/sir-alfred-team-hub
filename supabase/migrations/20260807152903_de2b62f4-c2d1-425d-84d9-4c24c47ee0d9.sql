@@ -1,0 +1,2 @@
+ALTER TABLE public.feedbacks DROP CONSTRAINT feedbacks_type_check;
+ALTER TABLE public.feedbacks ADD CONSTRAINT feedbacks_type_check CHECK (type = ANY (ARRAY['Positivo'::text, 'Melhoria'::text, 'Tecnico'::text, 'Critica'::text]));

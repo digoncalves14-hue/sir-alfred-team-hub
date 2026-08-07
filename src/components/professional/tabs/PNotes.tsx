@@ -28,15 +28,35 @@ export default function PNotes() {
   const { user } = useAuth();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("feedbacks")
-      .select("id,type,message,created_at,photo_paths")
-      .eq("professional_id", user.id)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setFeedbacks((data ?? []) as Feedback[]));
+    const key = `pnotes:lastSeenFeedback:${user.id}`;
+    setLastSeen(localStorage.getItem(key));
+
+    const loadFeedbacks = () =>
+      supabase
+        .from("feedbacks")
+        .select("id,type,message,created_at,photo_paths")
+        .eq("professional_id", user.id)
+        .order("created_at", { ascending: false })
+        .then(({ data }) => {
+          const rows = (data ?? []) as Feedback[];
+          setFeedbacks(rows);
+          if (rows[0]) localStorage.setItem(key, rows[0].created_at);
+        });
+
+    loadFeedbacks();
+
+    const channel = supabase
+      .channel("pnotes-feedbacks")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "feedbacks", filter: `professional_id=eq.${user.id}` },
+        () => loadFeedbacks(),
+      )
+      .subscribe();
 
 
     (async () => {
@@ -51,7 +71,14 @@ export default function PNotes() {
           .map((r) => ({ id: r.id, stars: r.stars, comment: r.comment, review_date: r.review_date }))
       );
     })();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
+
+  const isNew = (iso: string) => !lastSeen || new Date(iso) > new Date(lastSeen);
+  const newCount = feedbacks.filter((f) => isNew(f.created_at)).length;
 
   const dist = [5, 4, 3, 2, 1].map((star) => ({
     star,
@@ -104,14 +131,28 @@ export default function PNotes() {
       )}
 
       <div className="space-y-3">
-        <p className="text-xs uppercase tracking-widest text-gold font-bold">Feedbacks do gestor</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs uppercase tracking-widest text-gold font-bold">Feedbacks do gestor</p>
+          {newCount > 0 && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/20 text-gold border border-gold/40">
+              {newCount} novo{newCount > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
         {feedbacks.length === 0 ? (
           <Card><p className="text-sm text-muted-foreground">Nenhum feedback recebido ainda.</p></Card>
         ) : (
           feedbacks.map((f) => (
-            <Card key={f.id}>
+            <Card key={f.id} className={isNew(f.created_at) ? "border-gold/50" : undefined}>
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                <Badge className={TYPE_COLORS[f.type]}>{TYPE_LABEL[f.type]}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className={TYPE_COLORS[f.type]}>{TYPE_LABEL[f.type]}</Badge>
+                  {isNew(f.created_at) && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/20 text-gold border border-gold/40">
+                      Novo
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-muted-foreground">
                   {new Date(f.created_at).toLocaleDateString("pt-BR")}
                 </span>

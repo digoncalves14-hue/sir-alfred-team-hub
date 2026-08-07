@@ -18,6 +18,7 @@ const TYPE_LABEL: Record<string, string> = {
   Positivo: "Positivo",
   Melhoria: "Sugestão",
   Tecnico: "Técnico",
+  Critica: "Crítica construtiva",
 };
 
 type BirthdayProfile = { id: string; nome: string; foto_url: string | null; data_aniversario: string };

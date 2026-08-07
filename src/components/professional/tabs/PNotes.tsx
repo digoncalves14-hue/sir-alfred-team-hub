@@ -7,7 +7,7 @@ import { fetchMyName, normalizeName } from "@/lib/teamNames";
 
 type Feedback = {
   id: string;
-  type: "Positivo" | "Melhoria" | "Tecnico";
+  type: "Positivo" | "Melhoria" | "Tecnico" | "Critica";
   message: string;
   created_at: string;
   photo_paths: string[] | null;
@@ -20,8 +20,9 @@ const TYPE_COLORS: Record<string, string> = {
   Positivo: "bg-success/20 text-success border-success/40",
   Melhoria: "bg-warning/20 text-warning border-warning/40",
   Tecnico: "bg-blue-500/20 text-blue-400 border-blue-500/40",
+  Critica: "bg-destructive/20 text-destructive border-destructive/40",
 };
-const TYPE_LABEL: Record<string, string> = { Positivo: "Positivo", Melhoria: "Sugestão", Tecnico: "Técnico" };
+const TYPE_LABEL: Record<string, string> = { Positivo: "Positivo", Melhoria: "Sugestão", Tecnico: "Técnico", Critica: "Crítica construtiva" };
 
 export default function PNotes() {
   const { user } = useAuth();

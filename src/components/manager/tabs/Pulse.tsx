@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { moodLabels, MOOD_OPTIONS } from "@/lib/moods";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import PulseHistory from "@/components/manager/PulseHistory";
 
 type Row = {
   user_id: string;
@@ -138,6 +139,8 @@ export default function Pulse() {
           </Card>
         ))}
       </div>
+
+      <PulseHistory />
     </div>
   );
 }

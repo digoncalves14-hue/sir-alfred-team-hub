@@ -131,14 +131,28 @@ export default function PNotes() {
       )}
 
       <div className="space-y-3">
-        <p className="text-xs uppercase tracking-widest text-gold font-bold">Feedbacks do gestor</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs uppercase tracking-widest text-gold font-bold">Feedbacks do gestor</p>
+          {newCount > 0 && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/20 text-gold border border-gold/40">
+              {newCount} novo{newCount > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
         {feedbacks.length === 0 ? (
           <Card><p className="text-sm text-muted-foreground">Nenhum feedback recebido ainda.</p></Card>
         ) : (
           feedbacks.map((f) => (
-            <Card key={f.id}>
+            <Card key={f.id} className={isNew(f.created_at) ? "border-gold/50" : undefined}>
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                <Badge className={TYPE_COLORS[f.type]}>{TYPE_LABEL[f.type]}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className={TYPE_COLORS[f.type]}>{TYPE_LABEL[f.type]}</Badge>
+                  {isNew(f.created_at) && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/20 text-gold border border-gold/40">
+                      Novo
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-muted-foreground">
                   {new Date(f.created_at).toLocaleDateString("pt-BR")}
                 </span>

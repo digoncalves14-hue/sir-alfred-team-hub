@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Logo } from "../Logo";
 import { LogOut, RefreshCw } from "lucide-react";
 import Dashboard from "./tabs/Dashboard";
+import Company from "./tabs/Company";
+import Services from "./tabs/Services";
 import Team from "./tabs/Team";
 import Goals from "./tabs/Goals";
 import Pulse from "./tabs/Pulse";
@@ -25,6 +27,8 @@ import NotificationBell from "@/components/NotificationBell";
 
 const TABS = [
   { id: "painel", label: "Painel", C: Dashboard },
+  { id: "empresa", label: "Empresa & Unidades", C: Company },
+  { id: "servicos", label: "Serviços", C: Services },
   { id: "equipe", label: "Equipe", C: Team },
   { id: "perfil-comportamental", label: "Perfil Comportamental", C: BehavioralProfile },
   { id: "metas", label: "Desempenho", C: Goals },

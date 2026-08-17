@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionTitle, Badge } from "@/components/ui-kit";
 import { Avatar } from "@/components/Avatar";
 import { FeedbackPhotos } from "@/components/FeedbackPhotos";
+import { FeedbackReplies, QUICK_REPLIES_MANAGER } from "@/components/FeedbackReplies";
 import { Send, ImagePlus, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -167,6 +168,11 @@ export default function Feedbacks() {
             </div>
             <p className="text-sm text-muted-foreground">{f.message}</p>
             <FeedbackPhotos paths={f.photo_paths ?? []} />
+            <FeedbackReplies
+              feedbackId={f.id}
+              quickReplies={QUICK_REPLIES_MANAGER}
+              names={Object.fromEntries(profiles.map((p) => [p.id, p.nome]))}
+            />
           </Card>
         ))}
       </div>

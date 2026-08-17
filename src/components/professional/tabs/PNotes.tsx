@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, SectionTitle, Stars, Badge } from "@/components/ui-kit";
 import { FeedbackPhotos } from "@/components/FeedbackPhotos";
+import { FeedbackReplies, QUICK_REPLIES_PROFESSIONAL } from "@/components/FeedbackReplies";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchMyName, normalizeName } from "@/lib/teamNames";
@@ -159,6 +160,8 @@ export default function PNotes() {
               </div>
               <p className="text-sm text-muted-foreground">{f.message}</p>
               <FeedbackPhotos paths={f.photo_paths ?? []} />
+              <FeedbackReplies feedbackId={f.id} quickReplies={QUICK_REPLIES_PROFESSIONAL} />
+
 
             </Card>
           ))

@@ -20,12 +20,39 @@ function put(url: string, body: Blob, headers: Record<string, string>, onProgres
     xhr.open("PUT", url);
     for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => onProgress(e.loaded);
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.getResponseHeader("ETag")) : reject(new Error(uploadError(xhr))));
-    xhr.onerror = () => reject(new Error("Falha de rede durante o upload."));
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.getResponseHeader("ETag") ?? bodyEtag(xhr)) : reject(new UploadError(uploadError(xhr), xhr.status)));
+    xhr.onerror = () => reject(new UploadError("Falha de rede durante o upload.", 0));
     xhr.onabort = () => reject(new Error("Upload cancelado."));
     signal?.addEventListener("abort", () => xhr.abort());
     xhr.send(body);
   });
+}
+
+class UploadError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+function bodyEtag(xhr: XMLHttpRequest): string | null {
+  try {
+    return JSON.parse(xhr.responseText).etag ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Repete a parte em falhas de rede/servidor (5xx), com espera crescente. */
+async function putWithRetry(...args: Parameters<typeof put>): Promise<string | null> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await put(...args);
+    } catch (e) {
+      const retriable = e instanceof UploadError && (e.status === 0 || e.status >= 500);
+      if (!retriable || attempt >= 3 || args[4]?.aborted) throw e;
+      await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
+    }
+  }
 }
 
 function uploadError(xhr: XMLHttpRequest): string {
@@ -63,7 +90,7 @@ export async function uploadFile(file: File, opts: UploadOptions): Promise<strin
     for (let part = queue.shift(); part; part = queue.shift()) {
       const start = (part.partNumber - 1) * target.partSize;
       const blob = file.slice(start, Math.min(file.size, start + target.partSize));
-      const etag = await put(part.url, blob, {}, (l) => {
+      const etag = await putWithRetry(part.url, blob, {}, (l) => {
         loadedByPart.set(part!.partNumber, l);
         report([...loadedByPart.values()].reduce((a, b) => a + b, 0));
       }, opts.signal);

@@ -54,6 +54,30 @@ describe.skipIf(!endpoint)("armazenamento S3", () => {
     expect(await storage.stat(key)).toBeNull();
   });
 
+  it("upload pela aplicação em partes de 16 MB (cada requisição curta)", async () => {
+    const key = makeStorageKey("11111111-1111-4111-8111-111111111111", "sources", "mp4");
+    const data = randomBytes(40 * 1024 * 1024);
+    const target = await storage.createUpload(key, "video/mp4", data.length);
+    if (target.mode !== "multipart") throw new Error("esperava multipart");
+    expect(target.parts).toHaveLength(3);
+    expect(target.parts.every((p) => p.url.startsWith("/api/storage/upload?") && p.url.includes("part="))).toBe(true);
+    const parts = [];
+    for (const p of target.parts) {
+      const start = (p.partNumber - 1) * target.partSize;
+      const slice = data.subarray(start, start + target.partSize);
+      async function* one() {
+        yield slice;
+      }
+      parts.push({ partNumber: p.partNumber, etag: await storage.writePart(key, target.uploadId, p.partNumber, one(), target.partSize) });
+    }
+    await expect(
+      storage.writePart(key, target.uploadId, 1, (async function* () { yield randomBytes(target.partSize + 1); })(), target.partSize),
+    ).rejects.toThrow();
+    await storage.completeUpload(key, { uploadId: target.uploadId, parts });
+    expect((await storage.stat(key))?.size).toBe(data.length);
+    await storage.delete(key);
+  });
+
   it("rejeita upload maior que o declarado", async () => {
     const key = makeStorageKey("11111111-1111-4111-8111-111111111111", "sources", "mp4");
     async function* big() {

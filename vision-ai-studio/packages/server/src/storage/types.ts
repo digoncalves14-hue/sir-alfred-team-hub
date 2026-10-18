@@ -28,4 +28,6 @@ export interface StorageDriver {
   delete(key: string): Promise<void>;
   /** Recebe um upload que passa pela aplicação (stream), respeitando o tamanho máximo. */
   writeStream(key: string, body: AsyncIterable<Uint8Array>, maxBytes: number, contentType: string): Promise<number>;
+  /** Recebe uma parte de upload multipart pela aplicação (só S3); devolve o ETag. */
+  writePart?(key: string, uploadId: string, partNumber: number, body: AsyncIterable<Uint8Array>, maxBytes: number): Promise<string>;
 }

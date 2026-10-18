@@ -22,6 +22,9 @@ import { signedLocalUrl } from "./signing";
 import { getConfig } from "../config";
 import type { StorageDriver, UploadTarget } from "./types";
 
+/** Tamanho das partes no upload pela aplicação (cada requisição leva segundos, não minutos). */
+const PROXY_PART_MB = 16;
+
 /**
  * Armazenamento compatível com S3 (AWS S3, Cloudflare R2, MinIO...).
  * O bucket deve ser PRIVADO; todo acesso usa URLs pré-assinadas temporárias.
@@ -55,8 +58,21 @@ export class S3Storage implements StorageDriver {
     const partSize = c.MULTIPART_PART_MB * 1024 * 1024;
     const ttl = c.SIGNED_URL_TTL_SEC * 6;
     if (!c.S3_DIRECT_UPLOAD) {
-      // upload pela aplicação: não depende de CORS no bucket
-      return { mode: "single", method: "PUT", url: signedLocalUrl("put", key, ttl, { max: String(sizeBytes) }), headers: {} };
+      // Upload pela aplicação (não depende de CORS no bucket), sempre em partes pequenas:
+      // cada requisição termina rápido, abaixo do limite de tempo de proxies como o do Railway.
+      const proxyPart = PROXY_PART_MB * 1024 * 1024;
+      if (sizeBytes <= proxyPart) {
+        return { mode: "single", method: "PUT", url: signedLocalUrl("put", key, ttl, { max: String(sizeBytes) }), headers: {} };
+      }
+      const created = await this.client.send(new CreateMultipartUploadCommand({ Bucket: this.bucket, Key: key, ContentType: contentType }));
+      const uploadId = created.UploadId!;
+      const count = Math.ceil(sizeBytes / proxyPart);
+      if (count > 10_000) throw new Error("Arquivo grande demais para upload multipart.");
+      const parts = Array.from({ length: count }, (_, i) => ({
+        partNumber: i + 1,
+        url: signedLocalUrl("put", key, ttl, { max: String(proxyPart), part: String(i + 1), uploadId }),
+      }));
+      return { mode: "multipart", uploadId, partSize: proxyPart, parts };
     }
     if (sizeBytes <= partSize) {
       const url = await getSignedUrl(
@@ -166,6 +182,23 @@ export class S3Storage implements StorageDriver {
       throw err;
     }
     return total;
+  }
+
+  /** Recebe uma parte de upload multipart que passa pela aplicação; devolve o ETag. */
+  async writePart(key: string, uploadId: string, partNumber: number, body: AsyncIterable<Uint8Array>, maxBytes: number): Promise<string> {
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for await (const chunk of body) {
+      total += chunk.byteLength;
+      if (total > maxBytes) throw new Error("Parte maior que o tamanho esperado.");
+      chunks.push(chunk);
+    }
+    if (!total) throw new Error("Parte vazia.");
+    const r = await this.client.send(
+      new UploadPartCommand({ Bucket: this.bucket, Key: key, UploadId: uploadId, PartNumber: partNumber, Body: Buffer.concat(chunks), ContentLength: total }),
+    );
+    if (!r.ETag) throw new Error("O armazenamento não retornou o ETag da parte.");
+    return r.ETag;
   }
 
   async putBuffer(key: string, data: Buffer, contentType: string): Promise<void> {

@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0b0b0c;
+  color: #e8e6e1;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+
+::selection {
+  background: rgba(212, 175, 55, 0.35);
+}
+
+@layer components {
+  .panel {
+    @apply rounded-xl border border-ink-700 bg-ink-900 shadow-panel;
+  }
+  .input {
+    @apply w-full rounded-lg border border-ink-700 bg-ink-850 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-500 outline-none transition focus:border-gold-600 focus:ring-1 focus:ring-gold-600/40 disabled:opacity-50;
+  }
+  .label {
+    @apply mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-400;
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #34343a transparent;
+  }
+}
+
+input[type="range"] {
+  accent-color: #d4af37;
+}

@@ -1,0 +1,36 @@
+{
+  "name": "vision-ai-studio",
+  "private": true,
+  "version": "0.1.0",
+  "description": "VISION AI STUDIO — plataforma de edição de vídeos com IA",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @vision/web",
+    "dev:worker": "npm run dev -w @vision/worker",
+    "build": "npm run build -w @vision/web",
+    "start": "npm run start -w @vision/web",
+    "start:worker": "npm run start -w @vision/worker",
+    "db:migrate": "tsx packages/db/src/migrate.ts",
+    "db:seed": "tsx packages/db/src/seed.ts",
+    "typecheck": "tsc -p packages/core && tsc -p packages/db && tsc -p packages/server && tsc -p apps/worker && tsc -p apps/web --noEmit",
+    "test": "vitest run --project unit --project media",
+    "test:unit": "vitest run --project unit",
+    "test:media": "vitest run --project media",
+    "test:integration": "VISION_TEST_DB=1 vitest run --project integration",
+    "acceptance": "tsx scripts/acceptance.ts",
+    "fixtures": "tsx scripts/make-fixtures.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "drizzle-kit": "^0.30.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

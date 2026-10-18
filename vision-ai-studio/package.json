@@ -25,12 +25,15 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
-    "drizzle-kit": "^0.30.6",
+    "drizzle-kit": "^0.31.11",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=20.11"
+  },
+  "overrides": {
+    "postcss": "^8.5.31"
   }
 }

@@ -7,7 +7,7 @@
   "types": "src/index.ts",
   "dependencies": {
     "@vision/core": "*",
-    "drizzle-orm": "^0.38.3",
+    "drizzle-orm": "^0.45.4",
     "pg": "^8.13.1"
   },
   "devDependencies": {

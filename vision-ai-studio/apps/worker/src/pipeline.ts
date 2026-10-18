@@ -9,9 +9,11 @@ import {
   enqueueJob,
   jobs,
   projects,
+  templates,
   transcripts,
 } from "@vision/db";
-import { ACTIVE, capabilities, queueRenders } from "@vision/server";
+import { SYSTEM_TEMPLATES, TemplateConfig, applyEditPlan, templateToOperations } from "@vision/core";
+import { ACTIVE, capabilities, createVersion, getCurrentVersion, loadEngineContext, queueRenders } from "@vision/server";
 
 /** Avança o modo "Criar vídeo com IA" depois de cada etapa concluída. */
 export async function continueAutopilot(db: Db, projectId: string): Promise<void> {
@@ -44,6 +46,7 @@ export async function continueAutopilot(db: Db, projectId: string): Promise<void
         return;
       }
     }
+    if (project.templateId) await applyTemplateOnce(db, project);
     const [cmd] = await db
       .insert(aiCommands)
       .values({ orgId: project.orgId, projectId, userId: project.createdBy, text: ap.command, baseVersionId: project.currentVersionId })
@@ -73,3 +76,24 @@ async function saveAutopilot(db: Db, projectId: string, ap: AutopilotConfig) {
   await db.update(projects).set({ autopilot: ap }).where(eq(projects.id, projectId));
 }
 
+
+/** No modo automático, aplica o template escolhido antes do comando da IA. */
+async function applyTemplateOnce(db: Db, project: typeof projects.$inferSelect): Promise<void> {
+  const current = await getCurrentVersion(db, project);
+  if (!current) return;
+  let config: TemplateConfig | null = SYSTEM_TEMPLATES.find((t) => t.id === project.templateId)?.config ?? null;
+  if (!config && /^[0-9a-f-]{36}$/.test(project.templateId ?? "")) {
+    const [row] = await db.select().from(templates).where(and(eq(templates.id, project.templateId!), eq(templates.orgId, project.orgId)));
+    const parsed = TemplateConfig.safeParse(row?.config);
+    config = parsed.success ? parsed.data : null;
+  }
+  if (!config) return;
+  const ctx = await loadEngineContext(db, project, current.timeline);
+  const ops = templateToOperations(config, {
+    hasMusic: ctx.musicAssetIds.length + (ctx.brand?.musicAssetIds.length ?? 0) > 0,
+    hasTranscript: [...ctx.sources.values()].some((s) => s.transcript),
+    hasLogo: Boolean(ctx.brand?.logoAssetId),
+  });
+  const r = applyEditPlan(current.timeline, { reply: "", operations: ops }, ctx);
+  await createVersion(db, { orgId: project.orgId, projectId: project.id, timeline: r.timeline, source: "manual", summary: `Template aplicado. ${r.applied.join(" ")}`, parentId: current.version.id });
+}

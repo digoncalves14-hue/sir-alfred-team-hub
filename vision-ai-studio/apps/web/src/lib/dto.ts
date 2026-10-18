@@ -27,6 +27,7 @@ export async function assetDto(a: Asset) {
     licenseNote: a.licenseNote,
     errorMessage: a.errorMessage,
     hasAnalysis: Boolean(a.analysis),
+    bpm: a.role === "music" ? ((a.analysis as { bpm?: number | null } | null)?.bpm ?? null) : null,
     createdAt: a.createdAt.toISOString(),
     url: a.status === "ready" || a.status === "processing" ? await signedUrl(a.storageKey) : null,
     thumbnailUrl: await signedUrl(a.thumbnailKey),

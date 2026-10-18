@@ -1,16 +1,72 @@
 "use client";
+import { useEffect, useState } from "react";
+import { LayoutTemplate, Save } from "lucide-react";
+import type { TemplateDef } from "@vision/core";
+import { apiFetch } from "@/lib/client";
+import { Button } from "../ui";
 import { DESTINATIONS, EDIT_STYLES, FORMAT_PRESETS, type FormatPresetId, type Timeline } from "@vision/core";
 import { cx } from "../ui";
-import type { StudioActions } from "./types";
+import type { Detail, StudioActions } from "./types";
 
 const PLATFORM = { youtube: "YouTube", instagram: "Instagram", facebook: "Facebook" } as const;
 
 /** Formato/proporção, modo de enquadramento e estilo automático. */
-export function FormatPanel({ timeline, actions }: { timeline: Timeline; actions: StudioActions }) {
+export function FormatPanel({ data, timeline, actions }: { data: Detail; timeline: Timeline; actions: StudioActions }) {
+  const [templates, setTemplates] = useState<TemplateDef[]>([]);
+  const [chosen, setChosen] = useState<string>(data.project.templateId ?? "");
+  const [busy, setBusy] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  useEffect(() => {
+    apiFetch<{ templates: TemplateDef[] }>("/api/templates").then((r) => setTemplates(r.templates)).catch(() => {});
+  }, []);
+  const apply = async () => {
+    if (!chosen) return;
+    setBusy(true);
+    try {
+      const r = await apiFetch<{ applied: string[]; notes: string[] }>(`/api/projects/${data.project.id}/template`, { method: "POST", json: { templateId: chosen } });
+      actions.notify([r.applied.length ? `Template aplicado: ${r.applied.length} ajustes.` : "Template aplicado.", ...r.notes].join(" "), r.notes.length ? "warn" : "success");
+      await actions.refresh();
+    } catch (e) {
+      actions.notify((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = async () => {
+    if (saveName.trim().length < 2) return actions.notify("Dê um nome ao template.", "warn");
+    try {
+      await apiFetch("/api/templates", { method: "POST", json: { name: saveName.trim(), fromProjectId: data.project.id } });
+      setSaveName("");
+      setTemplates((await apiFetch<{ templates: TemplateDef[] }>("/api/templates")).templates);
+      actions.notify("Template salvo em “Templates”.", "success");
+    } catch (e) {
+      actions.notify((e as Error).message, "error");
+    }
+  };
+  const current = templates.find((t) => t.id === chosen);
   const auto = timeline.clips.filter((c) => c.focusSource === "auto_motion").length;
   const manual = timeline.clips.filter((c) => c.focusSource === "manual").length;
   return (
     <div className="space-y-5 p-4">
+      <div>
+        <p className="label">Template</p>
+        <div className="flex gap-2">
+          <select className="input" value={chosen} onChange={(e) => setChosen(e.target.value)}>
+            <option value="">Escolha um template…</option>
+            {[...new Set(templates.map((t) => t.category))].map((cat) => (
+              <optgroup key={cat} label={cat}>
+                {templates.filter((t) => t.category === cat).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          <Button onClick={apply} loading={busy} disabled={!chosen}><LayoutTemplate className="h-4 w-4" /> Aplicar</Button>
+        </div>
+        {current && <p className="mt-1 text-[11px] text-neutral-500">{current.description}{current.config.targetDurationSec ? ` · ${current.config.targetDurationSec}s` : ""}</p>}
+        <div className="mt-2 flex gap-2">
+          <input className="input py-1 text-xs" placeholder="Salvar esta edição como template…" value={saveName} onChange={(e) => setSaveName(e.target.value)} maxLength={80} />
+          <Button size="sm" onClick={save}><Save className="h-3.5 w-3.5" /></Button>
+        </div>
+      </div>
       <div>
         <p className="label">Formato</p>
         <div className="space-y-3">

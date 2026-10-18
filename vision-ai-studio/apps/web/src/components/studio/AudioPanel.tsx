@@ -64,7 +64,7 @@ export function AudioPanel({ data, timeline, actions }: { data: Detail; timeline
                 <Music2 className="h-4 w-4 text-gold-500" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{m.name}</span>
-                  <span className="block truncate text-[10px] text-neutral-500">{m.brandId ? "Da marca · " : ""}Licença: {m.licenseNote ?? "—"}</span>
+                  <span className="block truncate text-[10px] text-neutral-500">{m.brandId ? "Da marca · " : ""}{m.bpm ? `${Math.round(m.bpm)} BPM · ` : m.status === "ready" ? "batida não detectada · " : ""}Licença: {m.licenseNote ?? "—"}</span>
                 </span>
                 {m.status !== "ready" ? (
                   <span className="text-[11px] text-neutral-500">{m.status === "error" ? "Erro" : "Processando…"}</span>
@@ -84,6 +84,7 @@ export function AudioPanel({ data, timeline, actions }: { data: Detail; timeline
               <input type="range" min={0} max={1} step={0.02} defaultValue={cur.volume} key={cur.volume} className="mt-1 w-full" onMouseUp={(e) => actions.runOps([{ op: "set_music", action: "adjust", asset_id: null, volume: Number(e.currentTarget.value), ducking: null }], "Volume da música ajustado")} onTouchEnd={(e) => actions.runOps([{ op: "set_music", action: "adjust", asset_id: null, volume: Number(e.currentTarget.value), ducking: null }], "Volume da música ajustado")} />
             </label>
             <Toggle checked={cur.ducking} label="Abaixar a música automaticamente durante a fala" onChange={(v) => actions.runOps([{ op: "set_music", action: "adjust", asset_id: null, volume: null, ducking: v }])} />
+            <Button size="sm" disabled={!music.find((m) => m.id === cur.assetId)?.bpm} onClick={() => actions.runOps([{ op: "sync_to_beat", max_shift_sec: 0.35 }])}>Sincronizar cortes com a batida</Button>
             <p className="text-[11px] text-neutral-500">Fade in de {cur.fadeInSec}s e fade out de {cur.fadeOutSec}s. A redução durante a fala é aplicada no arquivo renderizado (a prévia não simula).</p>
           </div>
         )}

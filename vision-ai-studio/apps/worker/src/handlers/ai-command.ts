@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { applyEditPlan, diffTimelines, outputTimeToSource, placeClips, round3, timelineDuration, type Timeline } from "@vision/core";
-import { and, desc, eq, inArray, ne, or, aiCommands, assets, projects } from "@vision/db";
+import { SYSTEM_TEMPLATES, applyEditPlan, diffTimelines, outputTimeToSource, placeClips, round3, timelineDuration, type Timeline } from "@vision/core";
+import { and, desc, eq, inArray, ne, or, aiCommands, assets, projects, templates } from "@vision/db";
 import {
   LimitError,
   ProcessingError,
@@ -11,6 +11,7 @@ import {
   getCurrentVersion,
   getStorage,
   loadBrandContext,
+  loadMusicAnalyses,
   loadSources,
   recordUsage,
 } from "@vision/server";
@@ -75,6 +76,7 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
     musicAssets: musicRows,
     frames,
     history: history.reverse(),
+    templateGuidance: await templateGuidance(ctx, project.templateId, project.orgId),
   });
 
   // legendas precisam de transcrição: transcreve antes de aplicar, se possível
@@ -97,7 +99,12 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
   ctx.progress(0.85, "Aplicando edição");
   let result;
   try {
-    result = applyEditPlan(current.timeline, planned.plan, { sources, brand, musicAssetIds: musicRows.map((m) => m.id) });
+    result = applyEditPlan(current.timeline, planned.plan, {
+      sources,
+      brand,
+      musicAssetIds: musicRows.map((m) => m.id),
+      musicAnalyses: await loadMusicAnalyses(db, [...musicRows.map((m) => m.id), ...(brand?.musicAssetIds ?? [])]),
+    });
   } catch (err) {
     throw new ProcessingError("edit_rejected", (err as Error).message);
   }
@@ -156,8 +163,16 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
   };
 }
 
+async function templateGuidance(ctx: JobContext, templateId: string | null, orgId: string): Promise<string | null> {
+  if (!templateId) return null;
+  const sys = SYSTEM_TEMPLATES.find((t) => t.id === templateId);
+  if (sys) return sys.config.aiGuidance || null;
+  const [row] = await ctx.db.select().from(templates).where(and(eq(templates.id, templateId), eq(templates.orgId, orgId)));
+  return (row?.config as { aiGuidance?: string } | undefined)?.aiGuidance || null;
+}
+
 /** Amostra quadros ao longo do vídeo final atual para a análise visual multimodal. */
-async function sampleFrames(ctx: JobContext, tl: Timeline, count: number): Promise<PlannerFrame[]> {
+export async function sampleFrames(ctx: JobContext, tl: Timeline, count: number): Promise<PlannerFrame[]> {
   const total = placeClips(tl).at(-1)?.outEnd ?? 0;
   if (total <= 0) return [];
   const n = Math.min(count, Math.max(2, Math.floor(total / 2)));

@@ -34,6 +34,8 @@ export interface PlannerInput {
   musicAssets: Array<{ id: string; name: string }>;
   frames: PlannerFrame[];
   history: Array<{ text: string; reply: string | null }>;
+  /** Orientação do template aplicado ao projeto (estrutura narrativa). */
+  templateGuidance?: string | null;
 }
 
 export interface PlannerOutput {
@@ -150,6 +152,8 @@ export function buildPlannerContext(input: PlannerInput): string {
     musicas_enviadas: input.musicAssets.slice(0, 20),
     quadros_fornecidos: input.frames.map((f) => f.outputTime),
     pedidos_anteriores: input.history.slice(-4),
+    orientacao_do_template: input.templateGuidance || null,
+    musica_com_batida_detectada: Boolean(input.timeline.audio.music),
   };
   return JSON.stringify(ctx);
 }

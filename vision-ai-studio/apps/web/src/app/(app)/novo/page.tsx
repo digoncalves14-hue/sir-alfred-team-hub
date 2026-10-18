@@ -2,6 +2,7 @@ import { asc, eq, getDb, inArray, assets, brands } from "@vision/db";
 import { capabilities } from "@vision/server";
 import { NewProjectWizard } from "@/components/NewProjectWizard";
 import { brandDto } from "@/lib/dto";
+import { listTemplates } from "@/lib/templates";
 import { requireSession } from "@/lib/session";
 
 export const metadata = { title: "Novo projeto" };
@@ -14,5 +15,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ m
   const logoIds = rows.map((b) => b.logoAssetId).filter(Boolean) as string[];
   const logos = logoIds.length ? await db.select().from(assets).where(inArray(assets.id, logoIds)) : [];
   const caps = capabilities();
-  return <NewProjectWizard brands={await Promise.all(rows.map((b) => brandDto(b, logos)))} editorMode={modo === "editor"} capabilities={{ ai: caps.ai, transcription: caps.transcription, maxUploadMb: caps.maxUploadMb }} />;
+  return <NewProjectWizard brands={await Promise.all(rows.map((b) => brandDto(b, logos)))} templates={await listTemplates(s.org.id)} editorMode={modo === "editor"} capabilities={{ ai: caps.ai, transcription: caps.transcription, maxUploadMb: caps.maxUploadMb }} />;
 }

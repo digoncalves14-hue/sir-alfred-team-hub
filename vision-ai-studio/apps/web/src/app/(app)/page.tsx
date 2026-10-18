@@ -58,7 +58,7 @@ export default async function Dashboard() {
             <Scissors className="h-6 w-6 text-gold-500" />
             <span className="flex-1">
               <span className="block font-semibold">Cortes de vídeo longo</span>
-              <span className="block text-xs text-neutral-400">Fase 3 · em desenvolvimento</span>
+              <span className="block text-xs text-neutral-400">Sugestões de cortes a partir de gravações</span>
             </span>
           </Link>
           <Link href="/novo?modo=editor" className="group flex items-center gap-3 rounded-xl border border-ink-600 bg-ink-850 px-4 py-4 transition hover:border-ink-500">
@@ -136,7 +136,7 @@ export default async function Dashboard() {
           <QuickLink href="/biblioteca" icon={<Images className="h-4 w-4" />} title="Biblioteca de mídia" subtitle={`${mediaCount} arquivos`} />
           <div className="panel p-4">
             <div className="flex items-center gap-2 text-sm font-medium"><LayoutTemplate className="h-4 w-4 text-gold-500" /> Estilos automáticos</div>
-            <p className="mt-1 text-xs text-neutral-500">Disponíveis no assistente. Templates editáveis completos chegam na Fase 2.</p>
+            <p className="mt-1 text-xs text-neutral-500">Disponíveis no assistente e nos <Link href="/templates" className="text-gold-400 hover:underline">templates</Link>.</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {Object.values(EDIT_STYLES).map((st) => <Badge key={st.id}>{st.label}</Badge>)}
             </div>

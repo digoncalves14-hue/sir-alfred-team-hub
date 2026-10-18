@@ -1,13 +1,16 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, AudioLines, Bot, Download, Film, FolderOpen, History, Loader2, Redo2, Ratio, Subtitles, Undo2 } from "lucide-react";
+import { ArrowLeft, AudioLines, Bot, Download, FileText, Film, FolderOpen, History, Loader2, PenLine, Redo2, Ratio, Scissors, Subtitles, Undo2 } from "lucide-react";
 import { JOB_TYPE_LABEL, timelineDuration, type JobType, type Timeline } from "@vision/core";
 import { apiFetch } from "@/lib/client";
 import type { BrandDto } from "@/lib/dto";
 import { fmtDuration } from "@/lib/format";
 import { Alert, Button, Progress, StatusBadge, cx } from "../ui";
 import { AssistantPanel } from "./AssistantPanel";
+import { ClipsPanel } from "./ClipsPanel";
+import { ContentPanel } from "./ContentPanel";
+import { TranscriptPanel } from "./TranscriptPanel";
 import { AudioPanel } from "./AudioPanel";
 import { CaptionsPanel } from "./CaptionsPanel";
 import { ExportPanel } from "./ExportPanel";
@@ -18,12 +21,15 @@ import { TimelineView } from "./TimelineView";
 import { VersionsPanel } from "./VersionsPanel";
 import type { Detail, StudioActions } from "./types";
 
-type Tab = "assistant" | "captions" | "format" | "audio" | "export" | "versions" | "files";
+type Tab = "assistant" | "transcript" | "captions" | "format" | "audio" | "clips" | "content" | "export" | "versions" | "files";
 const TABS: Array<{ id: Tab; label: string; icon: typeof Bot; auto: boolean }> = [
   { id: "assistant", label: "Assistente", icon: Bot, auto: true },
+  { id: "transcript", label: "Transcrição", icon: PenLine, auto: false },
   { id: "captions", label: "Legendas", icon: Subtitles, auto: false },
   { id: "format", label: "Formato", icon: Ratio, auto: false },
   { id: "audio", label: "Áudio e logo", icon: AudioLines, auto: false },
+  { id: "clips", label: "Cortes", icon: Scissors, auto: true },
+  { id: "content", label: "Textos", icon: FileText, auto: true },
   { id: "export", label: "Exportar", icon: Download, auto: true },
   { id: "versions", label: "Versões", icon: History, auto: true },
   { id: "files", label: "Arquivos", icon: FolderOpen, auto: true },
@@ -212,13 +218,16 @@ export function Studio({ initial, brands }: { initial: Detail; brands: BrandDto[
           </div>
           <div className="scroll-thin min-h-0 flex-1 overflow-y-auto">
             {currentTab === "assistant" && <AssistantPanel data={data} actions={actions} />}
+            {currentTab === "transcript" && tl && <TranscriptPanel data={data} timeline={tl} actions={actions} />}
             {currentTab === "captions" && tl && <CaptionsPanel data={data} timeline={tl} actions={actions} />}
-            {currentTab === "format" && tl && <FormatPanel timeline={tl} actions={actions} />}
+            {currentTab === "clips" && <ClipsPanel data={data} actions={actions} />}
+            {currentTab === "content" && <ContentPanel data={data} actions={actions} />}
+            {currentTab === "format" && tl && <FormatPanel data={data} timeline={tl} actions={actions} />}
             {currentTab === "audio" && tl && <AudioPanel data={data} timeline={tl} actions={actions} />}
             {currentTab === "export" && tl && <ExportPanel data={data} timeline={tl} actions={actions} onPlayRender={setRendered} />}
             {currentTab === "versions" && <VersionsPanel data={data} actions={actions} />}
             {currentTab === "files" && <FilesPanel data={data} actions={actions} />}
-            {!tl && ["captions", "format", "audio", "export"].includes(currentTab) && <p className="p-4 text-sm text-neutral-500">Disponível assim que os vídeos forem processados.</p>}
+            {!tl && ["transcript", "captions", "format", "audio", "export"].includes(currentTab) && <p className="p-4 text-sm text-neutral-500">Disponível assim que os vídeos forem processados.</p>}
           </div>
         </aside>
       </div>

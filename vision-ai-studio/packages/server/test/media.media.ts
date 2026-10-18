@@ -13,7 +13,7 @@ import {
   type MediaProbe,
   type Timeline,
 } from "@vision/core";
-import { analyzeFile, ffmpeg, probeFile } from "../src/node";
+import { analyzeFile, analyzeMusic, ffmpeg, probeFile } from "../src/node";
 import { ProcessingError } from "../src/errors";
 import { makeFixtures } from "../../../scripts/make-fixtures";
 
@@ -176,6 +176,17 @@ describe("processamento real com FFmpeg", () => {
     const o = await probeFile(out);
     expect(o.hasAudio).toBe(true);
     expect(o.width).toBe(720);
+  });
+
+  it("detecta o andamento de uma música real (120 BPM)", async () => {
+    const m = await analyzeMusic(files.beat, 20);
+    expect(m.bpm).toBeGreaterThan(116);
+    expect(m.bpm).toBeLessThan(124);
+    // batidas alinhadas à grade de 0,5 s
+    const offs = m.beats.slice(2, 12).map((b) => Math.abs(((b + 0.25) % 0.5) - 0.25));
+    expect(Math.max(...offs)).toBeLessThan(0.08);
+    const sine = await analyzeMusic(files.music, 30);
+    expect(sine.beats.length === 0 || sine.confidence < 0.5).toBe(true);
   });
 
   it("arquivo corrompido gera erro compreensível (critério 8)", async () => {

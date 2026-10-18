@@ -1,4 +1,6 @@
 import {
+  MusicAnalysis,
+  type EngineContext,
   type AssetAnalysis,
   type BrandContext,
   type ProjectStatus,
@@ -12,6 +14,7 @@ import {
   desc,
   eq,
   inArray,
+  or,
   sql,
   type Db,
   type Project,
@@ -122,4 +125,28 @@ export async function loadBrandContext(db: Db, orgId: string, brandId: string | 
     tone: b.tone,
   };
   return ctx;
+}
+
+/** Análises de batida das músicas informadas (ignora as que não têm análise válida). */
+export async function loadMusicAnalyses(db: Db, assetIds: string[]): Promise<Map<string, MusicAnalysis>> {
+  const out = new Map<string, MusicAnalysis>();
+  if (!assetIds.length) return out;
+  const rows = await db.select({ id: assets.id, analysis: assets.analysis }).from(assets).where(inArray(assets.id, assetIds));
+  for (const r of rows) {
+    const parsed = MusicAnalysis.safeParse(r.analysis);
+    if (parsed.success) out.set(r.id, parsed.data);
+  }
+  return out;
+}
+
+/** Contexto completo do motor de edição para um projeto (fontes, marca, músicas e batidas). */
+export async function loadEngineContext(db: Db, p: Pick<Project, "id" | "orgId" | "brandId">, tl: Timeline): Promise<EngineContext> {
+  const sources = await loadSources(db, [...new Set(tl.clips.map((c) => c.assetId))]);
+  const brand = await loadBrandContext(db, p.orgId, p.brandId);
+  const music = await db
+    .select({ id: assets.id })
+    .from(assets)
+    .where(and(eq(assets.orgId, p.orgId), eq(assets.role, "music"), eq(assets.status, "ready"), or(eq(assets.projectId, p.id), p.brandId ? eq(assets.brandId, p.brandId) : eq(assets.projectId, p.id))));
+  const ids = [...music.map((m) => m.id), ...(brand?.musicAssetIds ?? [])];
+  return { sources, brand, musicAssetIds: music.map((m) => m.id), musicAnalyses: await loadMusicAnalyses(db, ids) };
 }

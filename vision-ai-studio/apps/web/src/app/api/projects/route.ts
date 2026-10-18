@@ -3,6 +3,7 @@ import { EDIT_STYLE_IDS, FORMAT_PRESET_IDS, RESOLUTIONS } from "@vision/core";
 import { and, desc, eq, getDb, isNull, brands, projects } from "@vision/db";
 import { HttpError, api, json, readJson } from "@/lib/api";
 import { projectCardDto } from "@/lib/dto";
+import { findTemplate } from "@/lib/templates";
 
 export const GET = api(async (req, { session }) => {
   const db = getDb();
@@ -24,6 +25,7 @@ const Create = z.object({
   presets: z.array(z.enum(FORMAT_PRESET_IDS)).min(1).max(9),
   styleId: z.enum(EDIT_STYLE_IDS).nullable().default(null),
   folder: z.string().trim().max(80).nullable().default(null),
+  templateId: z.string().max(80).nullable().default(null),
   autopilot: z
     .object({
       command: z.string().trim().min(3).max(4000),
@@ -38,6 +40,11 @@ export const POST = api(async (req, { session }) => {
   const body = await readJson(req, Create);
   const db = getDb();
   let styleId = body.styleId;
+  if (body.templateId) {
+    const t = await findTemplate(body.templateId, session.org.id);
+    if (!t) throw new HttpError(400, "Template inválido.");
+    styleId ??= t.config.styleId;
+  }
   if (body.brandId) {
     const [b] = await db.select().from(brands).where(and(eq(brands.id, body.brandId), eq(brands.orgId, session.org.id)));
     if (!b) throw new HttpError(400, "Marca inválida.");
@@ -54,6 +61,7 @@ export const POST = api(async (req, { session }) => {
       primaryPreset: body.presets[0],
       styleId,
       folder: body.folder,
+      templateId: body.templateId,
       createdBy: session.user.id,
       autopilot: body.autopilot
         ? { command: body.autopilot.command, presets: body.presets, autoRender: body.autopilot.autoRender, resolution: body.autopilot.resolution, stage: "waiting_analysis" }

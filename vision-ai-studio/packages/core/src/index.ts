@@ -13,3 +13,7 @@ export * from "./brands";
 export * from "./status";
 export * from "./factory";
 export * from "./version-diff";
+export * from "./beats";
+export * from "./suggestions";
+export * from "./templates";
+export * from "./content";

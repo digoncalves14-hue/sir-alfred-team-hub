@@ -10,6 +10,7 @@ import {
   or,
   aiCommands,
   assets,
+  contentSuggestions,
   brands,
   jobs,
   projects,
@@ -66,6 +67,7 @@ export async function projectDetail(id: string, orgId: string) {
     .limit(100);
   const current = current0;
   const commands = await db.select().from(aiCommands).where(eq(aiCommands.projectId, p.id)).orderBy(desc(aiCommands.createdAt)).limit(40);
+  const [content] = await db.select().from(contentSuggestions).where(eq(contentSuggestions.projectId, p.id)).orderBy(desc(contentSuggestions.createdAt)).limit(1);
   const jobRows = await db.select().from(jobs).where(eq(jobs.projectId, p.id)).orderBy(desc(jobs.createdAt)).limit(40);
   const renderRows = await db.select().from(renders).where(eq(renders.projectId, p.id)).orderBy(desc(renders.createdAt)).limit(40);
   const sourceIds = projectAssets.filter((a) => a.role === "source").map((a) => a.id);
@@ -92,6 +94,8 @@ export async function projectDetail(id: string, orgId: string) {
       primaryPreset: p.primaryPreset,
       destinations: p.destinations,
       styleId: p.styleId,
+      templateId: p.templateId,
+      parentProjectId: p.parentProjectId,
       folder: p.folder,
       currentVersionId: p.currentVersionId,
       autopilot: p.autopilot,
@@ -131,6 +135,9 @@ export async function projectDetail(id: string, orgId: string) {
       }),
     ),
     transcripts: trs.map((t) => ({ ...t, text: t.text.slice(0, 20000) })),
+    content: content
+      ? { id: content.id, status: content.status, data: content.data as Record<string, unknown> | null, model: content.model, costUsd: content.costUsd, errorMessage: content.errorMessage, versionId: content.versionId, createdAt: content.createdAt.toISOString() }
+      : null,
     capabilities: capabilities(),
   };
 }

@@ -110,6 +110,8 @@ export const projects = pgTable(
     destinations: jsonb("destinations").$type<string[]>().notNull().default([]),
     primaryPreset: text("primary_preset").notNull().default("instagram_reels_9x16"),
     styleId: text("style_id"),
+    templateId: text("template_id"),
+    parentProjectId: uuid("parent_project_id"),
     currentVersionId: uuid("current_version_id"),
     thumbnailKey: text("thumbnail_key"),
     folder: text("folder"),
@@ -242,6 +244,24 @@ export const templates = pgTable("templates", {
   isSystem: boolean("is_system").notNull().default(false),
   createdAt: createdAt(),
 });
+
+export const contentSuggestions = pgTable(
+  "content_suggestions",
+  {
+    id: id(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    versionId: uuid("version_id"),
+    status: text("status").notNull().default("queued"), // queued | running | succeeded | failed
+    data: jsonb("data"),
+    model: text("model"),
+    costUsd: doublePrecision("cost_usd"),
+    errorMessage: text("error_message"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [index("content_project_idx").on(t.projectId, t.createdAt)],
+);
 
 export const jobs = pgTable(
   "jobs",

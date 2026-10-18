@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Clapperboard, Download, FolderKanban, Gem, Home, Images, LogOut, Plus, Scissors } from "lucide-react";
+import { Clapperboard, Download, FolderKanban, Gem, Home, Images, LayoutTemplate, LogOut, Plus, Scissors } from "lucide-react";
 import type { ReactNode } from "react";
 import { apiFetch } from "@/lib/client";
 import { cx } from "./ui";
@@ -11,6 +11,7 @@ const NAV = [
   { href: "/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/biblioteca", label: "Biblioteca", icon: Images },
   { href: "/marcas", label: "Minhas Marcas", icon: Gem },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/exportacoes", label: "Exportações", icon: Download },
   { href: "/cortes", label: "Cortes longos", icon: Scissors },
 ];

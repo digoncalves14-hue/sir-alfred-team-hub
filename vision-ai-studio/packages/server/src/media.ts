@@ -158,3 +158,16 @@ export async function extractAudioChunks(
 export async function removeDir(dir: string): Promise<void> {
   await rm(dir, { recursive: true, force: true });
 }
+
+/** Analisa o ritmo de uma música (até 10 min) para sincronizar cortes com a batida. */
+export async function analyzeMusic(filePath: string, durationSec: number, signal?: AbortSignal) {
+  const { detectBeats } = await import("@vision/core");
+  const sr = 11025;
+  const { stdout } = await ffmpeg(
+    ["-hide_banner", "-nostdin", "-i", filePath, "-t", String(Math.min(600, durationSec || 600)), "-vn", "-ac", "1", "-ar", String(sr), "-f", "s16le", "-acodec", "pcm_s16le", "pipe:1"],
+    { signal, captureStdout: true },
+  );
+  const samples = new Int16Array(stdout.buffer, stdout.byteOffset, Math.floor(stdout.byteLength / 2));
+  const result = detectBeats(samples, sr);
+  return { ...result, duration: durationSec || result.duration };
+}

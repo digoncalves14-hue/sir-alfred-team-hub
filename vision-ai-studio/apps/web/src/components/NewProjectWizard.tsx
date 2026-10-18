@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { CheckCircle2, Film, Sparkles, Upload, Wand2, X } from "lucide-react";
-import { DESTINATIONS, EDIT_STYLES, FORMAT_PRESETS, type FormatPresetId } from "@vision/core";
+import { DESTINATIONS, EDIT_STYLES, FORMAT_PRESETS, type FormatPresetId, type TemplateDef } from "@vision/core";
 import type { BrandDto } from "@/lib/dto";
 import { apiFetch } from "@/lib/client";
 import { uploadFile } from "@/lib/upload-client";
@@ -18,7 +18,8 @@ const EXAMPLES = [
 
 const PLATFORM_LABEL = { youtube: "YouTube", instagram: "Instagram", facebook: "Facebook" } as const;
 
-export function NewProjectWizard({ brands, editorMode, capabilities }: { brands: BrandDto[]; editorMode: boolean; capabilities: { ai: boolean; transcription: boolean; maxUploadMb: number } }) {
+export function NewProjectWizard({ brands, templates, editorMode, capabilities }: { brands: BrandDto[]; templates: TemplateDef[]; editorMode: boolean; capabilities: { ai: boolean; transcription: boolean; maxUploadMb: number } }) {
+  const [templateId, setTemplateId] = useState<string | null>(null);
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -54,7 +55,7 @@ export function NewProjectWizard({ brands, editorMode, capabilities }: { brands:
   const submit = async () => {
     setError(null);
     if (!files.length) return setError("Adicione pelo menos um vídeo.");
-    if (!editorMode && command.trim().length < 3) return setError("Descreva o que a IA deve fazer.");
+    if (!editorMode && command.trim().length < 3 && !templateId) return setError("Descreva o que a IA deve fazer ou escolha um template.");
     try {
       setPhase("creating");
       const { id } = await apiFetch<{ id: string }>("/api/projects", {
@@ -65,7 +66,8 @@ export function NewProjectWizard({ brands, editorMode, capabilities }: { brands:
           brandId,
           presets,
           styleId,
-          autopilot: editorMode ? null : { command: command.trim(), autoRender, resolution },
+          templateId: editorMode ? null : templateId,
+          autopilot: editorMode ? null : { command: command.trim() || "Aplique o template escolhido.", autoRender, resolution },
         },
       });
       setPhase("uploading");
@@ -158,7 +160,25 @@ export function NewProjectWizard({ brands, editorMode, capabilities }: { brands:
         <p className="mt-2 text-xs text-neutral-500">O primeiro formato selecionado é o principal do editor; os demais são gerados na exportação em lote.</p>
       </Step>
 
-      <Step n={4} title="Estilo (opcional)">
+      {!editorMode && (
+        <Step n={4} title="Template (opcional)">
+          <select className="input" value={templateId ?? ""} onChange={(e) => {
+            const t = templates.find((x) => x.id === e.target.value) ?? null;
+            setTemplateId(t?.id ?? null);
+            if (t?.config.preset && !presets.includes(t.config.preset)) setPresets([t.config.preset, ...presets]);
+          }}>
+            <option value="">Nenhum — só o comando para a IA</option>
+            {[...new Set(templates.map((t) => t.category))].map((cat) => (
+              <optgroup key={cat} label={cat}>
+                {templates.filter((t) => t.category === cat).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </optgroup>
+            ))}
+          </select>
+          {templateId && <p className="mt-2 text-xs text-neutral-500">{templates.find((t) => t.id === templateId)?.description} O template é aplicado antes do seu comando.</p>}
+        </Step>
+      )}
+
+      <Step n={editorMode ? 4 : 5} title="Estilo (opcional)">
         <div className="flex flex-wrap gap-2">
           <button onClick={() => setStyleId(null)} className={cx("rounded-full border px-3 py-1 text-xs", styleId === null ? "border-gold-600 bg-gold-700/20 text-gold-300" : "border-ink-700 text-neutral-400")}>Padrão da marca</button>
           {Object.values(EDIT_STYLES).map((s) => (
@@ -168,7 +188,7 @@ export function NewProjectWizard({ brands, editorMode, capabilities }: { brands:
       </Step>
 
       {!editorMode && (
-        <Step n={5} title="Diga à IA o que fazer">
+        <Step n={6} title="Diga à IA o que fazer">
           <textarea className="input min-h-[110px] resize-y" value={command} onChange={(e) => setCommand(e.target.value)} placeholder="Ex.: Crie um Reels de 40 segundos, selecione as melhores cenas, adicione legendas automáticas e finalize com a logo." maxLength={4000} />
           <div className="mt-2 flex flex-wrap gap-1.5">
             {EXAMPLES.map((ex) => (

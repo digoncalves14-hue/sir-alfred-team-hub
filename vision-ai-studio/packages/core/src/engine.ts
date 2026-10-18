@@ -1,4 +1,5 @@
 import { weightedFocus } from "./analysis";
+import { type MusicAnalysis, beatsUntil, nearest } from "./beats";
 import { buildCaptionBlocks } from "./captions";
 import type { EditOperation, EditPlan } from "./edit-plan";
 import { FORMAT_PRESETS } from "./presets";
@@ -17,6 +18,7 @@ import {
   type Clip,
   type Timeline,
   clipsDuration,
+  newClipId,
   parseTimeline,
   round3,
 } from "./timeline";
@@ -41,6 +43,8 @@ export interface EngineContext {
   brand: BrandContext | null;
   /** Músicas que o usuário enviou para este projeto/organização (com licença declarada). */
   musicAssetIds: string[];
+  /** Análise de batida das músicas disponíveis (para sincronizar cortes). */
+  musicAnalyses?: Map<string, MusicAnalysis>;
 }
 
 export interface EngineResult {
@@ -124,9 +128,10 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
           : op.strategy === "speech_focused"
             ? "priorizando trechos com fala"
             : "selecionando os trechos com melhor pontuação heurística (movimento, fala e ausência de silêncio)";
+      const unchanged = res.clips === tl.clips;
       return {
         timeline: { ...tl, clips: res.clips },
-        message: `Versão de ~${fmt(clipsDuration({ clips: res.clips }))}s (alvo ${fmt(target)}s), ${label}.`,
+        message: unchanged ? undefined : `Versão de ~${fmt(clipsDuration({ clips: res.clips }))}s (alvo ${fmt(target)}s), ${label}.`,
         warnings: [...w, ...res.warnings],
       };
     }
@@ -323,6 +328,44 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
         warnings: w,
       };
     }
+    case "remove_source_range": {
+      const start = Math.max(0, op.start);
+      const end = op.end;
+      if (end - start < 0.05) return { timeline: tl, warnings: ["Trecho da transcrição inválido."] };
+      const clips = subtractSourceIntervals(tl.clips, new Map([[op.asset_id, [{ start, end }]]]));
+      const removed = total - clipsDuration({ clips });
+      if (removed < 0.01) return { timeline: tl, warnings: ["Esse trecho já não faz parte do vídeo."] };
+      return { timeline: { ...tl, clips }, message: `Removido trecho de ${fmt(removed)}s pela transcrição.`, warnings: w };
+    }
+    case "restore_source_range": {
+      const src = ctx.sources.get(op.asset_id);
+      const start = clamp(op.start, 0, src?.duration || op.end);
+      const end = clamp(op.end, start, src?.duration || op.end);
+      if (end - start < 0.05) return { timeline: tl, warnings: ["Trecho inválido para restaurar."] };
+      const clips = restoreSourceRange(tl.clips, op.asset_id, start, end);
+      const added = clipsDuration({ clips }) - total;
+      if (added < 0.01) return { timeline: tl, warnings: ["Esse trecho já está no vídeo."] };
+      return { timeline: { ...tl, clips }, message: `Restaurado trecho de ${fmt(added)}s da transcrição.`, warnings: w };
+    }
+    case "sync_to_beat": {
+      const music = tl.audio.music;
+      const analysis = music ? ctx.musicAnalyses?.get(music.assetId) : undefined;
+      if (!music) return { timeline: tl, warnings: ["Adicione uma música ao projeto para sincronizar os cortes com a batida."] };
+      if (!analysis?.beats.length) {
+        return {
+          timeline: tl,
+          warnings: [],
+          unsupported: { request: "sincronizar com a batida", reason: "Não foi possível identificar uma batida regular nesta música (ou ela ainda está sendo analisada)." },
+        };
+      }
+      const shift = clamp(op.max_shift_sec, 0.05, 1);
+      const r = snapCutsToBeats(tl.clips, beatsUntil(analysis, total + 2), shift, ctx.sources);
+      return {
+        timeline: { ...tl, clips: r.clips },
+        message: r.snapped ? `${r.snapped} corte(s) alinhados à batida (${analysis.bpm} BPM).` : "Os cortes já estavam alinhados à batida ou distantes demais dela.",
+        warnings: w,
+      };
+    }
     case "unsupported":
       return { timeline: tl, warnings: [], unsupported: { request: op.request, reason: op.reason } };
   }
@@ -333,8 +376,12 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
  * recorte na região com mais movimento detectado no trecho. Sem análise, centraliza.
  */
 export function applyAutoFocus(clips: Clip[], sources: SourceMap): Clip[] {
+  // junta trechos contíguos antes de recalcular o foco automático (o foco é derivado, não decisão do usuário)
+  const normalized = mergeContiguous(
+    clips.map((c) => (c.focusSource === "manual" ? c : { ...c, focusX: null, focusY: null, focusSource: "center" as const })),
+  );
   return mergeContiguous(
-    clips.map((c) => {
+    normalized.map((c) => {
       if (c.focusSource === "manual") return c;
       const activity = sources.get(c.assetId)?.analysis?.activity;
       const f = activity ? weightedFocus(activity, c.sourceStart, c.sourceEnd) : null;
@@ -351,4 +398,69 @@ function clamp(n: number, min: number, max: number): number {
 
 function fmt(n: number): string {
   return round3(n).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+}
+
+/** Reinsere um trecho da origem na posição cronológica correta, sem duplicar o que já existe. */
+export function restoreSourceRange(clips: Clip[], assetId: string, start: number, end: number): Clip[] {
+  // partes do intervalo que ainda não estão em nenhum clipe
+  let missing = [{ start, end }];
+  for (const c of clips.filter((x) => x.assetId === assetId)) {
+    missing = missing.flatMap((m) => {
+      if (c.sourceEnd <= m.start || c.sourceStart >= m.end) return [m];
+      const parts = [];
+      if (c.sourceStart > m.start) parts.push({ start: m.start, end: c.sourceStart });
+      if (c.sourceEnd < m.end) parts.push({ start: c.sourceEnd, end: m.end });
+      return parts;
+    });
+  }
+  const out = [...clips];
+  for (const m of missing.filter((x) => x.end - x.start > 0.04)) {
+    const template = out.find((c) => c.assetId === assetId);
+    const clip: Clip = {
+      ...(template ?? { id: "", assetId, focusX: null, focusY: null, focusSource: "center", volume: 1, zoom: 1, sourceStart: 0, sourceEnd: 0 }),
+      id: newClipId(),
+      assetId,
+      sourceStart: round3(m.start),
+      sourceEnd: round3(m.end),
+      zoom: 1,
+      label: "Restaurado pela transcrição",
+    };
+    // insere depois do último clipe do mesmo arquivo que começa antes do trecho
+    let idx = -1;
+    out.forEach((c, i) => {
+      if (c.assetId === assetId && c.sourceStart < m.start) idx = i;
+    });
+    if (idx === -1) {
+      const firstSame = out.findIndex((c) => c.assetId === assetId);
+      out.splice(firstSame === -1 ? out.length : firstSame, 0, clip);
+    } else {
+      out.splice(idx + 1, 0, clip);
+    }
+  }
+  return mergeContiguous(out);
+}
+
+/** Ajusta o fim de cada trecho (exceto o último) para cair na batida mais próxima. */
+export function snapCutsToBeats(clips: Clip[], beats: number[], maxShift: number, sources: SourceMap): { clips: Clip[]; snapped: number } {
+  const out = clips.map((c) => ({ ...c }));
+  let t = 0;
+  let snapped = 0;
+  for (let i = 0; i < out.length; i++) {
+    const c = out[i];
+    const dur = c.sourceEnd - c.sourceStart;
+    const cut = t + dur;
+    if (i < out.length - 1) {
+      const b = nearest(beats, cut);
+      if (b !== null && Math.abs(b - cut) <= maxShift && Math.abs(b - cut) > 0.01) {
+        const newDur = b - t;
+        const maxEnd = sources.get(c.assetId)?.duration || c.sourceEnd;
+        if (newDur >= 0.5 && c.sourceStart + newDur <= maxEnd + 0.001) {
+          c.sourceEnd = round3(c.sourceStart + newDur);
+          snapped++;
+        }
+      }
+    }
+    t += c.sourceEnd - c.sourceStart;
+  }
+  return { clips: out, snapped };
 }

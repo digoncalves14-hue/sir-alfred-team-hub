@@ -2,7 +2,7 @@ import path from "node:path";
 import { initialTimeline, newClipId, parseTimeline } from "@vision/core";
 import { and, eq, enqueueJob, assets, brands, projects } from "@vision/db";
 import { ProcessingError, createVersion, getConfig, getCurrentVersion, getStorage, makeStorageKey } from "@vision/server";
-import { extractThumbnail, probeFile } from "@vision/server/node";
+import { analyzeMusic, extractThumbnail, probeFile } from "@vision/server/node";
 import type { JobContext } from "../context";
 
 /** Leitura técnica do arquivo (ffprobe), validação, miniatura e timeline inicial. */
@@ -36,9 +36,20 @@ export async function handleProbe(ctx: JobContext): Promise<Record<string, unkno
       await storage.uploadFile(thumbPath, thumbnailKey, "image/jpeg");
     }
 
+    let musicAnalysis: Record<string, unknown> | null = null;
+    if (asset.role === "music") {
+      ctx.progress(0.5, "Analisando ritmo da música");
+      try {
+        musicAnalysis = (await analyzeMusic(file.path, probe.durationSec, ctx.signal)) as unknown as Record<string, unknown>;
+      } catch (err) {
+        ctx.log.warn("music_analysis_failed", { err });
+      }
+    }
+
     await db
       .update(assets)
       .set({
+        ...(musicAnalysis ? { analysis: musicAnalysis } : {}),
         probe: probe as unknown as Record<string, unknown>,
         durationSec: probe.durationSec,
         width: probe.width,

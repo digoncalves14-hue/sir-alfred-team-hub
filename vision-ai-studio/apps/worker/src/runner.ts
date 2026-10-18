@@ -1,5 +1,5 @@
 import type { JobType } from "@vision/core";
-import { eq, type Db, type Job, aiCommands, assets, completeJob, failJob, markCanceled, renders } from "@vision/db";
+import { eq, type Db, type Job, aiCommands, assets, completeJob, contentSuggestions, failJob, markCanceled, renders } from "@vision/db";
 import { CanceledError, log, refreshProjectStatus, toProcessingError } from "@vision/server";
 import { createContext, type JobContext } from "./context";
 import { handleAiCommand } from "./handlers/ai-command";
@@ -7,6 +7,7 @@ import { handleAnalyze } from "./handlers/analyze";
 import { handleProbe } from "./handlers/probe";
 import { handleRender } from "./handlers/render";
 import { handleTranscribe } from "./handlers/transcribe";
+import { handleGenerateContent } from "./handlers/content";
 import { continueAutopilot } from "./pipeline";
 
 const HANDLERS: Partial<Record<JobType, (ctx: JobContext) => Promise<Record<string, unknown>>>> = {
@@ -15,6 +16,7 @@ const HANDLERS: Partial<Record<JobType, (ctx: JobContext) => Promise<Record<stri
   transcribe: handleTranscribe,
   ai_command: handleAiCommand,
   render: handleRender,
+  generate_content: handleGenerateContent,
 };
 
 /** Executa uma tarefa já reservada, tratando sucesso, falha, retentativa e cancelamento. */
@@ -58,6 +60,9 @@ async function onFinalFailure(db: Db, job: Job, message: string, canceled: boole
   }
   if (job.type === "ai_command" && job.payload.commandId) {
     await db.update(aiCommands).set({ status: "failed", errorMessage: message, finishedAt: new Date() }).where(eq(aiCommands.id, String(job.payload.commandId)));
+  }
+  if (job.type === "generate_content" && job.payload.contentId) {
+    await db.update(contentSuggestions).set({ status: "failed", errorMessage: message }).where(eq(contentSuggestions.id, String(job.payload.contentId)));
   }
   if ((job.type === "probe" || job.type === "analyze") && job.assetId) {
     await db.update(assets).set({ status: "error", errorMessage: message, updatedAt: new Date() }).where(eq(assets.id, job.assetId));

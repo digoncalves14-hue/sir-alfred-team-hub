@@ -96,6 +96,22 @@ export const OpSetStyle = z.object({
   op: z.literal("set_style"),
   style_id: z.enum(EDIT_STYLE_IDS),
 });
+export const OpRemoveSourceRange = z.object({
+  op: z.literal("remove_source_range"),
+  asset_id: z.string().describe("ID do vídeo de origem"),
+  start: z.number().describe("Início no tempo do arquivo de ORIGEM"),
+  end: z.number().describe("Fim no tempo do arquivo de ORIGEM"),
+});
+export const OpRestoreSourceRange = z.object({
+  op: z.literal("restore_source_range"),
+  asset_id: z.string(),
+  start: z.number().describe("Início no tempo do arquivo de ORIGEM"),
+  end: z.number().describe("Fim no tempo do arquivo de ORIGEM"),
+});
+export const OpSyncToBeat = z.object({
+  op: z.literal("sync_to_beat"),
+  max_shift_sec: z.number().describe("Deslocamento máximo de cada corte até a batida (ex.: 0.35)"),
+});
 export const OpUnsupported = z.object({
   op: z.literal("unsupported"),
   request: z.string().describe("Parte do pedido que não pode ser executada"),
@@ -119,6 +135,9 @@ export const EditOperation = z.discriminatedUnion("op", [
   OpSetMusic,
   OpSetAudio,
   OpSetStyle,
+  OpRemoveSourceRange,
+  OpRestoreSourceRange,
+  OpSyncToBeat,
   OpUnsupported,
 ]);
 export type EditOperation = z.infer<typeof EditOperation>;

@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { EditOperation, applyEditPlan } from "@vision/core";
-import { and, eq, getDb, assets, or } from "@vision/db";
-import { createVersion, getCurrentVersion, loadBrandContext, loadSources } from "@vision/server";
+import { getDb } from "@vision/db";
+import { createVersion, getCurrentVersion } from "@vision/server";
 import { HttpError, api, json, readJson } from "@/lib/api";
+import { engineContext } from "@/lib/engine-context";
 import { getProjectForOrg } from "@/lib/projects";
 
 const Body = z.object({
-  operations: z.array(EditOperation).min(1).max(10),
+  operations: z.array(EditOperation).min(1).max(12),
   summary: z.string().trim().max(300).optional(),
   baseVersionId: z.string().uuid().nullable().optional(),
 });
@@ -24,15 +25,9 @@ export const POST = api(async (req, { session, params }) => {
   if (body.baseVersionId && body.baseVersionId !== current.version.id) {
     throw new HttpError(409, "O projeto foi alterado em outra aba ou pela IA. Recarregue para continuar.");
   }
-  const sources = await loadSources(db, [...new Set(current.timeline.clips.map((c) => c.assetId))]);
-  const brand = await loadBrandContext(db, p.orgId, p.brandId);
-  const music = await db
-    .select({ id: assets.id })
-    .from(assets)
-    .where(and(eq(assets.orgId, p.orgId), eq(assets.role, "music"), eq(assets.status, "ready"), or(eq(assets.projectId, p.id), p.brandId ? eq(assets.brandId, p.brandId) : eq(assets.projectId, p.id))));
   let result;
   try {
-    result = applyEditPlan(current.timeline, { reply: "", operations: body.operations }, { sources, brand, musicAssetIds: music.map((m) => m.id) });
+    result = applyEditPlan(current.timeline, { reply: "", operations: body.operations }, await engineContext(p, current.timeline));
   } catch (e) {
     throw new HttpError(400, (e as Error).message);
   }

@@ -21,6 +21,7 @@ export async function makeFixtures(dir: string): Promise<Record<string, string>>
     music: path.join(dir, "musica.mp3"),
     corrupt: path.join(dir, "corrompido.mp4"),
     noAudio: path.join(dir, "sem-audio.mp4"),
+    beat: path.join(dir, "batida-120bpm.mp3"),
   };
   // caixa branca se movendo para a direita na segunda metade; tom com pausas
   run([
@@ -34,6 +35,11 @@ export async function makeFixtures(dir: string): Promise<Record<string, string>>
   run(["-f", "lavfi", "-i", "color=c=0xD4AF37:s=400x200:d=1", "-frames:v", "1", files.logo]);
   run(["-f", "lavfi", "-i", "sine=frequency=220:sample_rate=48000:duration=30", "-c:a", "libmp3lame", "-b:a", "128k", files.music]);
   run(["-f", "lavfi", "-i", "testsrc2=s=640x360:r=25:d=6", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", files.noAudio]);
+  // cliques a 120 BPM (uma batida a cada 0,5 s) sobre um tom grave
+  run([
+    "-f", "lavfi", "-i", "aevalsrc='0.8*sin(2*PI*900*t)*exp(-40*mod(t,0.5))+0.1*sin(2*PI*110*t)':s=44100:d=20",
+    "-c:a", "libmp3lame", "-b:a", "128k", files.beat,
+  ]);
   await writeFile(files.corrupt, Buffer.concat([Buffer.from("not a video"), randomBytes(50_000)]));
   return files;
 }

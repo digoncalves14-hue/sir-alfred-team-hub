@@ -200,6 +200,12 @@ para erros recuperáveis, falha definitiva preserva projeto e versões, botão
   (com transcrição) + trechos sem fala divididos por cenas/silêncios; pontuação =
   movimento × peso do estilo + fala × peso − silêncio; escolha gulosa até a duração
   alvo, mantendo ordem cronológica e cortando em fim de palavra/frase.
+- **Templates**: a parte executável do template vira operações do motor; a
+  orientação narrativa (ex.: "antes no início, depois no final") só é usada pela IA
+  e entra no contexto dos comandos seguintes.
+- **Textos para redes**: gerados apenas a partir da fala que ficou no vídeo final,
+  de quadros amostrados e do tom da marca; sem chave de IA o recurso fica
+  desativado (HTTP 501), nada é inventado.
 - **Interpretador local**: cobre pedidos comuns em pt-BR (durações por extenso,
   cortes de início/fim/intervalo, silêncios, formatos, legendas, logo, música,
   ruído) para o sistema ser útil sem chave de IA — sempre identificado na interface.
@@ -235,14 +241,21 @@ oficial, música licenciada com ducking, cancelamento e retentativas.
 trechos parados, seleção heurística de melhores momentos, exportação em lote,
 zoom por trecho.
 
-**Fase 2 — Edição inteligente**: editor de templates (tabela já existe), edição
-pela transcrição (apagar palavras → cortes), biblioteca de músicas licenciadas com
-metadados de licença, sincronização de cortes com batida, vinhetas de abertura.
+**Fase 2 — Edição inteligente (entregue)**: templates inteligentes (11 do sistema +
+templates próprios salvos a partir de um projeto; operações determinísticas +
+orientação narrativa para a IA, aplicados também no modo automático), edição pela
+transcrição (`remove_source_range` / `restore_source_range`), sugestões de cortes
+a partir de gravações longas com aprovação/descarte (cada corte vira um projeto que
+reaproveita o vídeo), detecção de batida (onset + autocorrelação, com limiar de
+força do pulso para não "inventar" ritmo) e `sync_to_beat`, gerador de textos para
+redes sociais com saída estruturada (tabela `content_suggestions`, tarefa
+`generate_content`). *Pendente*: biblioteca de músicas licenciadas integrada e
+vinhetas de abertura/encerramento por marca.
 
-**Fase 3 — Estúdio avançado**: cortes de vídeo longo (temas, títulos, aprovação em
-lote), rastreamento de pessoas/rostos para reenquadramento, narração por voz
+**Fase 3 — Estúdio avançado**: segmentação de gravações longas por temas com IA e
+exportação em lote de vários cortes, rastreamento de pessoas/rostos para reenquadramento, narração por voz
 artificial (provedor plugável), transições/efeitos, textos e imagens na timeline,
-thumbnails inteligentes, gerador de títulos/descrições/hashtags.
+thumbnails inteligentes.
 
 **Fase 4 — Plataforma comercial**: convites e papéis em equipe, planos e créditos,
 cobrança, métricas, OAuth com YouTube/Instagram/Facebook e publicação/agendamento

@@ -30,7 +30,12 @@ o resultado e a plataforma corta, reenquadra, legenda e exporta MP4 de verdade
 | Exportação MP4/H.264, 720p/1080p/4K (se a origem permitir), qualidade, bitrate, FPS, lote | ✅ |
 | Progresso real, cancelamento, retentativas, recuperação de worker, erros compreensíveis | ✅ |
 | Histórico de versões, desfazer/refazer, restaurar, comparar | ✅ |
-| Cortes de vídeo longo, templates editáveis, narração, publicação em redes | ⏳ Fases 2–4 (identificado na interface) |
+| **Fase 2** · Templates inteligentes (11 do sistema + salvar os seus a partir de um projeto) | ✅ |
+| **Fase 2** · Edição pela transcrição (remover/restaurar trechos clicando nas palavras) | ✅ (requer transcrição) |
+| **Fase 2** · Vídeo longo → sugestões de cortes (15/30/45/60/90 s ou personalizada), aprovar/descartar, cada corte vira projeto | ✅ |
+| **Fase 2** · Análise de batida da música (BPM) e cortes sincronizados com o ritmo | ✅ |
+| **Fase 2** · Gerador de títulos, descrições, legendas, hashtags e ideias de capa | ✅ implementado — **requer `ANTHROPIC_API_KEY`** |
+| Narração por voz artificial, transições/efeitos, rastreamento de pessoas, thumbnails, publicação em redes | ⏳ Fases 3–4 (identificado na interface) |
 
 ## Pré-requisitos
 
@@ -88,7 +93,7 @@ Sem essas chaves, a interface mostra claramente o que está indisponível; nada 
 npm run test:unit         # lógica de edição, legendas, comandos, segurança (sem dependências externas)
 npm run test:media        # FFmpeg real: análise, corte, vertical, legendas queimadas, logo+música, erro, cancelamento
 npm run test:integration  # fila no PostgreSQL — use um banco de TESTE dedicado e o worker parado
-npm run acceptance        # critérios de aceite 1–8 contra a aplicação em execução (web+worker+banco)
+npm run acceptance        # critérios de aceite 1–8 + 5 testes da Fase 2 contra a aplicação em execução
 ```
 
 O roteiro de aceite gera seus próprios vídeos de teste com FFmpeg e grava

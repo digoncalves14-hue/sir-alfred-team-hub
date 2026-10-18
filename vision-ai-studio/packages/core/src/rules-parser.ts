@@ -190,6 +190,11 @@ export function parseCommandLocally(input: string): EditPlan {
     said.push("ajustar a música");
   }
 
+  if (/sincroniz|na batida|no ritmo da musica|ritmo da musica|com a batida/.test(t)) {
+    ops.push({ op: "sync_to_beat", max_shift_sec: 0.35 });
+    said.push("sincronizar os cortes com a batida da música");
+  }
+
   // áudio
   if (/normaliz|volume (igual|uniforme)/.test(t)) ops.push({ op: "set_audio", original_volume: null, normalize: true, denoise: null });
   if (/ruido|chiado|barulho/.test(t)) {

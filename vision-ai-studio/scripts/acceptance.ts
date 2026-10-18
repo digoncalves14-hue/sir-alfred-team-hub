@@ -225,7 +225,100 @@ async function main() {
     return `Erro informado: “${d.job.errorMessage}” (status do projeto: ${d.x.project.statusLabel}); timeline e ${d.x.versions.length} versões preservadas; botão “Tentar novamente” disponível.`;
   });
 
-  console.log(`\nResultado: ${results.filter((r) => r.ok).length}/${results.length} testes de aceite aprovados.`);
+  // ===================== FASE 2 =====================
+  const restoreV1 = async () => {
+    const v1 = (await detail(projectId)).versions.find((v: any) => v.number === 1);
+    await http("POST", `/api/projects/${projectId}/versions/${v1.id}/restore`);
+  };
+
+  await step("FASE 2 · Template inteligente aplicado de verdade", async () => {
+    await restoreV1();
+    const r = await http("POST", `/api/projects/${projectId}/template`, { templateId: "sys:transformacao" });
+    const d = await detail(projectId);
+    const dur = d.timeline.clips.reduce((s: number, c: any) => s + c.sourceEnd - c.sourceStart, 0);
+    if (d.timeline.styleId !== "reels_dynamic" || d.timeline.format.preset !== "instagram_reels_9x16" || dur > 31) throw new Error(`Template não aplicado (${d.timeline.styleId}, ${d.timeline.format.preset}, ${dur}s)`);
+    return `“Transformação de cabelo”: estilo ${d.timeline.styleId}, ${d.timeline.format.preset}, ${dur.toFixed(1)}s. ${r.applied.join(" ")} ${r.notes.join(" ")}`;
+  });
+
+  await step("FASE 2 · Edição pela transcrição (remover e restaurar palavras)", async () => {
+    await restoreV1();
+    const t = await http("GET", `/api/projects/${projectId}/transcript`);
+    const words = t.assets[0].words;
+    if (!words.length) throw new Error("Sem palavras com tempo na transcrição");
+    const [w0, w3] = [words[0], words[3]];
+    await http("POST", `/api/projects/${projectId}/operations`, { operations: [{ op: "remove_source_range", asset_id: sourceId, start: w0.start - 0.05, end: w3.end + 0.05 }] });
+    let d = await detail(projectId);
+    const inside = d.timeline.clips.some((c: any) => c.sourceStart <= w0.start + 0.01 && c.sourceEnd >= w3.end - 0.01);
+    if (inside) throw new Error("Palavras continuam no vídeo");
+    const removedDur = d.timeline.clips.reduce((s: number, c: any) => s + c.sourceEnd - c.sourceStart, 0);
+    await http("POST", `/api/projects/${projectId}/operations`, { operations: [{ op: "restore_source_range", asset_id: sourceId, start: w0.start - 0.05, end: w3.end + 0.05 }] });
+    d = await detail(projectId);
+    const back = d.timeline.clips.reduce((s: number, c: any) => s + c.sourceEnd - c.sourceStart, 0);
+    if (Math.abs(back - 20) > 0.05) throw new Error(`Restauração incompleta (${back}s)`);
+    return `Removidas “${words.slice(0, 4).map((w: any) => w.text).join(" ")}” → ${removedDur.toFixed(2)}s; restauradas → ${back.toFixed(2)}s (vídeo inteiro de volta, em ordem).`;
+  });
+
+  await step("FASE 2 · Vídeo longo → sugestões de cortes → corte aprovado vira projeto exportável", async () => {
+    const r = await http("POST", `/api/projects/${projectId}/suggestions`, { durationSec: 8, count: 3 });
+    if (!r.suggestions.length) throw new Error("Nenhuma sugestão");
+    const s0 = r.suggestions[0];
+    const { id: childId } = await http("POST", `/api/projects/${projectId}/clips`, { assetId: s0.assetId, start: s0.start, end: s0.end, title: s0.title });
+    const out = await exportAndDownload(childId, "instagram_reels_9x16", dir, "corte-aprovado");
+    const p = probe(out.file);
+    if (Math.abs(p.duration - s0.duration) > 0.3) throw new Error(`Duração ${p.duration} ≠ ${s0.duration}`);
+    return `${r.suggestions.length} sugestões (${r.basis}); melhor: “${s0.title}” ${s0.start}–${s0.end}s, pontuação heurística ${s0.score}/100 → novo projeto exportado (${p.width}x${p.height}, ${p.duration.toFixed(2)}s).`;
+  });
+
+  await step("FASE 2 · Música com análise de batida e cortes sincronizados", async () => {
+    await restoreV1();
+    const musicId = await upload(fx.beat, "music", { projectId, licenseNote: "Áudio sintético gerado para teste" });
+    const m = await waitFor("análise da música", async () => {
+      const a = (await detail(projectId)).assets.find((x: any) => x.id === musicId);
+      if (a?.status === "error") throw new Error(a.errorMessage);
+      return a?.status === "ready" ? a : null;
+    });
+    if (!m.bpm || Math.abs(m.bpm - 120) > 3) throw new Error(`BPM ${m.bpm}`);
+    await http("POST", `/api/projects/${projectId}/operations`, {
+      operations: [
+        { op: "remove_range", start: 3.3, end: 6.1 },
+        { op: "remove_range", start: 9.7, end: 11.2 },
+        { op: "set_music", action: "add", asset_id: musicId, volume: 0.4, ducking: true },
+        { op: "sync_to_beat", max_shift_sec: 0.35 },
+      ],
+    });
+    const d = await detail(projectId);
+    let t = 0;
+    const cuts: number[] = [];
+    for (const c of d.timeline.clips.slice(0, -1)) {
+      t += c.sourceEnd - c.sourceStart;
+      cuts.push(Math.round(t * 1000) / 1000);
+    }
+    const off = cuts.map((c) => Math.abs(((c + 0.25) % 0.5) - 0.25));
+    if (!cuts.length || Math.max(...off) > 0.06) throw new Error(`Cortes fora da batida: ${cuts.join(", ")}`);
+    const out = await exportAndDownload(projectId, "youtube_16x9", dir, "com-musica");
+    return `Música: ${m.bpm} BPM detectado; cortes em ${cuts.map((c) => `${c}s`).join(", ")} (grade de 0,5s); MP4 com música e ducking: ${probe(out.file).duration.toFixed(2)}s, áudio ${probe(out.file).acodec}.`;
+  });
+
+  await step("FASE 2 · Gerador de textos para redes sociais", async () => {
+    if (!me.capabilities.ai) {
+      try {
+        await http("POST", `/api/projects/${projectId}/content`);
+        throw new Error("Deveria recusar sem chave de IA");
+      } catch (e) {
+        if (!/501/.test((e as Error).message)) throw e;
+      }
+      return "Sem ANTHROPIC_API_KEY: o recurso recusa com mensagem clara (HTTP 501) e não inventa textos — comportamento esperado neste ambiente.";
+    }
+    const { id } = await http("POST", `/api/projects/${projectId}/content`);
+    const c = await waitFor("textos", async () => {
+      const x = (await detail(projectId)).content;
+      if (x?.id === id && x.status === "failed") throw new Error(x.errorMessage);
+      return x?.id === id && x.status === "succeeded" ? x : null;
+    });
+    return `Títulos: ${c.data.youtube_titles.join(" | ")} · ${c.data.hashtags.length} hashtags.`;
+  });
+
+  console.log(`\nResultado: ${results.filter((r) => r.ok).length}/${results.length} testes de aceite aprovados (Fase 1 + Fase 2).`);
   await writeFile(path.resolve("acceptance-report.json"), JSON.stringify({ base: BASE, at: new Date().toISOString(), capabilities: me.capabilities, results }, null, 2));
   await closeDb();
   if (results.some((r) => !r.ok)) process.exitCode = 1;

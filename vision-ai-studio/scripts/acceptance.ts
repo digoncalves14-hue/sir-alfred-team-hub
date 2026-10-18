@@ -118,7 +118,7 @@ async function main() {
       return a?.status === "ready" && x.timeline ? x : null;
     });
     const a = d.assets.find((y: any) => y.id === sourceId);
-    const res = await fetch(`${BASE}${a.url}`, { headers: { Range: "bytes=0-1023" } });
+    const res = await fetch(a.url.startsWith("http") ? a.url : `${BASE}${a.url}`, { headers: { Range: "bytes=0-1023" } });
     if (res.status !== 206 || !res.headers.get("content-type")?.includes("video/mp4")) throw new Error(`Streaming falhou (${res.status})`);
     return `Upload ok, ${a.width}x${a.height}, ${a.durationSec.toFixed(1)}s; streaming com Range → 206 video/mp4; timeline inicial versão ${d.currentVersion.number}.`;
   });

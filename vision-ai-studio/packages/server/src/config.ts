@@ -41,6 +41,8 @@ const EnvSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: bool.default("true"),
+  /** true = navegador envia direto ao bucket (exige CORS com ETag exposto); false = upload passa pela aplicação. */
+  S3_DIRECT_UPLOAD: bool.default("false"),
 
   MAX_UPLOAD_MB: z.coerce.number().positive().default(4096),
   MULTIPART_PART_MB: z.coerce.number().min(5).default(64),

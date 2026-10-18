@@ -26,4 +26,6 @@ export interface StorageDriver {
   putBuffer(key: string, data: Buffer, contentType: string): Promise<void>;
   getBuffer(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
+  /** Recebe um upload que passa pela aplicação (stream), respeitando o tamanho máximo. */
+  writeStream(key: string, body: AsyncIterable<Uint8Array>, maxBytes: number, contentType: string): Promise<number>;
 }

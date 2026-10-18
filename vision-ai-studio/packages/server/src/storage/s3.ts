@@ -16,6 +16,9 @@ import {
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { Upload } from "@aws-sdk/lib-storage";
+import { Readable as NodeReadable } from "node:stream";
+import { signedLocalUrl } from "./signing";
 import { getConfig } from "../config";
 import type { StorageDriver, UploadTarget } from "./types";
 
@@ -51,6 +54,10 @@ export class S3Storage implements StorageDriver {
     const c = getConfig();
     const partSize = c.MULTIPART_PART_MB * 1024 * 1024;
     const ttl = c.SIGNED_URL_TTL_SEC * 6;
+    if (!c.S3_DIRECT_UPLOAD) {
+      // upload pela aplicação: não depende de CORS no bucket
+      return { mode: "single", method: "PUT", url: signedLocalUrl("put", key, ttl, { max: String(sizeBytes) }), headers: {} };
+    }
     if (sizeBytes <= partSize) {
       const url = await getSignedUrl(
         this.presignClient,
@@ -133,6 +140,32 @@ export class S3Storage implements StorageDriver {
       new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: createReadStream(localPath), ContentType: contentType, ContentLength: size }),
     );
     return size;
+  }
+
+  async writeStream(key: string, body: AsyncIterable<Uint8Array>, maxBytes: number, contentType: string): Promise<number> {
+    let total = 0;
+    const counted = NodeReadable.from(
+      (async function* () {
+        for await (const chunk of body) {
+          total += chunk.byteLength;
+          if (total > maxBytes) throw new Error("Arquivo maior que o tamanho declarado.");
+          yield chunk;
+        }
+      })(),
+    );
+    const upload = new Upload({
+      client: this.client,
+      params: { Bucket: this.bucket, Key: key, Body: counted, ContentType: contentType },
+      partSize: Math.max(5, getConfig().MULTIPART_PART_MB) * 1024 * 1024,
+      queueSize: 4,
+    });
+    try {
+      await upload.done();
+    } catch (err) {
+      await upload.abort().catch(() => {});
+      throw err;
+    }
+    return total;
   }
 
   async putBuffer(key: string, data: Buffer, contentType: string): Promise<void> {

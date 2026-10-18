@@ -60,7 +60,7 @@ export class LocalStorage implements StorageDriver {
   }
 
   /** Grava um stream recebido pela rota de upload, respeitando o tamanho máximo. */
-  async writeStream(key: string, body: AsyncIterable<Uint8Array>, maxBytes: number): Promise<number> {
+  async writeStream(key: string, body: AsyncIterable<Uint8Array>, maxBytes: number, _contentType?: string): Promise<number> {
     const p = this.resolve(key);
     await mkdir(path.dirname(p), { recursive: true });
     let total = 0;

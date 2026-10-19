@@ -4,7 +4,7 @@ import { LayoutTemplate, Save } from "lucide-react";
 import type { TemplateDef } from "@vision/core";
 import { apiFetch } from "@/lib/client";
 import { Button } from "../ui";
-import { DESTINATIONS, EDIT_STYLES, FORMAT_PRESETS, type FormatPresetId, type Timeline } from "@vision/core";
+import { DESTINATIONS, EDIT_STYLES, FORMAT_PRESETS, LOOKS, TRANSITION_LABELS, type FormatPresetId, type Timeline } from "@vision/core";
 import { cx } from "../ui";
 import type { Detail, StudioActions } from "./types";
 
@@ -113,7 +113,56 @@ export function FormatPanel({ data, timeline, actions }: { data: Detail; timelin
             </button>
           ))}
         </div>
-        <p className="mt-2 text-xs text-neutral-500">O estilo define ritmo dos cortes automáticos, legenda e enquadramento. Transições e efeitos visuais chegam na Fase 3.</p>
+        <p className="mt-2 text-xs text-neutral-500">O estilo define o ritmo dos cortes, a legenda, o enquadramento e o acabamento (transição, cor e zoom dinâmico). Ajuste abaixo se quiser.</p>
+      </div>
+      <div>
+        <p className="label">Acabamento</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs text-neutral-400">
+            Transição nos cortes
+            <select
+              className="input mt-1 w-full py-1 text-xs"
+              value={timeline.transitions.type}
+              onChange={(e) => void actions.runOps([{ op: "set_transitions", type: e.target.value, duration_sec: null }])}
+            >
+              {Object.entries(TRANSITION_LABELS).map(([id, label]) => (
+                <option key={id} value={id}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-xs text-neutral-400">
+            Cor
+            <select className="input mt-1 w-full py-1 text-xs" value={timeline.look} onChange={(e) => void actions.runOps([{ op: "set_look", look: e.target.value }])}>
+              {Object.values(LOOKS).map((l) => (
+                <option key={l.id} value={l.id}>{l.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="mt-2 flex items-center gap-2 text-xs text-neutral-300">
+          <input
+            type="checkbox"
+            checked={timeline.dynamicZoom.enabled}
+            onChange={(e) => void actions.runOps([{ op: "dynamic_zoom", enabled: e.target.checked, intensity: null }])}
+          />
+          Zoom dinâmico (aproximações alternadas nos cortes, estilo Reels)
+        </label>
+        {timeline.texts.length > 0 && (
+          <div className="mt-2 space-y-1">
+            <p className="text-xs text-neutral-400">Textos animados</p>
+            {timeline.texts.map((t) => (
+              <div key={t.id} className="flex items-center justify-between rounded border border-ink-700 px-2 py-1 text-xs">
+                <span className="truncate">{t.text}</span>
+                <button
+                  className="ml-2 text-neutral-500 hover:text-red-400"
+                  onClick={() => void actions.commitTimeline({ ...timeline, texts: timeline.texts.filter((x) => x.id !== t.id) }, "Texto removido")}
+                >
+                  remover
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -218,8 +218,43 @@ export function parseCommandLocally(input: string): EditPlan {
       });
     }
   }
-  if (/transic|efeito|filtro de cor/.test(t)) {
-    ops.push({ op: "unsupported", request: "transições e efeitos", reason: "Transições e efeitos visuais estão previstos para a Fase 3 e ainda não são renderizados." });
+  // acabamento
+  const negTransitions = /\b(sem|tire|tira|remova|remove)\b[^.]{0,20}\btransic/.test(t);
+  if (negTransitions) {
+    ops.push({ op: "set_transitions", type: "none", duration_sec: null });
+    said.push("remover as transições");
+  } else if (/transic/.test(t)) {
+    const type = /flash|branc/.test(t) ? "flash" : /desfoq|blur/.test(t) ? "blur" : /fade|suave|preto/.test(t) ? "fade" : "zoom";
+    ops.push({ op: "set_transitions", type, duration_sec: null });
+    said.push("colocar transições nos cortes");
+  }
+  const looks: Array<[RegExp, "cinematic" | "warm" | "vibrant" | "cool" | "bw" | "clean"]> = [
+    [/preto e branco|p&b|pb\b/, "bw"],
+    [/cor(es)? (de )?cinema|cor cinematografic|look cinematografic/, "cinematic"],
+    [/cor(es)? quente|tom quente/, "warm"],
+    [/cor(es)? (mais )?vibrante|mais cor|cores vivas|saturad/, "vibrant"],
+    [/cor(es)? fria|tom frio/, "cool"],
+    [/mais claro|clarear|iluminad/, "clean"],
+  ];
+  const look = looks.find(([re]) => re.test(t));
+  if (look) {
+    ops.push({ op: "set_look", look: look[1] });
+    said.push("ajustar as cores");
+  }
+  if (/zoom dinamic|punch|aproximac(oes|ao) (alternad|nos cortes)/.test(t)) {
+    ops.push({ op: "dynamic_zoom", enabled: !/\b(sem|tire|desative)\b[^.]{0,15}zoom/.test(t), intensity: null });
+    said.push("usar zoom dinâmico nos cortes");
+  }
+  // pedido aberto: pacote profissional com o que dá para fazer sem IA
+  if (/criatividade|profissional|capricha|edite (pra|para) mim|deixe (bonito|top)|divulga/.test(t) && !ops.some((o) => o.op === "set_style")) {
+    ops.push({ op: "set_style", style_id: "reels_dynamic" });
+    ops.push({ op: "remove_silences", min_silence_sec: 0.6, padding_sec: 0.12 });
+    ops.push({ op: "set_captions", enabled: true, style: null, position: null });
+    ops.push({ op: "add_logo", placement: "end_card", duration_sec: null });
+    said.push("aplicar um acabamento profissional (estilo dinâmico com transições, cor, zoom, legendas e cartela com a logo)");
+  }
+  if (/efeito especial|particula|glitch/.test(t)) {
+    ops.push({ op: "unsupported", request: "efeitos especiais", reason: "Efeitos especiais (partículas, glitch) ainda não estão disponíveis. Transições, cor, zoom dinâmico e textos animados estão." });
   }
   if (/narrac|locucao|voz (masculina|feminina|artificial)/.test(t)) {
     ops.push({ op: "unsupported", request: "narração com voz artificial", reason: "A narração por voz artificial ainda não está integrada (Fase 3)." });

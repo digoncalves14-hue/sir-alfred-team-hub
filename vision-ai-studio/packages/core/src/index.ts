@@ -17,3 +17,4 @@ export * from "./beats";
 export * from "./suggestions";
 export * from "./templates";
 export * from "./content";
+export * from "./effects";

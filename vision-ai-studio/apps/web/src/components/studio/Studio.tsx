@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, AudioLines, Bot, Download, FileText, Film, FolderOpen, History, Loader2, PenLine, Redo2, Ratio, Scissors, Subtitles, Undo2 } from "lucide-react";
-import { JOB_TYPE_LABEL, timelineDuration, type JobType, type Timeline } from "@vision/core";
+import { JOB_TYPE_LABEL, brandPalette, timelineDuration, type JobType, type Timeline } from "@vision/core";
 import { apiFetch } from "@/lib/client";
 import type { BrandDto } from "@/lib/dto";
 import { fmtDuration } from "@/lib/format";
@@ -172,7 +172,7 @@ export function Studio({ initial, brands }: { initial: Detail; brands: BrandDto[
               {rendered ? (
                 <video key={rendered} src={rendered} controls autoPlay className="h-full w-full rounded-xl bg-black object-contain" />
               ) : tl ? (
-                <PreviewPlayer ref={player} timeline={tl} assets={data.assets} onTime={setTime} />
+                <PreviewPlayer ref={player} timeline={tl} assets={data.assets} onTime={setTime} accent={brandPalette(brands.find((b) => b.id === data.project.brandId)?.colors ?? []).accentColor} />
               ) : (
                 <div className="grid h-full place-items-center rounded-xl border border-ink-800 bg-ink-900 p-6">
                   <div className="w-full max-w-md text-center">

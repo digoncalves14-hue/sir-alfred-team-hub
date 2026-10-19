@@ -69,3 +69,20 @@ export const BRAND_SEEDS: BrandSeed[] = [
     defaultStyleId: "workshop_training",
   },
 ];
+
+/** Fundo = cor mais escura da paleta; destaque = cor mais viva que não seja escura. */
+export function brandPalette(colors: string[]): { backgroundColor: string | null; accentColor: string | null } {
+  const valid = colors.filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+  if (!valid.length) return { backgroundColor: null, accentColor: null };
+  const info = valid.map((c) => {
+    const n = parseInt(c.slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    return { c, lum: 0.299 * r + 0.587 * g + 0.114 * b, sat: max ? (max - min) / max : 0 };
+  });
+  const background = [...info].sort((a, b) => a.lum - b.lum)[0];
+  const accent = info.filter((x) => x.lum >= 70 && x.c !== background.c).sort((a, b) => b.sat - a.sat || b.lum - a.lum)[0];
+  return { backgroundColor: background.lum < 80 ? background.c : null, accentColor: accent?.c ?? null };
+}
+

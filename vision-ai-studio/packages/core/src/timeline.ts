@@ -36,6 +36,8 @@ export const Clip = z.object({
   zoom: z.number().min(1).max(2.5).default(1),
   /** Rótulo opcional (ex.: motivo da seleção pela IA). */
   label: z.string().max(200).optional(),
+  /** Aproximação automática do "zoom dinâmico" (punch-in); recalculada a cada edição. */
+  punch: z.boolean().default(false),
 });
 export type Clip = z.infer<typeof Clip>;
 
@@ -87,6 +89,41 @@ export const AudioConfig = z.object({
   music: MusicConfig.nullable().default(null),
 });
 
+export const TRANSITION_IDS = ["none", "fade", "flash", "zoom", "blur"] as const;
+export const TransitionId = z.enum(TRANSITION_IDS);
+export type TransitionId = z.infer<typeof TransitionId>;
+
+/**
+ * Transição aplicada em cada corte, nas bordas dos clipes (sem sobrepor clipes):
+ * a duração do vídeo e o sincronismo das legendas não mudam.
+ */
+export const TransitionsConfig = z.object({
+  type: TransitionId.default("none"),
+  durationSec: z.number().min(0.1).max(1.2).default(0.4),
+});
+
+export const LOOK_IDS = ["none", "cinematic", "warm", "vibrant", "cool", "bw", "clean"] as const;
+export const LookId = z.enum(LOOK_IDS);
+export type LookId = z.infer<typeof LookId>;
+
+export const TEXT_ROLES = ["hook", "title", "cta", "lower_third"] as const;
+
+/**
+ * Texto animado sobre o vídeo (gancho, título, chamada para ação). O tempo é
+ * ancorado no início ou no fim do vídeo para continuar correto após novos cortes.
+ */
+export const TextOverlay = z.object({
+  id: z.string().min(1).max(64),
+  text: z.string().min(1).max(120),
+  role: z.enum(TEXT_ROLES).default("title"),
+  anchor: z.enum(["start", "end"]).default("start"),
+  /** Segundos a partir do início (anchor=start) ou antes do fim dos clipes (anchor=end). */
+  offsetSec: z.number().min(0).max(600).default(0),
+  durationSec: z.number().min(0.5).max(30).default(3),
+  position: z.enum(["top", "center", "bottom"]).default("center"),
+});
+export type TextOverlay = z.infer<typeof TextOverlay>;
+
 export const LogoConfig = z.object({
   assetId: z.string().uuid(),
   /** end_card: cartela final com a logo oficial; watermark: logo no canto durante o vídeo. */
@@ -96,6 +133,11 @@ export const LogoConfig = z.object({
   backgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#0B0B0C"),
   /** Largura da logo em fração da largura do vídeo. */
   scale: z.number().min(0.05).max(0.9).default(0.45),
+  /** Cor de destaque da cartela (degradê e detalhes); normalmente a cor da marca. */
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  /** Frase curta abaixo da logo na cartela (ex.: slogan) e chamada para ação. */
+  headline: z.string().max(60).optional(),
+  cta: z.string().max(60).optional(),
 });
 export type LogoConfig = z.infer<typeof LogoConfig>;
 
@@ -110,6 +152,13 @@ export const TimelineSchema = z.object({
   captions: CaptionsConfig.default({}),
   audio: AudioConfig.default({}),
   logos: z.array(LogoConfig).max(2).default([]),
+  transitions: TransitionsConfig.default({}),
+  look: LookId.default("none"),
+  texts: z.array(TextOverlay).max(20).default([]),
+  /** Zoom dinâmico: alterna enquadramento normal e aproximado em cortes secos (estilo Reels). */
+  dynamicZoom: z
+    .object({ enabled: z.boolean().default(false), intensity: z.number().min(0.05).max(0.3).default(0.12) })
+    .default({}),
   styleId: z.string().max(64).optional(),
   brandId: z.string().uuid().nullable().optional(),
 });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FORMAT_PRESET_IDS } from "./presets";
 import { CAPTION_STYLE_IDS } from "./caption-styles";
 import { EDIT_STYLE_IDS } from "./styles";
+import { LOOK_IDS, TEXT_ROLES, TRANSITION_IDS } from "./timeline";
 
 /**
  * Plano de edição: o ÚNICO formato pelo qual a IA (ou o interpretador local)
@@ -112,6 +113,39 @@ export const OpSyncToBeat = z.object({
   op: z.literal("sync_to_beat"),
   max_shift_sec: z.number().describe("Deslocamento máximo de cada corte até a batida (ex.: 0.35)"),
 });
+export const OpSetTransitions = z.object({
+  op: z.literal("set_transitions"),
+  type: z.enum(TRANSITION_IDS).describe("none = corte seco; fade = pelo preto; flash = branco; zoom = punch; blur = desfoque"),
+  duration_sec: z.number().nullable().describe("Duração da transição (0.2 a 1.0; null = padrão 0.4)"),
+});
+export const OpSetLook = z.object({
+  op: z.literal("set_look"),
+  look: z.enum(LOOK_IDS).describe("Tratamento de cor do vídeo"),
+});
+export const OpAddText = z.object({
+  op: z.literal("add_text"),
+  text: z.string().describe("Texto curto (até ~8 palavras), em português do Brasil"),
+  role: z.enum(TEXT_ROLES).describe("hook = gancho no início; title = título; cta = chamada para ação; lower_third = identificação"),
+  anchor: z.enum(["start", "end"]).describe("start = conta a partir do início; end = conta antes do fim"),
+  offset_sec: z.number().nullable().describe("Segundos a partir da âncora (null = 0)"),
+  duration_sec: z.number().nullable().describe("Duração na tela (null = padrão do papel)"),
+  position: z.enum(["top", "center", "bottom"]).nullable(),
+});
+export const OpClearTexts = z.object({
+  op: z.literal("clear_texts"),
+  role: z.enum(TEXT_ROLES).nullable().describe("Remove só textos deste papel (null = todos)"),
+});
+export const OpDynamicZoom = z.object({
+  op: z.literal("dynamic_zoom"),
+  enabled: z.boolean(),
+  intensity: z.number().nullable().describe("Aproximação dos cortes com zoom, 0.05 a 0.3 (null = 0.12)"),
+});
+export const OpSetEndCard = z.object({
+  op: z.literal("set_end_card"),
+  headline: z.string().nullable().describe("Frase curta abaixo da logo (slogan/nome), até 60 caracteres; null = sem"),
+  cta: z.string().nullable().describe("Chamada para ação curta (ex.: AGENDE SEU HORÁRIO), até 40 caracteres; null = sem"),
+  duration_sec: z.number().nullable().describe("Duração da cartela (2 a 6 s; null = manter)"),
+});
 export const OpUnsupported = z.object({
   op: z.literal("unsupported"),
   request: z.string().describe("Parte do pedido que não pode ser executada"),
@@ -138,6 +172,12 @@ export const EditOperation = z.discriminatedUnion("op", [
   OpRemoveSourceRange,
   OpRestoreSourceRange,
   OpSyncToBeat,
+  OpSetTransitions,
+  OpSetLook,
+  OpAddText,
+  OpClearTexts,
+  OpDynamicZoom,
+  OpSetEndCard,
   OpUnsupported,
 ]);
 export type EditOperation = z.infer<typeof EditOperation>;

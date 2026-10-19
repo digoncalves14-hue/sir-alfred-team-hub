@@ -1,4 +1,5 @@
 import {
+  brandPalette,
   MusicAnalysis,
   type EngineContext,
   type AssetAnalysis,
@@ -121,6 +122,7 @@ export async function loadBrandContext(db: Db, orgId: string, brandId: string | 
     musicAssetIds: b.musicAssetIds,
     primaryColor: b.colors[0] ?? null,
     defaultStyleId: b.defaultStyleId,
+    ...brandPalette(b.colors),
     segment: b.segment,
     tone: b.tone,
   };

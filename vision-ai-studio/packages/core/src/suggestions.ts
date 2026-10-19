@@ -28,7 +28,7 @@ export function suggestClips(
   const candidates: ClipSuggestion[] = [];
   for (const src of sources.values()) {
     if (!src.duration) continue;
-    const whole: Clip = { id: "all", assetId: src.assetId, sourceStart: 0, sourceEnd: src.duration, focusX: null, focusY: null, focusSource: "center", volume: 1, zoom: 1 };
+    const whole: Clip = { id: "all", assetId: src.assetId, sourceStart: 0, sourceEnd: src.duration, focusX: null, focusY: null, focusSource: "center", volume: 1, zoom: 1, punch: false };
     const unitStyle = { ...style, maxClipSec: Math.min(style.maxClipSec, target / 2), minClipSec: Math.min(style.minClipSec, target / 4) };
     const units = scoreUnits(buildUnits([whole], sources, unitStyle), sources, unitStyle);
     for (let i = 0; i < units.length; i++) {

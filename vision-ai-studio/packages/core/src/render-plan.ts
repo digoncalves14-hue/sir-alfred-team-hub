@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { FORMAT_PRESETS, Resolution, even, outputDimensions } from "./presets";
 import { type Clip, type Timeline, clipDuration, clipsDuration, endCardDuration, round3 } from "./timeline";
+import { clipEffectsChain, endCardLayout, transitionEdges } from "./effects";
 
 /**
  * Converte uma timeline validada em argumentos do FFmpeg.
@@ -34,9 +35,19 @@ export interface RenderInputs {
   assets: Map<string, RenderAsset>;
   images: Map<string, string>;
   audios: Map<string, string>;
-  /** Arquivo .ass já gerado (ou null sem legendas). */
+  /** Arquivo .ass já gerado (legendas, textos animados e textos da cartela) ou null. */
   assPath: string | null;
+  /** Dimensões e transparência das imagens de logo (cartela animada e cor de fundo). */
+  logoMeta?: Map<string, LogoMeta>;
   fontsDir: string | null;
+}
+
+export interface LogoMeta {
+  width: number;
+  height: number;
+  hasAlpha: boolean;
+  /** Cor do canto da imagem quando ela tem fundo opaco (#RRGGBB). */
+  cornerColor: string | null;
 }
 
 export interface RenderCommand {
@@ -79,6 +90,7 @@ export function buildRenderCommand(
   let inputIndex = 0;
   const segV: string[] = [];
   const segA: string[] = [];
+  const edges = transitionEdges(tl);
 
   tl.clips.forEach((clip, i) => {
     const asset = inputs.assets.get(clip.assetId);
@@ -89,11 +101,16 @@ export function buildRenderCommand(
     args.push("-ss", n(start), "-t", n(dur), "-i", asset.path);
     const k = inputIndex++;
     const vf = `[${k}:v]setpts=PTS-STARTPTS,fps=${fps},${reframeChain(clip, asset, W, H, tl.format.reframe, i, graph)}`;
-    graph.push(`${vf}[v${i}]`);
+    const fx = clipEffectsChain(tl, edges[i], dur, W, H, fps);
+    graph.push(`${vf}${fx ? `,${fx}` : ""}[v${i}]`);
+    // micro fades no áudio dos cortes com transição (evita estalos); no fade pelo preto, mergulho curto
+    const aIn = edges[i].inSec > 0 ? Math.min(tl.transitions.type === "fade" ? 0.12 : 0.03, edges[i].inSec) : 0;
+    const aOut = edges[i].outSec > 0 ? Math.min(tl.transitions.type === "fade" ? 0.12 : 0.03, edges[i].outSec) : 0;
+    const afx = `${aIn ? `,afade=t=in:st=0:d=${n(aIn)}` : ""}${aOut ? `,afade=t=out:st=${n(Math.max(0, dur - aOut))}:d=${n(aOut)}` : ""}`;
     const vol = round3(clip.volume * tl.audio.originalVolume);
     if (asset.hasAudio) {
       graph.push(
-        `[${k}:a]asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${vol},apad,atrim=0:${n(dur)}[a${i}]`,
+        `[${k}:a]asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${vol},apad,atrim=0:${n(dur)}${afx}[a${i}]`,
       );
     } else {
       graph.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=0:${n(dur)},aformat=sample_fmts=fltp[a${i}]`);
@@ -107,13 +124,25 @@ export function buildRenderCommand(
   if (card) {
     const logoPath = inputs.images.get(card.assetId);
     if (!logoPath) throw new Error("Arquivo da logo oficial não encontrado.");
+    const meta = inputs.logoMeta?.get(card.assetId) ?? { width: 1, height: 1, hasAlpha: true, cornerColor: null };
+    const ec = endCardLayout(tl, card, W, H, meta);
     args.push("-loop", "1", "-t", n(cardDur), "-i", logoPath);
     const k = inputIndex++;
-    const lw = even(W * card.scale);
-    graph.push(`color=c=${hexToFfmpeg(card.backgroundColor)}:s=${W}x${H}:r=${fps}:d=${n(cardDur)}[ecbg]`);
-    graph.push(`[${k}:v]scale=${lw}:-2:flags=lanczos,format=rgba[eclogo]`);
+    // fundo: degradê animado nas cores da marca, ou a cor do fundo da própria logo (logo sem transparência)
+    if (ec.background.mode === "gradient") {
+      graph.push(
+        `gradients=s=${W}x${H}:r=${fps}:d=${n(cardDur)}:c0=${hexToFfmpeg(ec.background.c0)}:c1=${hexToFfmpeg(ec.background.c1)}:nb_colors=2:x0=0:y0=0:x1=${W}:y1=${H}:speed=0.015,format=yuv420p[ecbg]`,
+      );
+    } else {
+      graph.push(`color=c=${hexToFfmpeg(ec.background.c0)}:s=${W}x${H}:r=${fps}:d=${n(cardDur)},format=yuv420p[ecbg]`);
+    }
+    graph.push(`[${k}:v]scale=${ec.logoBox.w}:${ec.logoBox.h}:flags=lanczos,format=rgba[eclogo]`);
+    // logo entra com leve aproximação contínua (push-in) e a cartela aparece com fade
+    const frames = Math.max(1, Math.round(cardDur * fps));
     graph.push(
-      `[ecbg][eclogo]overlay=(W-w)/2:(H-h)/2:shortest=1,fade=t=in:st=0:d=0.4,setsar=1,format=yuv420p[vend]`,
+      `[ecbg][eclogo]overlay=${ec.logoBox.x}:${ec.logoBox.y}:shortest=1,scale=${W * 2}:${H * 2}:flags=bicubic,` +
+        `zoompan=z='1+0.06*on/${frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=${W}x${H}:fps=${fps},` +
+        `fade=t=in:st=0:d=0.45:color=${tl.transitions.type === "flash" ? "white" : "black"},setsar=1,format=yuv420p[vend]`,
     );
     graph.push(`anullsrc=channel_layout=stereo:sample_rate=48000,atrim=0:${n(cardDur)},aformat=sample_fmts=fltp[aend]`);
     segV.push("[vend]");
@@ -126,7 +155,7 @@ export function buildRenderCommand(
 
   // vídeo: legenda + marca d'água
   let vLabel = "[vcat]";
-  if (inputs.assPath && tl.captions.enabled) {
+  if (inputs.assPath) {
     const fontsOpt = inputs.fontsDir ? `:fontsdir=${escapeFilterPath(inputs.fontsDir)}` : "";
     graph.push(`${vLabel}ass=filename=${escapeFilterPath(inputs.assPath)}${fontsOpt}[vsub]`);
     vLabel = "[vsub]";

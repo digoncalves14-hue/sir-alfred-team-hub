@@ -14,6 +14,7 @@ import {
   mapOutputRange,
 } from "./selection";
 import { getStyle } from "./styles";
+import { LOOKS, TRANSITION_LABELS } from "./effects";
 import {
   type Clip,
   type Timeline,
@@ -36,6 +37,9 @@ export interface BrandContext {
   musicAssetIds: string[];
   primaryColor: string | null;
   defaultStyleId: string | null;
+  /** Cores extras da paleta da marca (fundo escuro e destaque) para a cartela. */
+  backgroundColor?: string | null;
+  accentColor?: string | null;
 }
 
 export interface EngineContext {
@@ -72,6 +76,7 @@ export function applyEditPlan(current: Timeline, plan: EditPlan, ctx: EngineCont
     }
   }
 
+  tl.clips = applyDynamicZoom(tl);
   tl.clips = applyAutoFocus(tl.clips, ctx.sources);
   if (tl.clips.length === 0) {
     throw new Error("A edição removeria todo o conteúdo do vídeo. Nenhuma alteração foi aplicada.");
@@ -235,15 +240,20 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
           },
         };
       }
+      const previous = tl.logos.find((l) => l.mode === op.placement);
       const logos = tl.logos.filter((l) => l.mode !== op.placement);
-      logos.push({
-        assetId: logoId,
-        mode: op.placement,
-        durationSec: clamp(op.duration_sec ?? 3, 1, 10),
-        position: "top_right",
-        backgroundColor: ctx.brand?.primaryColor ?? "#0B0B0C",
-        scale: op.placement === "end_card" ? 0.45 : 0.14,
-      });
+      logos.push(
+        op.placement === "end_card"
+          ? { ...endCardFor(logoId, ctx), headline: previous?.headline, cta: previous?.cta, durationSec: clamp(op.duration_sec ?? 3.5, 1, 10) }
+          : {
+              assetId: logoId,
+              mode: "watermark",
+              durationSec: clamp(op.duration_sec ?? 3, 1, 10),
+              position: "top_right",
+              backgroundColor: "#0B0B0C",
+              scale: 0.14,
+            },
+      );
       return {
         timeline: { ...tl, logos },
         message: op.placement === "end_card" ? `Cartela final com a logo oficial de ${ctx.brand?.name}.` : `Logo de ${ctx.brand?.name} no canto do vídeo.`,
@@ -323,6 +333,9 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
           styleId: s.id,
           format: { ...tl.format, reframe: s.reframe },
           captions: { ...tl.captions, style: s.captionStyle },
+          transitions: { type: s.transition, durationSec: s.transitionSec },
+          look: s.look,
+          dynamicZoom: { ...tl.dynamicZoom, enabled: s.dynamicZoom },
         },
         message: `Estilo "${s.label}" aplicado.`,
         warnings: w,
@@ -366,6 +379,82 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
         warnings: w,
       };
     }
+    case "set_transitions": {
+      const durationSec = clamp(op.duration_sec ?? tl.transitions.durationSec ?? 0.4, 0.2, 1);
+      return {
+        timeline: { ...tl, transitions: { type: op.type, durationSec } },
+        message: op.type === "none" ? "Transições removidas (cortes secos)." : `Transição "${TRANSITION_LABELS[op.type]}" em todos os cortes.`,
+        warnings: w,
+      };
+    }
+    case "set_look": {
+      return {
+        timeline: { ...tl, look: op.look },
+        message: op.look === "none" ? "Cor original restaurada." : `Tratamento de cor "${LOOKS[op.look].label}" aplicado.`,
+        warnings: w,
+      };
+    }
+    case "add_text": {
+      const text = op.text.replace(/\s+/g, " ").trim().slice(0, 120);
+      if (!text) return { timeline: tl, warnings: ["Texto vazio ignorado."] };
+      const defaults = { hook: 3, title: 3, cta: 3.5, lower_third: 4 } as const;
+      const positions = { hook: "top", title: "center", cta: "bottom", lower_third: "bottom" } as const;
+      const texts = tl.texts.filter((t) => op.role !== "hook" || t.role !== "hook").slice(-19);
+      texts.push({
+        id: newClipId(),
+        text,
+        role: op.role,
+        anchor: op.anchor,
+        offsetSec: clamp(op.offset_sec ?? 0, 0, Math.max(0, total - 1)),
+        durationSec: clamp(op.duration_sec ?? defaults[op.role], 0.8, Math.max(1, Math.min(15, total))),
+        position: op.position ?? positions[op.role],
+      });
+      const labels = { hook: "Gancho animado", title: "Título animado", cta: "Chamada para ação animada", lower_third: "Identificação animada" } as const;
+      return { timeline: { ...tl, texts }, message: `${labels[op.role]}: "${text}".`, warnings: w };
+    }
+    case "clear_texts": {
+      const texts = op.role ? tl.texts.filter((t) => t.role !== op.role) : [];
+      return { timeline: { ...tl, texts }, message: "Textos removidos.", warnings: w };
+    }
+    case "dynamic_zoom": {
+      const intensity = clamp(op.intensity ?? tl.dynamicZoom.intensity ?? 0.12, 0.05, 0.3);
+      return {
+        timeline: { ...tl, dynamicZoom: { enabled: op.enabled, intensity } },
+        message: op.enabled ? "Zoom dinâmico nos cortes (aproximações alternadas)." : "Zoom dinâmico desativado.",
+        warnings: w,
+      };
+    }
+    case "set_end_card": {
+      let logos = tl.logos;
+      if (!logos.some((l) => l.mode === "end_card")) {
+        const logoId = ctx.brand?.logoAssetId;
+        if (!logoId) {
+          return {
+            timeline: tl,
+            warnings: [],
+            unsupported: {
+              request: "cartela final",
+              reason: ctx.brand
+                ? `A marca ${ctx.brand.name} ainda não tem logo oficial cadastrada. Envie a logo em "Minhas Marcas".`
+                : "Selecione uma marca com logo oficial cadastrada para o projeto.",
+            },
+          };
+        }
+        logos = [...logos, endCardFor(logoId, ctx)];
+      }
+      const clean = (v: string | null, max: number) => (v ? v.replace(/\s+/g, " ").trim().slice(0, max) || undefined : undefined);
+      logos = logos.map((l) =>
+        l.mode === "end_card"
+          ? {
+              ...l,
+              headline: clean(op.headline, 60),
+              cta: clean(op.cta, 40),
+              durationSec: op.duration_sec != null ? clamp(op.duration_sec, 2, 6) : Math.max(l.durationSec, op.headline || op.cta ? 3.5 : l.durationSec),
+            }
+          : l,
+      );
+      return { timeline: { ...tl, logos }, message: "Cartela final animada com a logo oficial, frase e chamada para ação.", warnings: w };
+    }
     case "unsupported":
       return { timeline: tl, warnings: [], unsupported: { request: op.request, reason: op.reason } };
   }
@@ -375,6 +464,55 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
  * Reenquadramento automático: para cada clipe sem ajuste manual, centraliza o
  * recorte na região com mais movimento detectado no trecho. Sem análise, centraliza.
  */
+/** Cartela final padrão: fundo escuro da marca com degradê para a cor de destaque. */
+function endCardFor(logoId: string, ctx: EngineContext) {
+  const accent = ctx.brand?.primaryColor && !isDark(ctx.brand.primaryColor) ? ctx.brand.primaryColor : (ctx.brand?.accentColor ?? "#C9A227");
+  return {
+    assetId: logoId,
+    mode: "end_card" as const,
+    durationSec: 3.5,
+    position: "top_right" as const,
+    backgroundColor: ctx.brand?.backgroundColor ?? "#0B0B0C",
+    scale: 0.5,
+    accentColor: accent,
+  };
+}
+
+function isDark(hex: string): boolean {
+  const n = parseInt(hex.slice(1), 16);
+  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255) < 90;
+}
+
+/**
+ * Zoom dinâmico (punch-in), recalculado a cada edição: desfaz as aproximações
+ * automáticas anteriores e, se ativo, divide trechos longos em cortes secos que
+ * alternam enquadramento normal e aproximado. Zooms manuais não são tocados.
+ */
+export function applyDynamicZoom(tl: Timeline): Clip[] {
+  const base = mergeContiguous(tl.clips.map((c) => (c.punch ? { ...c, zoom: 1, punch: false } : c)));
+  if (!tl.dynamicZoom.enabled) return base;
+  const style = getStyle(tl.styleId);
+  const seg = clamp((style.minClipSec + style.maxClipSec) / 2, 1.6, 3.2);
+  const out: Clip[] = [];
+  let toggle = false;
+  for (const c of base) {
+    const dur = c.sourceEnd - c.sourceStart;
+    if (c.zoom > 1.001) {
+      out.push(c);
+      continue;
+    }
+    const n = dur >= seg * 1.6 ? Math.max(2, Math.round(dur / seg)) : 1;
+    for (let k = 0; k < n; k++) {
+      const s = round3(c.sourceStart + (dur * k) / n);
+      const e = k === n - 1 ? c.sourceEnd : round3(c.sourceStart + (dur * (k + 1)) / n);
+      const punch = n > 1 ? k % 2 === 1 : toggle;
+      out.push({ ...c, id: k === 0 ? c.id : newClipId(), sourceStart: s, sourceEnd: e, zoom: punch ? round3(1 + tl.dynamicZoom.intensity) : 1, punch });
+    }
+    toggle = !toggle;
+  }
+  return out;
+}
+
 export function applyAutoFocus(clips: Clip[], sources: SourceMap): Clip[] {
   // junta trechos contíguos antes de recalcular o foco automático (o foco é derivado, não decisão do usuário)
   const normalized = mergeContiguous(
@@ -417,12 +555,13 @@ export function restoreSourceRange(clips: Clip[], assetId: string, start: number
   for (const m of missing.filter((x) => x.end - x.start > 0.04)) {
     const template = out.find((c) => c.assetId === assetId);
     const clip: Clip = {
-      ...(template ?? { id: "", assetId, focusX: null, focusY: null, focusSource: "center", volume: 1, zoom: 1, sourceStart: 0, sourceEnd: 0 }),
+      ...(template ?? { id: "", assetId, focusX: null, focusY: null, focusSource: "center", volume: 1, zoom: 1, punch: false, sourceStart: 0, sourceEnd: 0 }),
       id: newClipId(),
       assetId,
       sourceStart: round3(m.start),
       sourceEnd: round3(m.end),
       zoom: 1,
+      punch: false,
       label: "Restaurado pela transcrição",
     };
     // insere depois do último clipe do mesmo arquivo que começa antes do trecho

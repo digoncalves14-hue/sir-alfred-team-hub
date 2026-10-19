@@ -3,7 +3,8 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   type BrandContext,
   type EditPlan,
-  EditPlanSchema,
+  EditOperation,
+  EditPlanEnvelopeSchema,
   EDIT_STYLES,
   FORMAT_PRESETS,
   CAPTION_STYLES,
@@ -12,7 +13,7 @@ import {
   averageTrack,
   clipsDuration,
   parseCommandLocally,
-  parseEditPlan,
+  planFromEnvelope,
   placeClips,
   round3,
   timelineDuration,
@@ -48,7 +49,7 @@ export interface PlannerOutput {
   fallbackReason?: string;
 }
 
-const SYSTEM_PROMPT = `Você é o editor de vídeo do VISION AI STUDIO. Converte pedidos em português do Brasil em um PLANO DE EDIÇÃO estruturado (JSON), que um motor determinístico executa com FFmpeg. Você nunca escreve comandos FFmpeg.
+export const SYSTEM_PROMPT = `Você é o editor de vídeo do VISION AI STUDIO. Converte pedidos em português do Brasil em um PLANO DE EDIÇÃO estruturado (JSON), que um motor determinístico executa com FFmpeg. Você nunca escreve comandos FFmpeg.
 
 Regras:
 - Todos os tempos (start/end) referem-se ao VÍDEO FINAL ATUAL (a versão descrita no contexto), em segundos.
@@ -71,14 +72,46 @@ Estilos de legenda: ${Object.values(CAPTION_STYLES)
   .join("; ")}.
 Formatos: ${Object.values(FORMAT_PRESETS)
   .map((p) => `${p.id} = ${p.label}`)
-  .join("; ")}.`;
+  .join("; ")}.
+
+Formato da resposta: cada operação tem "op" (nome) e "args" (texto com um objeto JSON contendo TODOS os campos listados abaixo para essa operação; use null nos campos que aceitam null quando não se aplicarem).
+Operações e seus campos:
+${operationCatalog()}`;
+
+/** Lista legível dos campos de cada operação (vai no prompt; o schema enviado à API é o envelope compacto). */
+function operationCatalog(): string {
+  return EditOperation.options
+    .map((o) => {
+      const schema = zodToJsonSchema(o, { $refStrategy: "none" }) as { properties: Record<string, JsonProp> };
+      const fields = Object.entries(schema.properties)
+        .filter(([k]) => k !== "op")
+        .map(([k, v]) => `${k}: ${describeProp(v)}`);
+      return `- ${o.shape.op.value}: ${fields.length ? fields.join("; ") : "sem campos ({})"}`;
+    })
+    .join("\n");
+}
+
+interface JsonProp {
+  type?: string | string[];
+  enum?: unknown[];
+  anyOf?: JsonProp[];
+  description?: string;
+}
+
+function describeProp(p: JsonProp): string {
+  const types = (Array.isArray(p.type) ? p.type : p.type ? [p.type] : []).concat((p.anyOf ?? []).flatMap((a) => (Array.isArray(a.type) ? a.type : a.type ? [a.type] : [])));
+  const enums = p.enum ?? p.anyOf?.find((a) => a.enum)?.enum;
+  let t = enums ? enums.filter((e) => e !== null).map((e) => JSON.stringify(e)).join(" | ") : types.filter((x) => x !== "null").join(" | ");
+  if (types.includes("null") || enums?.includes(null)) t += " | null";
+  return p.description ? `${t} (${p.description})` : t;
+}
 
 let cachedSchema: Record<string, unknown> | null = null;
 
-/** JSON Schema do plano, ajustado para saídas estruturadas. */
+/** JSON Schema enviado à API: envelope compacto (op + args em JSON), cada operação validada depois. */
 export function editPlanJsonSchema(): Record<string, unknown> {
   if (cachedSchema) return cachedSchema;
-  const raw = zodToJsonSchema(EditPlanSchema, { $refStrategy: "none", target: "jsonSchema7" }) as Record<string, unknown>;
+  const raw = zodToJsonSchema(EditPlanEnvelopeSchema, { $refStrategy: "none", target: "jsonSchema7" }) as Record<string, unknown>;
   cachedSchema = sanitizeSchema(raw) as Record<string, unknown>;
   return cachedSchema;
 }
@@ -220,7 +253,7 @@ export async function planEdit(input: PlannerInput): Promise<PlannerOutput> {
       return { ...local("Resposta do modelo incompleta; usado o interpretador local."), inputTokens, outputTokens, costUsd };
     }
     const text = response.content.find((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")?.text ?? "";
-    const plan = parseEditPlan(JSON.parse(text));
+    const plan = planFromEnvelope(JSON.parse(text));
     return { plan, engine: "anthropic", model: response.model, inputTokens, outputTokens, costUsd };
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {

@@ -12,7 +12,9 @@ export async function refreshProjectStatus(db: Db, projectId: string): Promise<P
   const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
   if (!project) return "draft";
   const recent = await db.select().from(jobs).where(eq(jobs.projectId, projectId)).orderBy(desc(jobs.createdAt)).limit(50);
-  const active = recent.filter((j) => ACTIVE.includes(j.status));
+  // a cópia de prévia roda em segundo plano e não muda o status do projeto
+  const tracked = recent.filter((j) => j.type !== "proxy");
+  const active = tracked.filter((j) => ACTIVE.includes(j.status));
   let status: ProjectStatus;
   let detail: string | null = null;
   let error: string | null = null;
@@ -26,7 +28,7 @@ export async function refreshProjectStatus(db: Db, projectId: string): Promise<P
     else status = "queued";
     detail = running[0]?.stage ?? null;
   } else {
-    const lastFinished = recent.find((j) => j.status === "failed" || j.status === "succeeded" || j.status === "canceled");
+    const lastFinished = tracked.find((j) => j.status === "failed" || j.status === "succeeded" || j.status === "canceled");
     const sources = await db.select({ id: assets.id }).from(assets).where(and(eq(assets.projectId, projectId), eq(assets.role, "source")));
     if (lastFinished?.status === "failed") {
       status = "error";

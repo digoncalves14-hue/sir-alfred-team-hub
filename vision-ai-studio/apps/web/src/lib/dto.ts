@@ -29,7 +29,8 @@ export async function assetDto(a: Asset) {
     hasAnalysis: Boolean(a.analysis),
     bpm: a.role === "music" ? ((a.analysis as { bpm?: number | null } | null)?.bpm ?? null) : null,
     createdAt: a.createdAt.toISOString(),
-    url: a.status === "ready" || a.status === "processing" ? await signedUrl(a.storageKey) : null,
+    // a prévia usa a cópia leve quando existe; downloads e render usam o original
+    url: a.status === "ready" || a.status === "processing" ? await signedUrl(a.proxyKey ?? a.storageKey) : null,
     thumbnailUrl: await signedUrl(a.thumbnailKey),
   };
 }

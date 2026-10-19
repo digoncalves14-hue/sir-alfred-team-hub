@@ -23,7 +23,7 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   error: "Erro no processamento",
 };
 
-export const JOB_TYPES = ["probe", "analyze", "transcribe", "ai_command", "render", "thumbnail", "generate_content"] as const;
+export const JOB_TYPES = ["probe", "analyze", "transcribe", "ai_command", "render", "thumbnail", "generate_content", "proxy"] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
 export const JOB_STATUSES = ["queued", "running", "succeeded", "failed", "canceled"] as const;
@@ -37,4 +37,5 @@ export const JOB_TYPE_LABEL: Record<JobType, string> = {
   render: "Renderização",
   thumbnail: "Miniatura",
   generate_content: "Geração de textos para redes sociais",
+  proxy: "Cópia leve para a prévia",
 };

@@ -147,6 +147,8 @@ export const assets = pgTable(
     fps: doublePrecision("fps"),
     hasAudio: boolean("has_audio"),
     thumbnailKey: text("thumbnail_key"),
+    /** Cópia leve (720p H.264, faststart) usada na prévia do estúdio; o original continua sendo a fonte do render. */
+    proxyKey: text("proxy_key"),
     licenseNote: text("license_note"),
     errorMessage: text("error_message"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),

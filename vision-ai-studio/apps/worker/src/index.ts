@@ -1,7 +1,7 @@
 import { readdir, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { claimJob, closeDb, getDb, recoverStaleJobs } from "@vision/db";
+import { and, assets, claimJob, closeDb, enqueueJob, eq, getDb, inArray, isNull, jobs, recoverStaleJobs } from "@vision/db";
 import { getConfig, log } from "@vision/server";
 import { runJob } from "./runner";
 
@@ -49,6 +49,32 @@ async function housekeeping(): Promise<void> {
   }
 }
 
+/** Vídeos enviados antes da cópia de prévia existir ganham a sua (uma vez por vídeo). */
+async function backfillPreviewProxies(): Promise<void> {
+  try {
+    const missing = await db
+      .select({ id: assets.id, orgId: assets.orgId, projectId: assets.projectId })
+      .from(assets)
+      .where(and(eq(assets.role, "source"), eq(assets.status, "ready"), isNull(assets.proxyKey)))
+      .limit(200);
+    if (!missing.length) return;
+    const queued = await db
+      .select({ assetId: jobs.assetId })
+      .from(jobs)
+      .where(and(eq(jobs.type, "proxy"), inArray(jobs.assetId, missing.map((m) => m.id))));
+    const done = new Set(queued.map((q) => q.assetId));
+    let n = 0;
+    for (const a of missing) {
+      if (done.has(a.id)) continue;
+      await enqueueJob(db, { orgId: a.orgId, projectId: a.projectId, assetId: a.id, type: "proxy", priority: 5 });
+      n++;
+    }
+    if (n) log.info("preview_proxy_backfill", { count: n });
+  } catch (err) {
+    log.error("preview_proxy_backfill_failed", { err });
+  }
+}
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -74,5 +100,6 @@ log.info("worker_started", {
   transcription: cfg.transcriptionProvider,
 });
 await housekeeping();
+await backfillPreviewProxies();
 setInterval(() => void housekeeping(), 30_000).unref();
 await Promise.all(Array.from({ length: cfg.WORKER_CONCURRENCY }, (_, i) => loop(i)));

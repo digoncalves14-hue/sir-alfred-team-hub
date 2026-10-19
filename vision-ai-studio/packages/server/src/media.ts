@@ -115,6 +115,29 @@ export async function extractThumbnail(filePath: string, outPath: string, atSec:
   if (!s || s.size === 0) throw new ProcessingError("thumbnail_failed", "Não foi possível gerar a miniatura.", false);
 }
 
+/**
+ * Cópia leve para a prévia no navegador: 720p no lado menor, H.264 8 bits,
+ * keyframe a cada segundo (busca rápida) e moov no início (começa a tocar sem
+ * baixar o arquivo inteiro). Vídeos de celular (HEVC/4K/HDR) travam a prévia
+ * em conexões comuns; o render final continua usando o original.
+ */
+export async function createPreviewProxy(filePath: string, outPath: string, durationSec: number, signal?: AbortSignal, onProgress?: (f: number) => void): Promise<void> {
+  await mkdir(path.dirname(outPath), { recursive: true });
+  await ffmpeg(
+    [
+      "-hide_banner", "-nostdin", "-y", "-i", filePath,
+      "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "-1",
+      "-vf", "scale='if(lt(iw,ih),trunc(min(720,iw)/2)*2,-2)':'if(lt(iw,ih),-2,trunc(min(720,ih)/2)*2)',format=yuv420p",
+      "-fpsmax", "30", "-c:v", "libx264", "-preset", "veryfast", "-crf", "27", "-force_key_frames", "expr:gte(t,n_forced*1)",
+      "-c:a", "aac", "-b:a", "96k", "-ac", "2",
+      "-movflags", "+faststart", outPath,
+    ],
+    { signal, expectedDurationSec: durationSec, onProgress, timeoutMs: Math.max(10 * 60_000, durationSec * 4000) },
+  );
+  const s = await stat(outPath).catch(() => null);
+  if (!s || s.size === 0) throw new ProcessingError("proxy_failed", "Não foi possível gerar a cópia de prévia.", true);
+}
+
 /** Extrai quadros (JPEG pequenos) em instantes específicos — usados na análise visual por IA. */
 export async function extractFrames(filePath: string, times: number[], outDir: string, width = 512, signal?: AbortSignal): Promise<string[]> {
   await mkdir(outDir, { recursive: true });

@@ -8,6 +8,7 @@ import { handleProbe } from "./handlers/probe";
 import { handleRender } from "./handlers/render";
 import { handleTranscribe } from "./handlers/transcribe";
 import { handleGenerateContent } from "./handlers/content";
+import { handleProxy } from "./handlers/proxy";
 import { continueAutopilot } from "./pipeline";
 
 const HANDLERS: Partial<Record<JobType, (ctx: JobContext) => Promise<Record<string, unknown>>>> = {
@@ -17,6 +18,7 @@ const HANDLERS: Partial<Record<JobType, (ctx: JobContext) => Promise<Record<stri
   ai_command: handleAiCommand,
   render: handleRender,
   generate_content: handleGenerateContent,
+  proxy: handleProxy,
 };
 
 /** Executa uma tarefa já reservada, tratando sucesso, falha, retentativa e cancelamento. */

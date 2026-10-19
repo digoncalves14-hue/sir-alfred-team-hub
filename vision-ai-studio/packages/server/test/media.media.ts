@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -13,7 +13,7 @@ import {
   type MediaProbe,
   type Timeline,
 } from "@vision/core";
-import { analyzeFile, analyzeMusic, ffmpeg, probeFile } from "../src/node";
+import { analyzeFile, analyzeMusic, createPreviewProxy, ffmpeg, probeFile } from "../src/node";
 import { ProcessingError } from "../src/errors";
 import { makeFixtures } from "../../../scripts/make-fixtures";
 
@@ -188,6 +188,20 @@ describe("processamento real com FFmpeg", () => {
     const sine = await analyzeMusic(files.music, 30);
     expect(sine.beats.length === 0 || sine.confidence < 0.5).toBe(true);
   });
+
+  it("gera cópia leve de prévia (vertical 4K HEVC 10 bits → 720p H.264 com faststart)", async () => {
+    const src = path.join(dir, "celular.mov");
+    await ffmpeg(["-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i", "testsrc2=s=1080x1920:r=60", "-f", "lavfi", "-i", "sine=f=300", "-t", "2", "-c:v", "libx265", "-preset", "ultrafast", "-pix_fmt", "yuv420p10le", "-tag:v", "hvc1", "-c:a", "aac", src]);
+    const out = path.join(dir, "previa.mp4");
+    await createPreviewProxy(src, out, 2);
+    const p = await probeFile(out);
+    expect([p.width, p.height]).toEqual([720, 1280]);
+    expect(p.fps).toBeLessThanOrEqual(30);
+    expect(p.hasAudio).toBe(true);
+    expect(p.durationSec).toBeGreaterThan(1.9);
+    const head = (await readFile(out)).subarray(0, 65536);
+    expect(head.includes(Buffer.from("moov"))).toBe(true);
+  }, 120_000);
 
   it("arquivo corrompido gera erro compreensível (critério 8)", async () => {
     await expect(probeFile(files.corrupt)).rejects.toBeInstanceOf(ProcessingError);

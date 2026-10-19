@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { parseTimeline } from "@vision/core";
 import { resetConfig } from "../src/config";
-import { buildPlannerContext, editPlanJsonSchema, planEdit } from "../src/ai-planner";
+import Anthropic from "@anthropic-ai/sdk";
+import { buildPlannerContext, describeAiError, editPlanJsonSchema, planEdit } from "../src/ai-planner";
 
 const A = "11111111-1111-4111-8111-111111111111";
 
@@ -44,5 +45,18 @@ describe("planejador de edição", () => {
     );
     expect(ctx.versao_atual.duracao_total).toBe(10);
     expect(ctx.versao_atual.trechos[0].fala).toContain("[2s] Olá pessoal");
+  });
+});
+
+describe("erros da API de IA", () => {
+  const bad = (message: string) =>
+    new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message } }, message, new Headers());
+
+  it("mostra a causa informada pela API", () => {
+    expect(describeAiError(bad("tool_choice not supported"))).toBe("Serviço de IA indisponível (400: tool_choice not supported).");
+  });
+
+  it("explica falta de créditos em português", () => {
+    expect(describeAiError(bad("Your credit balance is too low to access the Anthropic API."))).toMatch(/sem créditos/);
   });
 });

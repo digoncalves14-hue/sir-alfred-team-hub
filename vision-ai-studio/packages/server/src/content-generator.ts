@@ -4,6 +4,8 @@ import { ContentSuggestionsSchema, type ContentSuggestions } from "@vision/core"
 import { getConfig } from "./config";
 import { estimateAiCost } from "./costs";
 import { ProcessingError } from "./errors";
+import { aiErrorDetail, describeAiError } from "./ai-planner";
+import { log } from "./logger";
 
 export interface ContentInput {
   projectName: string;
@@ -79,7 +81,10 @@ export async function generateContent(input: ContentInput): Promise<{ data: Cont
     if (err instanceof ProcessingError) throw err;
     if (err instanceof Anthropic.RateLimitError) throw new ProcessingError("ai_rate_limit", "Limite de uso da IA atingido; tente novamente em instantes.", true);
     if (err instanceof Anthropic.AuthenticationError) throw new ProcessingError("ai_auth", "A chave da API de IA é inválida.");
-    if (err instanceof Anthropic.APIError) throw new ProcessingError("ai_api", `Serviço de IA indisponível (${err.status ?? "erro"}).`, true);
+    if (err instanceof Anthropic.APIError) {
+      log.error("ai_api_error", { status: err.status, detail: aiErrorDetail(err) });
+      throw new ProcessingError("ai_api", describeAiError(err), true);
+    }
     throw new ProcessingError("ai_invalid", "A IA retornou um resultado inválido.", true, (err as Error).message);
   }
 }

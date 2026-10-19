@@ -73,8 +73,11 @@ docker compose up --build
 ```
 
 O MinIO fica em `http://localhost:9000` (console em `:9001`). Em produção, use um
-bucket privado com CORS liberando `PUT` da sua origem e expondo o cabeçalho `ETag`
-(necessário para upload multipart direto do navegador).
+bucket privado. Com `S3_DIRECT_UPLOAD=auto` (padrão), a aplicação configura o CORS do
+bucket para `APP_URL` (PUT/GET, expondo `ETag`) e o navegador envia o vídeo direto ao
+bucket em partes de `MULTIPART_PART_MB`; se o provedor recusar a configuração, o upload
+passa pela aplicação em partes de 5 MB (cada requisição curta, compatível com proxies
+que limitam a duração das requisições, como o do Railway).
 
 ## Configuração de IA e transcrição
 

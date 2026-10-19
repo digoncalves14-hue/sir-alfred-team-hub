@@ -11,6 +11,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  PutBucketCorsCommand,
   PutObjectCommand,
   S3Client,
   UploadPartCommand,
@@ -23,7 +24,7 @@ import { getConfig } from "../config";
 import type { StorageDriver, UploadTarget } from "./types";
 
 /** Tamanho das partes no upload pela aplicação (cada requisição leva segundos, não minutos). */
-const PROXY_PART_MB = 16;
+const PROXY_PART_MB = 5;
 
 /**
  * Armazenamento compatível com S3 (AWS S3, Cloudflare R2, MinIO...).
@@ -57,7 +58,7 @@ export class S3Storage implements StorageDriver {
     const c = getConfig();
     const partSize = c.MULTIPART_PART_MB * 1024 * 1024;
     const ttl = c.SIGNED_URL_TTL_SEC * 6;
-    if (!c.S3_DIRECT_UPLOAD) {
+    if (!(await this.directUploadEnabled())) {
       // Upload pela aplicação (não depende de CORS no bucket), sempre em partes pequenas:
       // cada requisição termina rápido, abaixo do limite de tempo de proxies como o do Railway.
       const proxyPart = PROXY_PART_MB * 1024 * 1024;
@@ -97,6 +98,41 @@ export class S3Storage implements StorageDriver {
       })),
     );
     return { mode: "multipart", uploadId, partSize, parts };
+  }
+
+  private directUpload?: Promise<boolean>;
+
+  /**
+   * Envio direto do navegador ao bucket: mais rápido (borda do provedor perto do usuário) e sem o
+   * limite de tempo por requisição do proxy da aplicação. No modo "auto", configura o CORS do bucket
+   * para a origem da aplicação; se o provedor recusar, o upload passa pela aplicação.
+   */
+  private directUploadEnabled(): Promise<boolean> {
+    const c = getConfig();
+    if (c.S3_DIRECT_UPLOAD !== "auto") return Promise.resolve(c.S3_DIRECT_UPLOAD === "true");
+    this.directUpload ??= this.client
+      .send(
+        new PutBucketCorsCommand({
+          Bucket: this.bucket,
+          CORSConfiguration: {
+            CORSRules: [
+              {
+                AllowedOrigins: [new URL(c.APP_URL).origin],
+                AllowedMethods: ["PUT", "GET", "HEAD"],
+                AllowedHeaders: ["*"],
+                ExposeHeaders: ["ETag"],
+                MaxAgeSeconds: 3600,
+              },
+            ],
+          },
+        }),
+      )
+      .then(() => true)
+      .catch((err) => {
+        console.warn(JSON.stringify({ level: "warn", msg: "CORS do bucket não configurado; upload passará pela aplicação", error: (err as Error).message }));
+        return false;
+      });
+    return this.directUpload;
   }
 
   async completeUpload(key: string, t: { uploadId?: string; parts?: Array<{ partNumber: number; etag: string }> }): Promise<void> {

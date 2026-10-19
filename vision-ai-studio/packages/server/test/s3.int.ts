@@ -6,7 +6,7 @@ import { readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import { randomBytes } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { CreateBucketCommand, S3Client } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, GetBucketCorsCommand, S3Client } from "@aws-sdk/client-s3";
 import { resetConfig } from "../src/config";
 import { S3Storage } from "../src/storage/s3";
 import { makeStorageKey } from "../src/storage/keys";
@@ -25,6 +25,7 @@ describe.skipIf(!endpoint)("armazenamento S3", () => {
       S3_SECRET_ACCESS_KEY: "test",
       S3_REGION: "us-east-1",
       MULTIPART_PART_MB: "5",
+      S3_DIRECT_UPLOAD: "false",
     });
     resetConfig();
     const c = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "test", secretAccessKey: "test" } });
@@ -34,7 +35,7 @@ describe.skipIf(!endpoint)("armazenamento S3", () => {
 
   it("upload pela aplicação (multipart), download assinado com Range, materialização e exclusão", async () => {
     const key = makeStorageKey("11111111-1111-4111-8111-111111111111", "sources", "mp4");
-    const target = await storage.createUpload(key, "video/mp4", 12 * 1024 * 1024);
+    const target = await storage.createUpload(key, "video/mp4", 4 * 1024 * 1024);
     expect(target.mode).toBe("single");
     expect(target.mode === "single" && target.url.startsWith("/api/storage/upload?")).toBe(true);
     const data = randomBytes(12 * 1024 * 1024);
@@ -54,9 +55,9 @@ describe.skipIf(!endpoint)("armazenamento S3", () => {
     expect(await storage.stat(key)).toBeNull();
   });
 
-  it("upload pela aplicação em partes de 16 MB (cada requisição curta)", async () => {
+  it("upload pela aplicação em partes de 5 MB (cada requisição curta)", async () => {
     const key = makeStorageKey("11111111-1111-4111-8111-111111111111", "sources", "mp4");
-    const data = randomBytes(40 * 1024 * 1024);
+    const data = randomBytes(12 * 1024 * 1024);
     const target = await storage.createUpload(key, "video/mp4", data.length);
     if (target.mode !== "multipart") throw new Error("esperava multipart");
     expect(target.parts).toHaveLength(3);
@@ -76,6 +77,27 @@ describe.skipIf(!endpoint)("armazenamento S3", () => {
     await storage.completeUpload(key, { uploadId: target.uploadId, parts });
     expect((await storage.stat(key))?.size).toBe(data.length);
     await storage.delete(key);
+  });
+
+  it("modo auto: configura o CORS do bucket e passa a enviar direto ao bucket", async () => {
+    process.env.S3_DIRECT_UPLOAD = "auto";
+    process.env.APP_URL = "https://app.exemplo.com.br";
+    resetConfig();
+    try {
+      const auto = new S3Storage();
+      const key = makeStorageKey("11111111-1111-4111-8111-111111111111", "sources", "mp4");
+      const target = await auto.createUpload(key, "video/mp4", 12 * 1024 * 1024);
+      if (target.mode !== "multipart") throw new Error("esperava multipart direto");
+      expect(target.parts[0].url.startsWith(endpoint!)).toBe(true);
+      const c = new S3Client({ endpoint, region: "us-east-1", forcePathStyle: true, credentials: { accessKeyId: "test", secretAccessKey: "test" } });
+      const cors = await c.send(new GetBucketCorsCommand({ Bucket: "vision-test" }));
+      expect(cors.CORSRules?.[0]?.AllowedOrigins).toEqual(["https://app.exemplo.com.br"]);
+      expect(cors.CORSRules?.[0]?.ExposeHeaders).toContain("ETag");
+      await auto.abortUpload(key, target.uploadId);
+    } finally {
+      process.env.S3_DIRECT_UPLOAD = "false";
+      resetConfig();
+    }
   });
 
   it("rejeita upload maior que o declarado", async () => {

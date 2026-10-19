@@ -1,0 +1,17 @@
+# Aplicação web (Next.js standalone). Não executa processamento pesado.
+FROM node:22-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json tsconfig.base.json ./
+COPY packages ./packages
+COPY apps/web ./apps/web
+COPY apps/worker/package.json ./apps/worker/package.json
+RUN npm ci --no-audit --no-fund && npm run build -w @vision/web
+
+FROM node:22-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
+COPY --from=build /app/apps/web/.next/standalone ./
+COPY --from=build /app/apps/web/.next/static ./apps/web/.next/static
+USER node
+EXPOSE 3000
+CMD ["node", "apps/web/server.js"]

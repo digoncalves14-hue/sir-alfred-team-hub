@@ -1,0 +1,12 @@
+node_modules
+.next
+dist
+coverage
+.env
+.env.local
+/data
+/tmp
+*.log
+next-env.d.ts
+tsconfig.tsbuildinfo
+acceptance-report.json

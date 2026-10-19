@@ -41,11 +41,14 @@ const EnvSchema = z.object({
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
   S3_FORCE_PATH_STYLE: bool.default("true"),
-  /** true = navegador envia direto ao bucket (exige CORS com ETag exposto); false = upload passa pela aplicação. */
-  S3_DIRECT_UPLOAD: bool.default("false"),
+  /**
+   * true = navegador envia direto ao bucket (exige CORS com ETag exposto); false = upload passa pela aplicação;
+   * auto = a aplicação configura o CORS do bucket para APP_URL e, se conseguir, usa o envio direto.
+   */
+  S3_DIRECT_UPLOAD: z.enum(["auto", "true", "false", "1", "0"]).default("auto").transform((v) => (v === "1" ? "true" : v === "0" ? "false" : v)),
 
   MAX_UPLOAD_MB: z.coerce.number().positive().default(4096),
-  MULTIPART_PART_MB: z.coerce.number().min(5).default(64),
+  MULTIPART_PART_MB: z.coerce.number().min(5).default(16),
   SIGNED_URL_TTL_SEC: z.coerce.number().min(60).default(3600),
 
   FFMPEG_PATH: z.string().default("ffmpeg"),

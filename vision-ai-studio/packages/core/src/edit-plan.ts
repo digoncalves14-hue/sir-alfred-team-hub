@@ -148,6 +148,48 @@ export const EditPlanSchema = z.object({
 });
 export type EditPlan = z.infer<typeof EditPlanSchema>;
 
+/** Nomes de todas as operações aceitas pelo motor. */
+export const EDIT_OP_NAMES = EditOperation.options.map((o) => o.shape.op.value) as [EditOperation["op"], ...EditOperation["op"][]];
+
+/**
+ * Formato compacto usado com saídas estruturadas da IA: o schema completo (20
+ * operações) gera uma gramática grande demais para o provedor. A IA devolve cada
+ * operação como nome + argumentos em JSON (texto), e cada uma é validada aqui
+ * com o mesmo schema do motor. Operações inválidas nunca são aplicadas: viram
+ * "unsupported" com o motivo, para o usuário ver.
+ */
+export const EditPlanEnvelopeSchema = z.object({
+  reply: z.string().describe("Resposta curta ao usuário, em português do Brasil"),
+  operations: z.array(
+    z.object({
+      op: z.enum(EDIT_OP_NAMES),
+      args: z.string().describe('Objeto JSON com os demais campos da operação, ex.: {"seconds": 30, "strategy": "best_moments"}'),
+    }),
+  ),
+});
+export type EditPlanEnvelope = z.infer<typeof EditPlanEnvelopeSchema>;
+
+export function planFromEnvelope(input: unknown): EditPlan {
+  const env = EditPlanEnvelopeSchema.parse(input);
+  if (env.operations.length > 30) throw new Error("Plano de edição com operações demais.");
+  const operations = env.operations.map((item): EditOperation => {
+    let args: unknown;
+    try {
+      args = JSON.parse(item.args || "{}");
+    } catch {
+      args = null;
+    }
+    const parsed = args && typeof args === "object" && !Array.isArray(args) ? EditOperation.safeParse({ ...args, op: item.op }) : null;
+    if (parsed?.success) return parsed.data;
+    return {
+      op: "unsupported",
+      request: item.op,
+      reason: "A IA gerou parâmetros inválidos para esta operação; ela não foi aplicada.",
+    };
+  });
+  return { reply: env.reply, operations };
+}
+
 export function parseEditPlan(input: unknown): EditPlan {
   const plan = EditPlanSchema.parse(input);
   if (plan.operations.length > 30) throw new Error("Plano de edição com operações demais.");

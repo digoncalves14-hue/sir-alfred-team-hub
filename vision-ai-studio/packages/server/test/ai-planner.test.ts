@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { parseTimeline } from "@vision/core";
 import { resetConfig } from "../src/config";
 import Anthropic from "@anthropic-ai/sdk";
-import { buildPlannerContext, describeAiError, editPlanJsonSchema, planEdit } from "../src/ai-planner";
+import { SYSTEM_PROMPT, buildPlannerContext, describeAiError, editPlanJsonSchema, planEdit } from "../src/ai-planner";
 
 const A = "11111111-1111-4111-8111-111111111111";
 
@@ -20,6 +20,14 @@ describe("planejador de edição", () => {
     expect(s).not.toContain('"$schema"');
     expect(s).toContain('"additionalProperties":false');
     expect(s).toContain("target_duration");
+    // gramática pequena: o schema completo das 20 operações excedia o limite do provedor
+    expect(s.length).toBeLessThan(2000);
+  });
+
+  it("prompt descreve os campos de cada operação", () => {
+    expect(SYSTEM_PROMPT).toContain('- target_duration: seconds: number');
+    expect(SYSTEM_PROMPT).toContain('"best_moments" | "beginning" | "speech_focused"');
+    expect(SYSTEM_PROMPT).toContain("- set_captions: enabled: boolean");
   });
 
   it("sem chave de IA usa o interpretador local e identifica isso", async () => {

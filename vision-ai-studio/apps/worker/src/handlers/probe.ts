@@ -79,6 +79,7 @@ export async function handleProbe(ctx: JobContext): Promise<Record<string, unkno
       }
       if (project) await addToTimeline(ctx, project.id, asset.id, probe.durationSec, probe.fps);
       await enqueueJob(db, { orgId: asset.orgId, projectId: asset.projectId, assetId: asset.id, type: "analyze", priority: job.priority });
+      await enqueueJob(db, { orgId: asset.orgId, projectId: asset.projectId, assetId: asset.id, type: "proxy", priority: job.priority - 5 });
     }
     return { durationSec: probe.durationSec, width: probe.width, height: probe.height };
   } finally {

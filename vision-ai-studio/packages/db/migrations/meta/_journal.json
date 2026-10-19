@@ -15,6 +15,13 @@
       "when": 1792349709020,
       "tag": "0001_fase2",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792380000000,
+      "tag": "0002_preview_proxy",
+      "breakpoints": true
     }
   ]
 }

@@ -31,6 +31,22 @@ describe("plano compacto da IA (op + args em JSON)", () => {
     expect(plan.operations[2]).toEqual({ op: "remove_range", start: 1, end: 2 });
   });
 
+  it("tolera campos anuláveis ausentes e números como texto", () => {
+    const plan = planFromEnvelope({
+      reply: "ok",
+      operations: [
+        { op: "set_captions", args: '{"enabled": true}' },
+        { op: "target_duration", args: '{"seconds": "30", "strategy": "best_moments"}' },
+        { op: "add_logo", args: '{"placement": "end_card"}' },
+      ],
+    });
+    expect(plan.operations).toEqual([
+      { op: "set_captions", enabled: true, style: null, position: null },
+      { op: "target_duration", seconds: 30, strategy: "best_moments" },
+      { op: "add_logo", placement: "end_card", duration_sec: null },
+    ]);
+  });
+
   it("rejeita nome de operação desconhecido e planos enormes", () => {
     expect(() => planFromEnvelope({ reply: "", operations: [{ op: "rm_rf", args: "{}" }] })).toThrow();
     const many = Array.from({ length: 31 }, () => ({ op: "trim_start", args: '{"seconds": 1}' }));

@@ -169,6 +169,28 @@ export const EditPlanEnvelopeSchema = z.object({
 });
 export type EditPlanEnvelope = z.infer<typeof EditPlanEnvelopeSchema>;
 
+const OP_SCHEMAS = new Map(EditOperation.options.map((o) => [o.shape.op.value as string, o]));
+
+/**
+ * Tolerância a deslizes comuns do modelo, sem afrouxar a validação: campos
+ * anuláveis ausentes viram null e números enviados como texto ("30") viram
+ * número. Campos desconhecidos são descartados pelo schema.
+ */
+function normalizeArgs(op: string, args: Record<string, unknown>): Record<string, unknown> {
+  const schema = OP_SCHEMAS.get(op);
+  const out: Record<string, unknown> = { ...args, op };
+  if (!schema) return out;
+  for (const [key, field] of Object.entries(schema.shape as Record<string, z.ZodTypeAny>)) {
+    if (key === "op") continue;
+    if (out[key] === undefined && field.isNullable()) out[key] = null;
+    const base = field instanceof z.ZodNullable ? field.unwrap() : field;
+    if (base instanceof z.ZodNumber && typeof out[key] === "string" && out[key] !== "" && Number.isFinite(Number(out[key]))) {
+      out[key] = Number(out[key]);
+    }
+  }
+  return out;
+}
+
 export function planFromEnvelope(input: unknown): EditPlan {
   const env = EditPlanEnvelopeSchema.parse(input);
   if (env.operations.length > 30) throw new Error("Plano de edição com operações demais.");
@@ -179,7 +201,7 @@ export function planFromEnvelope(input: unknown): EditPlan {
     } catch {
       args = null;
     }
-    const parsed = args && typeof args === "object" && !Array.isArray(args) ? EditOperation.safeParse({ ...args, op: item.op }) : null;
+    const parsed = args && typeof args === "object" && !Array.isArray(args) ? EditOperation.safeParse(normalizeArgs(item.op, args as Record<string, unknown>)) : null;
     if (parsed?.success) return parsed.data;
     return {
       op: "unsupported",

@@ -253,7 +253,12 @@ export async function planEdit(input: PlannerInput): Promise<PlannerOutput> {
       return { ...local("Resposta do modelo incompleta; usado o interpretador local."), inputTokens, outputTokens, costUsd };
     }
     const text = response.content.find((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")?.text ?? "";
-    const plan = planFromEnvelope(JSON.parse(text));
+    const raw = JSON.parse(text);
+    const plan = planFromEnvelope(raw);
+    log.info("ai_plan", {
+      requested: (raw.operations ?? []).map((o: { op?: string; args?: string }) => `${o.op} ${String(o.args ?? "").slice(0, 200)}`),
+      applied: plan.operations.map((o) => o.op),
+    });
     return { plan, engine: "anthropic", model: response.model, inputTokens, outputTokens, costUsd };
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {

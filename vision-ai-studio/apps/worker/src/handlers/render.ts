@@ -4,16 +4,19 @@ import {
   FORMAT_PRESETS,
   type FormatPresetId,
   RenderSettingsSchema,
+  brandPalette,
+  buildAssFile,
   buildRenderCommand,
   captionCues,
+  endCardLayout,
+  type LogoMeta,
   parseTimeline,
   renderDimensions,
   resolutionAllowed,
-  toAss,
   toSrt,
   type RenderAsset,
 } from "@vision/core";
-import { eq, inArray, assets, projects, renders, timelineVersions } from "@vision/db";
+import { eq, inArray, assets, brands, projects, renders, timelineVersions } from "@vision/db";
 import {
   LimitError,
   ProcessingError,
@@ -23,7 +26,7 @@ import {
   makeStorageKey,
   recordUsage,
 } from "@vision/server";
-import { ffmpeg, probeFile } from "@vision/server/node";
+import { ffmpeg, inspectLogo, probeFile } from "@vision/server/node";
 import type { JobContext } from "../context";
 
 /** Renderização real: timeline → FFmpeg → MP4 H.264 + SRT, com progresso e verificação. */
@@ -63,13 +66,17 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
       audios: new Map<string, string>(),
       assPath: null as string | null,
       fontsDir: getConfig().FONTS_DIR ?? null,
+      logoMeta: new Map<string, LogoMeta>(),
     };
     for (const row of rows) {
       if (row.orgId !== render.orgId) throw new ProcessingError("forbidden", "Arquivo de outra organização.");
       if (row.status !== "ready") throw new ProcessingError("not_ready", `O arquivo "${row.originalName}" ainda não está pronto.`);
       const f = await storage.materialize(row.storageKey, ctx.tmpDir);
       cleanups.push(f.cleanup);
-      if (row.role === "logo" || row.kind === "image") inputs.images.set(row.id, f.path);
+      if (row.role === "logo" || row.kind === "image") {
+        inputs.images.set(row.id, f.path);
+        inputs.logoMeta.set(row.id, { width: row.width ?? 1, height: row.height ?? 1, ...(await inspectLogo(f.path)) });
+      }
       else if (row.role === "music" || row.kind === "audio") inputs.audios.set(row.id, f.path);
       else
         inputs.assets.set(row.id, {
@@ -88,11 +95,21 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
 
     const { width, height } = renderDimensions(timeline, settings);
     let srtAssetId: string | null = null;
-    if (timeline.captions.enabled) {
-      const cues = captionCues(timeline);
+    const cues = timeline.captions.enabled ? captionCues(timeline) : [];
+    const card = timeline.logos.find((l) => l.mode === "end_card");
+    const cardMeta = card ? inputs.logoMeta.get(card.assetId) : undefined;
+    const ass = buildAssFile(timeline, cues, {
+      width,
+      height,
+      accent: card?.accentColor ?? (await projectAccent(db, project?.brandId ?? null)) ?? "#C9A227",
+      endCard: card && cardMeta ? endCardLayout(timeline, card, width, height, cardMeta) : null,
+    });
+    if (ass) {
+      inputs.assPath = path.join(ctx.tmpDir, "legendas.ass");
+      await writeFile(inputs.assPath, ass, "utf8");
+    }
+    {
       if (cues.length) {
-        inputs.assPath = path.join(ctx.tmpDir, "legendas.ass");
-        await writeFile(inputs.assPath, toAss(timeline, cues, { width, height }), "utf8");
         if (render.kind === "export") {
           const srtKey = makeStorageKey(render.orgId, "subtitles", "srt");
           const srt = Buffer.from(toSrt(cues), "utf8");
@@ -202,4 +219,11 @@ function slug(s: string): string {
       .toLowerCase()
       .slice(0, 60) || "video"
   );
+}
+
+/** Cor de destaque da marca do projeto (caixas dos textos animados). */
+async function projectAccent(db: JobContext["db"], brandId: string | null): Promise<string | null> {
+  if (!brandId) return null;
+  const [b] = await db.select({ colors: brands.colors }).from(brands).where(eq(brands.id, brandId));
+  return b ? brandPalette(b.colors).accentColor : null;
 }

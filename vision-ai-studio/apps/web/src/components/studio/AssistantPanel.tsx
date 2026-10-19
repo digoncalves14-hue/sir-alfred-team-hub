@@ -7,6 +7,9 @@ import { Badge, Button, Spinner } from "../ui";
 import type { Detail, StudioActions } from "./types";
 
 const SUGGESTIONS = [
+  "Deixe profissional: transições, cor, textos e cartela com a logo",
+  "Crie um Reels de 30 segundos com gancho forte e chamada para ação",
+  "Coloque transições suaves e cor cinematográfica",
   "Faça uma versão de 30 segundos",
   "Remova os silêncios",
   "Deixe o vídeo mais dinâmico",

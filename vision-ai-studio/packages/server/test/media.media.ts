@@ -4,9 +4,11 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applyEditPlan,
+  buildAssFile,
   buildCaptionBlocks,
   buildRenderCommand,
   captionCues,
+  endCardLayout,
   parseTimeline,
   toAss,
   type AssetAnalysis,
@@ -35,10 +37,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await rm(dir, { recursive: true, force: true });
+  if (!process.env.KEEP_MEDIA_DIR) await rm(dir, { recursive: true, force: true });
+  else console.log("MEDIA_DIR=" + dir);
 });
 
-async function render(tl: Timeline, name: string, extra: { ass?: string; resolution?: "720p" | "1080p" } = {}) {
+async function render(tl: Timeline, name: string, extra: { ass?: string; resolution?: "720p" | "1080p"; logoAlpha?: boolean } = {}) {
   const out = path.join(dir, `${name}.mp4`);
   const graph = path.join(dir, `${name}.txt`);
   const cmd = buildRenderCommand(
@@ -49,6 +52,7 @@ async function render(tl: Timeline, name: string, extra: { ass?: string; resolut
       audios: new Map([[MUSIC, files.music]]),
       assPath: extra.ass ?? null,
       fontsDir: null,
+      logoMeta: new Map([[LOGO, { width: 400, height: 200, hasAlpha: extra.logoAlpha ?? false, cornerColor: extra.logoAlpha ? null : "#D4AF37" }]]),
     },
     { resolution: extra.resolution ?? "720p", encoderPreset: "ultrafast" },
     out,
@@ -163,6 +167,65 @@ describe("processamento real com FFmpeg", () => {
     expect(r.probe.width).toBe(720);
     expect(r.probe.height).toBe(900);
   });
+
+  it("transições nos cortes mantêm a duração (fade, flash, zoom, desfoque) e o flash clareia o corte", async () => {
+    const clips = [
+      { id: "c0", assetId: A, sourceStart: 0, sourceEnd: 2 },
+      { id: "c1", assetId: A, sourceStart: 6, sourceEnd: 8 },
+      { id: "c2", assetId: A, sourceStart: 12, sourceEnd: 14 },
+    ];
+    for (const type of ["fade", "flash", "zoom", "blur"] as const) {
+      const tl = base({ clips: clips as never, transitions: { type, durationSec: 0.5 }, look: "cinematic" });
+      const r = await render(tl, `transicao-${type}`);
+      expect(r.probe.durationSec, type).toBeGreaterThan(5.9);
+      expect(r.probe.durationSec, type).toBeLessThan(6.15);
+      if (type === "flash") {
+        const atCut = await frameAt(r.out, 1.98, "1280:720:0:0");
+        const mid = await frameAt(r.out, 1.0, "1280:720:0:0");
+        const avg = (b: Buffer) => b.reduce((a, v) => a + v, 0) / b.length;
+        expect(avg(atCut)).toBeGreaterThan(avg(mid) + 40);
+      }
+    }
+  }, 240_000);
+
+  it("textos animados, zoom dinâmico e cartela animada (degradê e logo opaca) renderizam juntos", async () => {
+    const engineCtx = { sources: new Map(), brand: null, musicAssetIds: [] };
+    const tl0 = base({
+      clips: [{ id: "c0", assetId: A, sourceStart: 0, sourceEnd: 8 }] as never,
+      transitions: { type: "zoom", durationSec: 0.4 },
+      logos: [{ assetId: LOGO, mode: "end_card", durationSec: 3, position: "top_right", backgroundColor: "#0B0B0C", scale: 0.5, accentColor: "#C9A227", headline: "Formação profissional", cta: "Inscreva-se já" }],
+    });
+    const { timeline: tl } = applyEditPlan(
+      tl0,
+      {
+        reply: "",
+        operations: [
+          { op: "dynamic_zoom", enabled: true, intensity: 0.15 },
+          { op: "add_text", text: "Você está cortando errado?", role: "hook", anchor: "start", offset_sec: 0, duration_sec: 2.5, position: null },
+          { op: "add_text", text: "Garanta sua vaga", role: "cta", anchor: "end", offset_sec: 0, duration_sec: 2, position: null },
+        ],
+      },
+      engineCtx,
+    );
+    expect(tl.clips.length).toBeGreaterThan(1);
+    expect(tl.clips.some((c) => c.punch && c.zoom > 1.1)).toBe(true);
+    const card = tl.logos[0];
+    for (const alpha of [false, true]) {
+      const ass = buildAssFile(tl, [], {
+        width: 1280,
+        height: 720,
+        accent: "#C9A227",
+        endCard: endCardLayout(tl, card, 1280, 720, { width: 400, height: 200, hasAlpha: alpha, cornerColor: alpha ? null : "#D4AF37" }),
+      });
+      expect(ass).toContain("VOCÊ ESTÁ CORTANDO ERRADO?");
+      expect(ass).toContain("INSCREVA-SE JÁ");
+      const assPath = path.join(dir, `textos-${alpha}.ass`);
+      await writeFile(assPath, ass!);
+      const r = await render(tl, `acabamento-${alpha}`, { ass: assPath, logoAlpha: alpha });
+      expect(r.probe.durationSec).toBeGreaterThan(10.9);
+      expect(r.probe.durationSec).toBeLessThan(11.2);
+    }
+  }, 240_000);
 
   it("vídeo sem áudio recebe trilha silenciosa", async () => {
     const out = path.join(dir, "mudo-out.mp4");

@@ -1,4 +1,5 @@
 import type { CaptionStyleId } from "./caption-styles";
+import type { LookId, TransitionId } from "./timeline";
 
 export const EDIT_STYLE_IDS = [
   "cinematic",
@@ -15,7 +16,7 @@ export type EditStyleId = (typeof EDIT_STYLE_IDS)[number];
 /**
  * Estilos automáticos. Cada estilo é um conjunto de parâmetros concretos que o
  * motor realmente usa (ritmo de cortes, legenda, reenquadramento, música).
- * Na Fase 1 não há transições/efeitos visuais: os estilos não prometem isso.
+ * Cada estilo também define o acabamento: transição, tratamento de cor e zoom dinâmico.
  */
 export interface EditStyle {
   id: EditStyleId;
@@ -32,6 +33,10 @@ export interface EditStyle {
   speechWeight: number;
   reframe: "fill" | "fit_blur";
   musicVolume: number;
+  transition: TransitionId;
+  transitionSec: number;
+  look: LookId;
+  dynamicZoom: boolean;
 }
 
 export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
@@ -47,6 +52,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.4,
     reframe: "fit_blur",
     musicVolume: 0.35,
+    transition: "fade",
+    transitionSec: 0.6,
+    look: "cinematic",
+    dynamicZoom: false,
   },
   premium: {
     id: "premium",
@@ -60,6 +69,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.5,
     reframe: "fill",
     musicVolume: 0.28,
+    transition: "fade",
+    transitionSec: 0.4,
+    look: "clean",
+    dynamicZoom: false,
   },
   reels_dynamic: {
     id: "reels_dynamic",
@@ -73,6 +86,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.4,
     reframe: "fill",
     musicVolume: 0.3,
+    transition: "zoom",
+    transitionSec: 0.35,
+    look: "vibrant",
+    dynamicZoom: true,
   },
   educational: {
     id: "educational",
@@ -86,6 +103,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.8,
     reframe: "fit_blur",
     musicVolume: 0.12,
+    transition: "none",
+    transitionSec: 0.4,
+    look: "clean",
+    dynamicZoom: false,
   },
   product_commercial: {
     id: "product_commercial",
@@ -99,6 +120,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.25,
     reframe: "fill",
     musicVolume: 0.35,
+    transition: "flash",
+    transitionSec: 0.3,
+    look: "vibrant",
+    dynamicZoom: true,
   },
   kids_fun: {
     id: "kids_fun",
@@ -112,6 +137,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.4,
     reframe: "fill",
     musicVolume: 0.35,
+    transition: "zoom",
+    transitionSec: 0.35,
+    look: "vibrant",
+    dynamicZoom: true,
   },
   interview_podcast: {
     id: "interview_podcast",
@@ -125,6 +154,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.9,
     reframe: "fill",
     musicVolume: 0.1,
+    transition: "none",
+    transitionSec: 0.4,
+    look: "clean",
+    dynamicZoom: true,
   },
   workshop_training: {
     id: "workshop_training",
@@ -138,6 +171,10 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     speechWeight: 0.7,
     reframe: "fit_blur",
     musicVolume: 0.1,
+    transition: "fade",
+    transitionSec: 0.4,
+    look: "clean",
+    dynamicZoom: false,
   },
 };
 

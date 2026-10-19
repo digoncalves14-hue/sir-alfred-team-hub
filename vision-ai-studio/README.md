@@ -35,7 +35,10 @@ o resultado e a plataforma corta, reenquadra, legenda e exporta MP4 de verdade
 | **Fase 2** · Vídeo longo → sugestões de cortes (15/30/45/60/90 s ou personalizada), aprovar/descartar, cada corte vira projeto | ✅ |
 | **Fase 2** · Análise de batida da música (BPM) e cortes sincronizados com o ritmo | ✅ |
 | **Fase 2** · Gerador de títulos, descrições, legendas, hashtags e ideias de capa | ✅ implementado — **requer `ANTHROPIC_API_KEY`** |
-| Narração por voz artificial, transições/efeitos, rastreamento de pessoas, thumbnails, publicação em redes | ⏳ Fases 3–4 (identificado na interface) |
+| **Fase 3** · Acabamento profissional automático: transições nos cortes (fade, flash, zoom, desfoque), tratamento de cor (cinematográfico, quente, vibrante, frio, P&B, claro), zoom dinâmico (punch-in), textos animados (gancho, título, chamada para ação, identificação) e cartela final animada (degradê da marca, logo oficial em movimento, frase e CTA) | ✅ |
+| **Fase 3** · "Use sua criatividade": a IA aplica o pacote profissional completo sozinha | ✅ **(requer `ANTHROPIC_API_KEY`)**; sem chave, versão reduzida pelo interpretador local |
+| Prévia leve no estúdio (cópia 720p gerada automaticamente) | ✅ |
+| Narração por voz artificial, trilha gerada por IA, rastreamento de pessoas, thumbnails, publicação em redes | ⏳ próximas fases (identificado na interface) |
 
 ## Pré-requisitos
 

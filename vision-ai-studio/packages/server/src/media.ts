@@ -138,6 +138,26 @@ export async function createPreviewProxy(filePath: string, outPath: string, dura
   if (!s || s.size === 0) throw new ProcessingError("proxy_failed", "Não foi possível gerar a cópia de prévia.", true);
 }
 
+/**
+ * Lê o canto superior esquerdo da logo: transparente → a cartela usa o degradê da
+ * marca; opaco → a cartela usa essa cor de fundo (evita o "quadrado" em volta da logo).
+ */
+export async function inspectLogo(filePath: string): Promise<{ hasAlpha: boolean; cornerColor: string | null }> {
+  try {
+    const { stdout } = await ffmpeg(
+      ["-hide_banner", "-nostdin", "-loglevel", "error", "-i", filePath, "-frames:v", "1", "-vf", "crop=2:2:0:0,format=rgba", "-f", "rawvideo", "-"],
+      { captureStdout: true, timeoutMs: 30_000 },
+    );
+    const px = stdout;
+    if (!px || px.length < 4) return { hasAlpha: true, cornerColor: null };
+    if (px[3] < 250) return { hasAlpha: true, cornerColor: null };
+    const hex = (v: number) => v.toString(16).padStart(2, "0");
+    return { hasAlpha: false, cornerColor: `#${hex(px[0])}${hex(px[1])}${hex(px[2])}`.toUpperCase() };
+  } catch {
+    return { hasAlpha: true, cornerColor: null };
+  }
+}
+
 /** Extrai quadros (JPEG pequenos) em instantes específicos — usados na análise visual por IA. */
 export async function extractFrames(filePath: string, times: number[], outDir: string, width = 512, signal?: AbortSignal): Promise<string[]> {
   await mkdir(outDir, { recursive: true });

@@ -99,6 +99,22 @@ function sanitizeSchema(node: unknown): unknown {
   return out;
 }
 
+/** Mensagem de erro devolvida pela API de IA (sem dados da requisição nem chaves). */
+export function aiErrorDetail(err: InstanceType<typeof Anthropic.APIError>): string {
+  const body = err.error as { error?: { message?: unknown } } | undefined;
+  const msg = typeof body?.error?.message === "string" ? body.error.message : err.message;
+  return msg.slice(0, 300);
+}
+
+/** Explicação em português para o usuário, incluindo a causa informada pela API. */
+export function describeAiError(err: InstanceType<typeof Anthropic.APIError>): string {
+  const detail = aiErrorDetail(err);
+  if (/credit balance/i.test(detail)) {
+    return "A conta da API de IA está sem créditos — adicione créditos em platform.claude.com (Billing).";
+  }
+  return `Serviço de IA indisponível (${err.status ?? "erro"}: ${detail}).`;
+}
+
 /** Resumo compacto do projeto enviado ao modelo. */
 export function buildPlannerContext(input: PlannerInput): string {
   const tl = input.timeline;
@@ -213,8 +229,8 @@ export async function planEdit(input: PlannerInput): Promise<PlannerOutput> {
     }
     if (err instanceof Anthropic.RateLimitError) return local("Limite de uso da IA atingido no momento; usado o interpretador local.");
     if (err instanceof Anthropic.APIError) {
-      log.error("ai_api_error", { status: err.status, message: err.message });
-      return local(`Serviço de IA indisponível (${err.status ?? "erro"}); usado o interpretador local.`);
+      log.error("ai_api_error", { status: err.status, detail: aiErrorDetail(err) });
+      return local(`${describeAiError(err)} Usado o interpretador local.`);
     }
     log.error("ai_plan_invalid", { err });
     return local("A IA retornou um plano inválido; usado o interpretador local.");

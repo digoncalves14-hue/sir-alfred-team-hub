@@ -37,6 +37,7 @@ export interface EditStyle {
   transitionSec: number;
   look: LookId;
   dynamicZoom: boolean;
+  sfx: boolean;
 }
 
 export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
@@ -56,6 +57,7 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.6,
     look: "cinematic",
     dynamicZoom: false,
+    sfx: false,
   },
   premium: {
     id: "premium",
@@ -73,12 +75,13 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.4,
     look: "clean",
     dynamicZoom: false,
+    sfx: false,
   },
   reels_dynamic: {
     id: "reels_dynamic",
     label: "Dinâmico para Reels",
     description: "Cortes curtos, sem pausas, legenda grande e chamativa.",
-    captionStyle: "dynamic",
+    captionStyle: "reels_pop",
     minClipSec: 1.2,
     maxClipSec: 3.5,
     silenceThresholdSec: 0.5,
@@ -90,6 +93,7 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.35,
     look: "vibrant",
     dynamicZoom: true,
+    sfx: true,
   },
   educational: {
     id: "educational",
@@ -107,6 +111,7 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.4,
     look: "clean",
     dynamicZoom: false,
+    sfx: false,
   },
   product_commercial: {
     id: "product_commercial",
@@ -124,6 +129,7 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.3,
     look: "vibrant",
     dynamicZoom: true,
+    sfx: true,
   },
   kids_fun: {
     id: "kids_fun",
@@ -141,6 +147,7 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.35,
     look: "vibrant",
     dynamicZoom: true,
+    sfx: true,
   },
   interview_podcast: {
     id: "interview_podcast",
@@ -158,6 +165,7 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.4,
     look: "clean",
     dynamicZoom: true,
+    sfx: false,
   },
   workshop_training: {
     id: "workshop_training",
@@ -175,6 +183,7 @@ export const EDIT_STYLES: Record<EditStyleId, EditStyle> = {
     transitionSec: 0.4,
     look: "clean",
     dynamicZoom: false,
+    sfx: false,
   },
 };
 

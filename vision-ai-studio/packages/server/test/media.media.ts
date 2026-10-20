@@ -227,6 +227,36 @@ describe("processamento real com FFmpeg", () => {
     }
   }, 240_000);
 
+  it("deslizar, glitch e flash quente com efeitos sonoros e legenda Reels pop renderizam", async () => {
+    const clips = [
+      { id: "c0", assetId: A, sourceStart: 0, sourceEnd: 2 },
+      { id: "c1", assetId: A, sourceStart: 6, sourceEnd: 8 },
+      { id: "c2", assetId: A, sourceStart: 12, sourceEnd: 14 },
+    ];
+    for (const type of ["slide", "glitch", "light"] as const) {
+      const tl = base({
+        clips: clips as never,
+        transitions: { type, durationSec: 0.5 },
+        audio: { originalVolume: 1, normalize: true, denoise: false, music: null, sfx: true },
+        texts: [{ id: "h", text: "Olha esse corte", role: "hook", anchor: "start", offsetSec: 0.2, durationSec: 1.5, position: "top" }],
+        captions: {
+          enabled: true,
+          style: "reels_pop",
+          position: "bottom",
+          fontScale: 1,
+          blocks: [{ id: "b", assetId: A, start: 0.3, end: 1.8, text: "corte muito limpo", words: [{ text: "corte", start: 0.3, end: 0.8 }, { text: "muito", start: 0.8, end: 1.3 }, { text: "limpo", start: 1.3, end: 1.8 }] }],
+        },
+      });
+      const ass = buildAssFile(tl, captionCues(tl), { width: 1280, height: 720, accent: "#C9A227", endCard: null });
+      const assPath = path.join(dir, `fx3-${type}.ass`);
+      await writeFile(assPath, ass!);
+      const r = await render(tl, `fx3-${type}`, { ass: assPath });
+      expect(r.probe.durationSec, type).toBeGreaterThan(5.9);
+      expect(r.probe.durationSec, type).toBeLessThan(6.15);
+      expect(r.probe.hasAudio, type).toBe(true);
+    }
+  }, 240_000);
+
   it("vídeo sem áudio recebe trilha silenciosa", async () => {
     const out = path.join(dir, "mudo-out.mp4");
     const graph = path.join(dir, "mudo.txt");

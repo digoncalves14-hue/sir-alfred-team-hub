@@ -87,9 +87,11 @@ export const AudioConfig = z.object({
   normalize: z.boolean().default(true),
   denoise: z.boolean().default(false),
   music: MusicConfig.nullable().default(null),
+  /** Efeitos sonoros sintetizados (whoosh nas transições, pop nos textos, impacto na cartela). */
+  sfx: z.boolean().default(false),
 });
 
-export const TRANSITION_IDS = ["none", "fade", "flash", "zoom", "blur"] as const;
+export const TRANSITION_IDS = ["none", "fade", "flash", "zoom", "blur", "slide", "glitch", "light"] as const;
 export const TransitionId = z.enum(TRANSITION_IDS);
 export type TransitionId = z.infer<typeof TransitionId>;
 

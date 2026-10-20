@@ -1,4 +1,6 @@
 import { CAPTION_STYLES } from "./caption-styles";
+import { readableOn } from "./color";
+export { readableOn } from "./color";
 import { type OutputCue, assColor, escapeAssText, toAss, wrapLines } from "./captions";
 import { FORMAT_PRESETS } from "./presets";
 import {
@@ -80,6 +82,9 @@ export const TRANSITION_LABELS: Record<TransitionId, string> = {
   flash: "Flash branco",
   zoom: "Zoom (punch)",
   blur: "Desfoque rápido",
+  slide: "Deslizar",
+  glitch: "Glitch (falha digital)",
+  light: "Flash de luz quente",
 };
 
 export interface ClipEdges {
@@ -128,8 +133,9 @@ export function clipEffectsChain(
   const outStart = round3(Math.max(0, durSec - outSec));
   switch (tl.transitions.type) {
     case "fade":
-    case "flash": {
-      const color = tl.transitions.type === "flash" ? "white" : "black";
+    case "flash":
+    case "light": {
+      const color = tl.transitions.type === "flash" ? "white" : tl.transitions.type === "light" ? "0xFFB061" : "black";
       if (inSec > 0) parts.push(`fade=t=in:st=0:d=${inSec}:color=${color}`);
       if (outSec > 0) parts.push(`fade=t=out:st=${outStart}:d=${outSec}:color=${color}`);
       break;
@@ -160,6 +166,26 @@ export function clipEffectsChain(
       }
       break;
     }
+    case "slide": {
+      // o clipe entra deslizando pela direita e sai pela esquerda (suavizado), sem sobrepor clipes
+      if (inSec > 0 || outSec > 0) {
+        const ease = (p: string) => `(${p})*(${p})*(3-2*(${p}))`;
+        const pin = inSec > 0 ? `clip(t/${inSec},0,1)` : "1";
+        const pout = outSec > 0 ? `clip((t-${outStart})/${outSec},0,1)` : "0";
+        parts.push(`pad=${W * 3}:${H}:${W}:0:black`);
+        parts.push(`crop=${W}:${H}:'${W}*${ease(pin)}+${W}*${ease(pout)}':0`);
+      }
+      break;
+    }
+    case "glitch": {
+      const win = [inSec > 0 ? `lt(t,${inSec})` : "", outSec > 0 ? `gte(t,${outStart})` : ""].filter(Boolean).join("+");
+      if (win) {
+        parts.push(`rgbashift=rh=-${Math.round(W * 0.012)}:bh=${Math.round(W * 0.012)}:enable='${win}'`);
+        parts.push(`noise=alls=45:allf=t:enable='${win}'`);
+        parts.push(`eq=contrast=1.25:enable='${win}'`);
+      }
+      break;
+    }
     case "none":
       break;
   }
@@ -172,14 +198,15 @@ export function previewTransitionState(
   edges: ClipEdges,
   tInClip: number,
   clipDur: number,
-): { overlay: string | null; overlayOpacity: number; scale: number; blurPx: number } {
-  const idle = { overlay: null, overlayOpacity: 0, scale: 1, blurPx: 0 };
+): { overlay: string | null; overlayOpacity: number; scale: number; blurPx: number; translateX: number; glitch: boolean } {
+  const idle = { overlay: null, overlayOpacity: 0, scale: 1, blurPx: 0, translateX: 0, glitch: false };
   if (type === "none") return idle;
   let p = 0; // 0 = sem efeito, 1 = efeito máximo (no corte)
   if (edges.inSec > 0 && tInClip < edges.inSec) p = 1 - tInClip / edges.inSec;
   const outStart = clipDur - edges.outSec;
   if (edges.outSec > 0 && tInClip > outStart) p = Math.max(p, (tInClip - outStart) / edges.outSec);
   if (p <= 0) return idle;
+  const entering = edges.inSec > 0 && tInClip < edges.inSec;
   switch (type) {
     case "fade":
       return { ...idle, overlay: "#000", overlayOpacity: p };
@@ -189,8 +216,62 @@ export function previewTransitionState(
       return { ...idle, scale: 1 + 0.24 * p };
     case "blur":
       return { ...idle, blurPx: p > 0.5 ? 14 : 6 };
+    case "light":
+      return { ...idle, overlay: "#FFB061", overlayOpacity: p };
+    case "slide": {
+      const e = p * p * (3 - 2 * p);
+      // entrando: vem da direita (+); saindo: vai para a esquerda (-)
+      return { ...idle, translateX: entering ? e : -e };
+    }
+    case "glitch":
+      return { ...idle, glitch: true };
   }
 }
+
+// ------------------------------------------------------------------
+// Efeitos sonoros sintetizados (sem arquivos de terceiros: gerados pelo FFmpeg)
+// ------------------------------------------------------------------
+
+export type SfxKind = "whoosh" | "pop" | "impact";
+
+export interface SfxEvent {
+  kind: SfxKind;
+  /** Instante (s, no vídeo final) em que o efeito começa. */
+  at: number;
+}
+
+/** Whoosh centrado em cada transição, pop quando gancho/CTA aparecem, impacto na cartela. */
+export function sfxEvents(tl: Pick<Timeline, "clips" | "transitions" | "logos" | "texts" | "audio">): SfxEvent[] {
+  if (!tl.audio.sfx) return [];
+  const out: SfxEvent[] = [];
+  const edges = transitionEdges(tl);
+  let t = 0;
+  tl.clips.forEach((c, i) => {
+    if (i > 0 && edges[i].inSec > 0) out.push({ kind: "whoosh", at: round3(Math.max(0, t - 0.28)) });
+    t += clipDuration(c);
+  });
+  for (const p of placeTexts(tl)) {
+    if (p.overlay.role === "hook" || p.overlay.role === "cta") out.push({ kind: "pop", at: p.start });
+  }
+  if (tl.logos.some((l) => l.mode === "end_card")) out.push({ kind: "impact", at: round3(clipsDuration(tl)) });
+  return out.sort((a, b) => a.at - b.at).slice(0, 40);
+}
+
+/** Fonte lavfi de cada efeito (expressões constantes). */
+export const SFX_SOURCES: Record<SfxKind, { src: string; dur: number }> = {
+  whoosh: {
+    src: "anoisesrc=d=0.56:c=pink:r=48000:a=0.9,bandpass=f=1400:width_type=o:w=2.5,afade=t=in:st=0:d=0.3:curve=exp,afade=t=out:st=0.3:d=0.26:curve=log,volume=0.55",
+    dur: 0.56,
+  },
+  pop: {
+    src: "aevalsrc='0.55*sin(2*PI*(420+1400*exp(-t*28))*t)*exp(-t*22)':d=0.18:s=48000",
+    dur: 0.18,
+  },
+  impact: {
+    src: "aevalsrc='0.9*sin(2*PI*(48+60*exp(-t*9))*t)*exp(-t*4.5)':d=0.9:s=48000,lowpass=f=400",
+    dur: 0.9,
+  },
+};
 
 // ------------------------------------------------------------------
 // Textos animados e cartela final (ASS / libass)
@@ -373,12 +454,6 @@ function colorDistance(a: string, b: string): number {
   return Math.hypot(pa[0] - pb[0], pa[1] - pb[1], pa[2] - pb[2]);
 }
 
-/** Texto preto ou branco, o que for mais legível sobre a cor. */
-export function readableOn(hex: string): string {
-  const [r, g, b] = parseHex(hex);
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return lum > 0.6 ? "#111111" : "#FFFFFF";
-}
 
 function assTime(t: number): string {
   const cs = Math.max(0, Math.round(t * 100));

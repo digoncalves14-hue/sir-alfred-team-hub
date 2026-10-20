@@ -147,6 +147,10 @@ export function FormatPanel({ data, timeline, actions }: { data: Detail; timelin
           />
           Zoom dinâmico (aproximações alternadas nos cortes, estilo Reels)
         </label>
+        <label className="mt-1 flex items-center gap-2 text-xs text-neutral-300">
+          <input type="checkbox" checked={timeline.audio.sfx} onChange={(e) => void actions.runOps([{ op: "set_sfx", enabled: e.target.checked }])} />
+          Efeitos sonoros (whoosh nas transições, pop nos textos, impacto na cartela)
+        </label>
         {timeline.texts.length > 0 && (
           <div className="mt-2 space-y-1">
             <p className="text-xs text-neutral-400">Textos animados</p>

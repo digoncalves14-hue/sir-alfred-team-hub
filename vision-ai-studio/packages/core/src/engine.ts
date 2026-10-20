@@ -335,6 +335,7 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
           captions: { ...tl.captions, style: s.captionStyle },
           transitions: { type: s.transition, durationSec: s.transitionSec },
           look: s.look,
+          audio: { ...tl.audio, sfx: s.sfx },
           dynamicZoom: { ...tl.dynamicZoom, enabled: s.dynamicZoom },
         },
         message: `Estilo "${s.label}" aplicado.`,
@@ -454,6 +455,13 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
           : l,
       );
       return { timeline: { ...tl, logos }, message: "Cartela final animada com a logo oficial, frase e chamada para ação.", warnings: w };
+    }
+    case "set_sfx": {
+      return {
+        timeline: { ...tl, audio: { ...tl.audio, sfx: op.enabled } },
+        message: op.enabled ? "Efeitos sonoros: whoosh nas transições, pop nos textos e impacto na cartela." : "Efeitos sonoros desativados.",
+        warnings: w,
+      };
     }
     case "unsupported":
       return { timeline: tl, warnings: [], unsupported: { request: op.request, reason: op.reason } };

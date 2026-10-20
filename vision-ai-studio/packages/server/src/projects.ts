@@ -43,6 +43,22 @@ export async function loadSources(db: Db, assetIds: string[]): Promise<SourceMap
   return map;
 }
 
+/** Narrações (voz) do projeto e suas palavras com tempo, para o motor de edição. */
+export async function loadVoiceovers(db: Db, projectId: string): Promise<{ ids: string[]; transcripts: Map<string, TranscriptData> }> {
+  const rows = await db
+    .select({ id: assets.id })
+    .from(assets)
+    .where(and(eq(assets.projectId, projectId), eq(assets.role, "voiceover"), eq(assets.status, "ready")));
+  const ids = rows.map((r) => r.id);
+  const map = new Map<string, TranscriptData>();
+  if (ids.length) {
+    for (const t of await db.select().from(transcripts).where(inArray(transcripts.assetId, ids))) {
+      map.set(t.assetId, { language: t.language, text: t.text, words: t.words, segments: t.segments });
+    }
+  }
+  return { ids, transcripts: map };
+}
+
 export async function getCurrentVersion(db: Db, project: Pick<Project, "id" | "currentVersionId">) {
   if (project.currentVersionId) {
     const [v] = await db.select().from(timelineVersions).where(eq(timelineVersions.id, project.currentVersionId));
@@ -150,5 +166,13 @@ export async function loadEngineContext(db: Db, p: Pick<Project, "id" | "orgId" 
     .from(assets)
     .where(and(eq(assets.orgId, p.orgId), eq(assets.role, "music"), eq(assets.status, "ready"), or(eq(assets.projectId, p.id), p.brandId ? eq(assets.brandId, p.brandId) : eq(assets.projectId, p.id))));
   const ids = [...music.map((m) => m.id), ...(brand?.musicAssetIds ?? [])];
-  return { sources, brand, musicAssetIds: music.map((m) => m.id), musicAnalyses: await loadMusicAnalyses(db, ids) };
+  const vo = await loadVoiceovers(db, p.id);
+  return {
+    sources,
+    brand,
+    musicAssetIds: music.map((m) => m.id),
+    musicAnalyses: await loadMusicAnalyses(db, ids),
+    voiceoverAssetIds: vo.ids,
+    voiceoverTranscripts: vo.transcripts,
+  };
 }

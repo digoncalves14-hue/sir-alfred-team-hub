@@ -39,7 +39,8 @@ o resultado e a plataforma corta, reenquadra, legenda e exporta MP4 de verdade
 | **Fase 3** · Legendas animadas (Reels pop: palavra salta; marca-texto), transições deslizar/glitch/flash quente e efeitos sonoros sintetizados (whoosh, pop, impacto — gerados pelo FFmpeg, sem arquivos de terceiros) | ✅ |
 | **Fase 3** · "Use sua criatividade": a IA aplica o pacote profissional completo sozinha | ✅ **(requer `ANTHROPIC_API_KEY`)**; sem chave, versão reduzida pelo interpretador local |
 | Prévia leve no estúdio (cópia 720p gerada automaticamente) | ✅ |
-| Narração por voz artificial, trilha gerada por IA, rastreamento de pessoas, thumbnails, publicação em redes | ⏳ próximas fases (identificado na interface) |
+| **Fase 3** · Trilha sonora gerada por IA (ElevenLabs Music, combinando com a marca e o clima) e narração com voz de IA em português, com legendas sincronizadas da narração e música abaixando sob a voz | ✅ **(requer `ELEVENLABS_API_KEY`)** — uso comercial conforme o plano da conta ElevenLabs |
+| Rastreamento de pessoas, thumbnails, publicação em redes | ⏳ próximas fases (identificado na interface) |
 
 ## Pré-requisitos
 
@@ -88,6 +89,7 @@ que limitam a duração das requisições, como o do Railway).
 | Variável | Efeito |
 |---|---|
 | `ANTHROPIC_API_KEY` | Ativa o planejador de edição com Claude (`AI_MODEL`, padrão `claude-opus-5-5`) e a análise visual por quadros (`AI_VISION_FRAMES`, padrão 10) |
+| `ELEVENLABS_API_KEY` | Ativa trilha gerada por IA e narração com voz de IA (`ELEVENLABS_TTS_MODEL`, padrão `eleven_multilingual_v2`; `ELEVENLABS_MAX_MUSIC_SEC`, padrão 90). Permissões da chave: Text to Speech, Geração de Música, Sound Effects e Vozes (leitura) |
 | `OPENAI_API_KEY` | Ativa a transcrição pela API de áudio (`OPENAI_TRANSCRIBE_MODEL`, padrão `whisper-1`) |
 | `WHISPER_CPP_BIN` + `WHISPER_CPP_MODEL` | Transcrição local com whisper.cpp (sem custo por uso) |
 | `MONTHLY_AI_BUDGET_USD`, `STORAGE_LIMIT_GB`, `MONTHLY_RENDER_MINUTES` | Limites mensais por organização |

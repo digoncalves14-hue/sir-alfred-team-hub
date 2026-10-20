@@ -55,6 +55,7 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
 
   const ids = new Set<string>([...timeline.clips.map((c) => c.assetId), ...timeline.logos.map((l) => l.assetId)]);
   if (timeline.audio.music) ids.add(timeline.audio.music.assetId);
+  if (timeline.audio.voiceover) ids.add(timeline.audio.voiceover.assetId);
   const rows = await db.select().from(assets).where(inArray(assets.id, [...ids]));
   const storage = getStorage();
   const cleanups: Array<() => Promise<void>> = [];

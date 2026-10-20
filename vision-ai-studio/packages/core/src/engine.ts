@@ -1,4 +1,4 @@
-import { weightedFocus } from "./analysis";
+import { type TranscriptData, weightedFocus } from "./analysis";
 import { type MusicAnalysis, beatsUntil, nearest } from "./beats";
 import { buildCaptionBlocks } from "./captions";
 import type { EditOperation, EditPlan } from "./edit-plan";
@@ -49,6 +49,10 @@ export interface EngineContext {
   musicAssetIds: string[];
   /** Análise de batida das músicas disponíveis (para sincronizar cortes). */
   musicAnalyses?: Map<string, MusicAnalysis>;
+  /** Narrações (voz) disponíveis no projeto. */
+  voiceoverAssetIds?: string[];
+  /** Palavras com tempo de cada narração (para legendas). */
+  voiceoverTranscripts?: Map<string, TranscriptData>;
 }
 
 export interface EngineResult {
@@ -210,6 +214,9 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
           return t ? buildCaptionBlocks(t, id, styleId) : [];
         });
       }
+      const vo = tl.audio.voiceover;
+      const voT = vo ? ctx.voiceoverTranscripts?.get(vo.assetId) : undefined;
+      if (vo && voT && !blocks.some((b) => b.assetId === vo.assetId)) blocks = [...blocks, ...buildCaptionBlocks(voT, vo.assetId, styleId)];
       if (!blocks.length) {
         return {
           timeline: tl,
@@ -462,6 +469,48 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
         message: op.enabled ? "Efeitos sonoros: whoosh nas transições, pop nos textos e impacto na cartela." : "Efeitos sonoros desativados.",
         warnings: w,
       };
+    }
+    case "generate_music":
+      // chega aqui só se o worker não pôde gerar (sem provedor configurado ou falha)
+      return {
+        timeline: tl,
+        warnings: [],
+        unsupported: {
+          request: "gerar trilha sonora com IA",
+          reason: "A geração de trilha por IA não está configurada no servidor (ELEVENLABS_API_KEY). Envie uma música licenciada na aba Áudio.",
+        },
+      };
+    case "add_narration":
+      return {
+        timeline: tl,
+        warnings: [],
+        unsupported: {
+          request: "narração com voz de IA",
+          reason: "A narração por voz de IA não está configurada no servidor (ELEVENLABS_API_KEY).",
+        },
+      };
+    case "remove_narration": {
+      const voId = tl.audio.voiceover?.assetId;
+      const captions = voId ? { ...tl.captions, blocks: tl.captions.blocks.filter((b) => b.assetId !== voId) } : tl.captions;
+      return { timeline: { ...tl, captions, audio: { ...tl.audio, voiceover: null } }, message: "Narração removida.", warnings: w };
+    }
+    case "set_voiceover": {
+      if (!ctx.voiceoverAssetIds?.includes(op.asset_id)) {
+        return { timeline: tl, warnings: ["A narração indicada não pertence a este projeto."] };
+      }
+      const voiceover = {
+        assetId: op.asset_id,
+        startSec: clamp(op.start_sec ?? 0, 0, Math.max(0, total - 0.5)),
+        volume: clamp(op.volume ?? 1, 0, 2),
+      };
+      // com legendas ligadas, a narração ganha legenda (substitui a de narrações anteriores)
+      let captions = tl.captions;
+      const voT = ctx.voiceoverTranscripts?.get(op.asset_id);
+      if (captions.enabled && voT) {
+        const others = captions.blocks.filter((b) => !ctx.voiceoverAssetIds?.includes(b.assetId));
+        captions = { ...captions, blocks: [...others, ...buildCaptionBlocks(voT, op.asset_id, captions.style)] };
+      }
+      return { timeline: { ...tl, captions, audio: { ...tl.audio, voiceover } }, message: "Narração com voz de IA adicionada.", warnings: w };
     }
     case "unsupported":
       return { timeline: tl, warnings: [], unsupported: { request: op.request, reason: op.reason } };

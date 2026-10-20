@@ -150,6 +150,26 @@ export const OpSetSfx = z.object({
   op: z.literal("set_sfx"),
   enabled: z.boolean().describe("Efeitos sonoros: whoosh nas transições, pop nos textos e impacto na cartela"),
 });
+export const OpGenerateMusic = z.object({
+  op: z.literal("generate_music"),
+  prompt: z.string().describe("Descrição da trilha EM INGLÊS: gênero, clima, andamento e instrumentos (sem nomes de artistas ou músicas existentes)"),
+  instrumental: z.boolean().describe("true = sem voz cantada (recomendado para vídeos com fala ou textos)"),
+});
+export const OpAddNarration = z.object({
+  op: z.literal("add_narration"),
+  text: z.string().describe("Roteiro da narração em português do Brasil (~2,5 palavras por segundo de vídeo)"),
+  voice: z.enum(["feminina", "masculina"]).nullable(),
+  start_sec: z.number().nullable().describe("Início da narração no vídeo final (null = 0)"),
+});
+export const OpRemoveNarration = z.object({
+  op: z.literal("remove_narration"),
+});
+export const OpSetVoiceover = z.object({
+  op: z.literal("set_voiceover"),
+  asset_id: z.string().describe("ID de uma narração já gerada/enviada para este projeto"),
+  start_sec: z.number().nullable(),
+  volume: z.number().nullable().describe("0 a 2 (1 = normal)"),
+});
 export const OpUnsupported = z.object({
   op: z.literal("unsupported"),
   request: z.string().describe("Parte do pedido que não pode ser executada"),
@@ -183,6 +203,10 @@ export const EditOperation = z.discriminatedUnion("op", [
   OpDynamicZoom,
   OpSetEndCard,
   OpSetSfx,
+  OpGenerateMusic,
+  OpAddNarration,
+  OpRemoveNarration,
+  OpSetVoiceover,
   OpUnsupported,
 ]);
 export type EditOperation = z.infer<typeof EditOperation>;

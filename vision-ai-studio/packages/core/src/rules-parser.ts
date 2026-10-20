@@ -276,11 +276,38 @@ export function parseCommandLocally(input: string): EditPlan {
     ops.push({ op: "set_captions", enabled: true, style: "marker", position: null });
     said.push("colocar legendas com marca-texto");
   }
+  // trilha e narração por IA (o worker gera se a ElevenLabs estiver configurada)
+  if (/(gere|gera|crie|cria|componha|faca) (uma |1 |a )?(trilha|musica)|trilha (com|por|gerada (com|por)) ia|musica (com|por|gerada (com|por)) ia/.test(t) && !negMusic) {
+    // a trilha gerada substitui a busca por música enviada
+    for (let i = ops.length - 1; i >= 0; i--) {
+      const o = ops[i];
+      if ((o.op === "set_music" && o.action === "add") || (o.op === "unsupported" && o.request === "escolher música por clima")) ops.splice(i, 1);
+    }
+    const mood = /calm|suave|relax/.test(t)
+      ? "calm, soft, relaxing"
+      : /energ|animad|agitad|dinamic/.test(t)
+        ? "energetic, upbeat, driving"
+        : /eleg|sofistic|premium|luxo/.test(t)
+          ? "elegant, sophisticated, premium"
+          : /infantil|crianc|divertid/.test(t)
+            ? "playful, cheerful, kids"
+            : "modern, upbeat, confident";
+    ops.push({ op: "generate_music", prompt: `${mood} instrumental background music for a short social media video, clean modern production, no vocals`, instrumental: true });
+    said.push("compor uma trilha sonora com IA");
+  }
+  const narr = raw.match(/(?:narra[cç][aã]o|locu[cç][aã]o|narre|narra)[^"“]*["“]([^"”]{3,600})["”]/i);
+  if (narr) {
+    ops.push({ op: "add_narration", text: narr[1].trim(), voice: /masculin|homem/.test(t) ? "masculina" : /feminin|mulher/.test(t) ? "feminina" : null, start_sec: null });
+    said.push("gravar a narração com voz de IA");
+  } else if (/narrac|locucao|voz (masculina|feminina|artificial)/.test(t)) {
+    ops.push({
+      op: "unsupported",
+      request: "narração com voz de IA",
+      reason: 'Escreva o texto da narração entre aspas, por exemplo: narração "Venha conhecer nosso curso de barbearia". Com a IA de edição ativa, ela também pode escrever o roteiro.',
+    });
+  }
   if (/efeito especial|particula/.test(t)) {
     ops.push({ op: "unsupported", request: "efeitos especiais", reason: "Efeitos especiais com partículas ainda não estão disponíveis. Transições (inclusive glitch e deslizar), cor, zoom dinâmico, efeitos sonoros e textos animados estão." });
-  }
-  if (/narrac|locucao|voz (masculina|feminina|artificial)/.test(t)) {
-    ops.push({ op: "unsupported", request: "narração com voz artificial", reason: "A narração por voz artificial ainda não está integrada (Fase 3)." });
   }
 
   const reply = said.length

@@ -13,11 +13,13 @@ import {
   loadBrandContext,
   loadMusicAnalyses,
   loadSources,
+  loadVoiceovers,
   recordUsage,
 } from "@vision/server";
 import { extractFrames, planEdit, type PlannerFrame } from "@vision/server/node";
 import type { JobContext } from "../context";
 import { transcribeAsset } from "./transcribe";
+import { resolveGenerativeOps } from "./generate-audio";
 
 /**
  * Comando de edição: linguagem natural → plano JSON validado (IA ou interpretador
@@ -79,6 +81,17 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
     templateGuidance: await templateGuidance(ctx, project.templateId, project.orgId),
   });
 
+  // trilha e narração geradas por IA (ElevenLabs) viram arquivos do projeto antes do motor
+  const gen = await resolveGenerativeOps(ctx, project, current.timeline, planned.plan.operations);
+  planned.plan.operations = gen.operations;
+  if (gen.generated.length) {
+    const fresh = await db
+      .select({ id: assets.id, name: assets.originalName })
+      .from(assets)
+      .where(and(inArray(assets.id, gen.generated), eq(assets.role, "music")));
+    musicRows.push(...fresh.filter((f) => !musicRows.some((m) => m.id === f.id)));
+  }
+
   // legendas precisam de transcrição: transcreve antes de aplicar, se possível
   const wantsCaptions = planned.plan.operations.some((o) => o.op === "set_captions" && o.enabled);
   const preWarnings: string[] = [];
@@ -104,6 +117,7 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
       brand,
       musicAssetIds: musicRows.map((m) => m.id),
       musicAnalyses: await loadMusicAnalyses(db, [...musicRows.map((m) => m.id), ...(brand?.musicAssetIds ?? [])]),
+      ...(await loadVoiceovers(db, project.id).then((v) => ({ voiceoverAssetIds: v.ids, voiceoverTranscripts: v.transcripts }))),
     });
   } catch (err) {
     throw new ProcessingError("edit_rejected", (err as Error).message);

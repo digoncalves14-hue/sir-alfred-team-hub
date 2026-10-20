@@ -69,6 +69,11 @@ const EnvSchema = z.object({
 
   TRANSCRIPTION_PROVIDER: z.enum(["openai", "whisper_cpp", "none"]).optional(),
   OPENAI_API_KEY: z.string().optional(),
+  /** Trilha sonora e narração geradas por IA (licença comercial conforme o plano da conta ElevenLabs). */
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_TTS_MODEL: z.string().default("eleven_multilingual_v2"),
+  /** Duração máxima de trilha gerada por vídeo (segundos), para controlar créditos. */
+  ELEVENLABS_MAX_MUSIC_SEC: z.coerce.number().min(10).max(300).default(90),
   OPENAI_TRANSCRIBE_MODEL: z.string().default("whisper-1"),
   TRANSCRIPTION_PRICE_PER_MIN: z.coerce.number().default(0.006),
   WHISPER_CPP_BIN: z.string().optional(),
@@ -127,7 +132,8 @@ export function capabilities() {
     maxUploadMb: c.MAX_UPLOAD_MB,
     publishing: false,
     musicLibrary: false,
-    tts: false,
+    aiMusic: Boolean(c.ELEVENLABS_API_KEY),
+    tts: Boolean(c.ELEVENLABS_API_KEY),
   };
 }
 export type Capabilities = ReturnType<typeof capabilities>;

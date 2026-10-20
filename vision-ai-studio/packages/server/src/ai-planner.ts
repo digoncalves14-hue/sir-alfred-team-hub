@@ -19,7 +19,7 @@ import {
   round3,
   timelineDuration,
 } from "@vision/core";
-import { getConfig } from "./config";
+import { capabilities, getConfig } from "./config";
 import { estimateAiCost } from "./costs";
 import { log } from "./logger";
 
@@ -62,7 +62,8 @@ Regras:
 - zoom_range: use para "aproxime a câmera" quando os QUADROS fornecidos mostrarem claramente o momento pedido; use os instantes dos quadros para estimar o trecho. Se não houver quadros ou não for possível identificar, use "unsupported" explicando.
 - Nunca afirme ter visto ou reconhecido algo que não está nos quadros, na transcrição ou na análise técnica fornecidos.
 - Acabamento disponível: set_transitions (transição em todos os cortes: zoom, fade, flash, blur, slide, glitch, light), set_sfx (efeitos sonoros sintetizados nas transições/textos/cartela), set_look (tratamento de cor), dynamic_zoom (aproximações alternadas em cortes secos, ótimo para fala/tutorial), add_text (gancho, título, chamada para ação, identificação) e set_end_card (frase e chamada para ação na cartela final animada com a logo oficial). Use-os sempre que melhorarem o vídeo.
-- Pedidos impossíveis nesta versão (narração por voz, escolha de música por clima sem biblioteca, efeitos especiais/partículas, publicação em redes sociais, criar ou redesenhar logo) → operação "unsupported" com motivo honesto.
+- Trilha e narração por IA: se "audio_ia_disponivel" for true no contexto, use generate_music (prompt EM INGLÊS descrevendo gênero, clima, andamento e instrumentos; nunca cite artistas, bandas ou músicas existentes; instrumental=true quando houver fala, narração ou textos) e add_narration (roteiro em português do Brasil, natural e falado, cabendo no vídeo a ~2,5 palavras por segundo; voice feminina ou masculina conforme o pedido/marca). Se for false, peça uma música licenciada (unsupported com o motivo).
+- Pedidos impossíveis nesta versão (efeitos especiais/partículas, publicação em redes sociais, criar ou redesenhar logo, imitar a voz de uma pessoa real) → operação "unsupported" com motivo honesto.
 
 PACOTE PROFISSIONAL — quando o pedido for aberto ou criativo ("use sua criatividade", "deixe profissional", "crie um vídeo para divulgar...", "faça um Reels", "edite pra mim"), entregue o vídeo pronto, sem pedir confirmação:
 1. set_style coerente com a marca e o conteúdo (o estilo já define transição, cor e zoom; ajuste depois se precisar).
@@ -72,7 +73,8 @@ PACOTE PROFISSIONAL — quando o pedido for aberto ou criativo ("use sua criativ
 5. add_text role=hook anchor=start: gancho de no máximo 6 palavras, que gere curiosidade ou mostre o benefício (ex.: "O SEGREDO DO DEGRADÊ PERFEITO"), baseado no que aparece/é dito no vídeo e no objetivo do usuário.
 6. add_text role=cta anchor=end com ação concreta (ex.: "Garanta sua vaga", "Agende seu horário") quando o objetivo for divulgar/vender.
 7. add_logo end_card + set_end_card com headline (benefício/slogan curto coerente com a marca, sem inventar preços, datas ou números) e cta.
-8. set_music se houver música licenciada disponível (da marca ou enviada) e set_sfx enabled=true em vídeos dinâmicos (Reels, comercial, infantil).
+8. Trilha: set_music se houver música licenciada disponível (da marca ou enviada); se não houver e audio_ia_disponivel=true, generate_music combinando com a marca e o clima do vídeo. set_sfx enabled=true em vídeos dinâmicos (Reels, comercial, infantil).
+10. Narração (add_narration) somente quando o usuário pedir narração/locução, ou quando o vídeo não tiver fala e o objetivo for divulgar/vender (e audio_ia_disponivel=true). Com narração, ative legendas (set_captions) depois dela.
 9. set_format para o destino pedido (ex.: Reels → instagram_reels_9x16).
 Textos: português do Brasil, curtos, sem promessas de resultado garantido, sem dados que não estejam no contexto.
 - A ordem das operações importa: aplique cortes (trim/remove/target_duration) antes ou depois conforme o pedido; formatos e legendas podem vir em qualquer ordem.
@@ -217,6 +219,8 @@ export function buildPlannerContext(input: PlannerInput): string {
       ? { nome: input.brand.name, segmento: input.brand.segment, tom: input.brand.tone, logo_oficial: Boolean(input.brand.logoAssetId), musicas_da_marca: input.brand.musicAssetIds.length }
       : null,
     musicas_enviadas: input.musicAssets.slice(0, 20),
+    audio_ia_disponivel: capabilities().aiMusic,
+    narracao_atual: input.timeline.audio.voiceover ? "sim" : "não",
     quadros_fornecidos: input.frames.map((f) => f.outputTime),
     pedidos_anteriores: input.history.slice(-4),
     orientacao_do_template: input.templateGuidance || null,

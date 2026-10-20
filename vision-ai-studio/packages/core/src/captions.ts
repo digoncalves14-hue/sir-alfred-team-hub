@@ -68,9 +68,26 @@ export interface OutputCue {
 }
 
 /** Projeta os blocos de legenda (tempo de origem) no tempo do vídeo final. */
-export function captionCues(tl: Pick<Timeline, "clips" | "captions">): OutputCue[] {
+export function captionCues(tl: Pick<Timeline, "clips" | "captions"> & { audio?: Pick<Timeline["audio"], "voiceover"> }): OutputCue[] {
   if (!tl.captions.enabled) return [];
   const cues: OutputCue[] = [];
+  // narração: blocos no tempo da própria narração, deslocados pelo início dela no vídeo final
+  const vo = tl.audio?.voiceover;
+  const totalOut = placeClips(tl).reduce((m, p) => Math.max(m, p.outEnd), 0);
+  if (vo) {
+    for (const b of tl.captions.blocks) {
+      if (b.assetId !== vo.assetId) continue;
+      const s = b.start + vo.startSec;
+      const e = Math.min(b.end + vo.startSec, totalOut);
+      if (e - s < 0.15) continue;
+      cues.push({
+        start: round3(s),
+        end: round3(e),
+        text: b.text,
+        words: (b.words ?? []).map((w) => ({ text: w.text, start: round3(w.start + vo.startSec), end: round3(Math.min(w.end + vo.startSec, e)) })),
+      });
+    }
+  }
   for (const p of placeClips(tl)) {
     const clip = p.clip;
     const offset = p.outStart - clip.sourceStart;

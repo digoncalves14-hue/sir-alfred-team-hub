@@ -7,6 +7,8 @@ export const CAPTION_STYLE_IDS = [
   "educational",
   "kids_colorful",
   "commercial",
+  "reels_pop",
+  "marker",
 ] as const;
 export const CaptionStyleId = z.enum(CAPTION_STYLE_IDS);
 export type CaptionStyleId = z.infer<typeof CaptionStyleId>;
@@ -34,6 +36,10 @@ export interface CaptionStyle {
   wordHighlight: boolean;
   /** Animação discreta de entrada (fade). */
   fadeMs: number;
+  /** A palavra falada "salta" (escala) ao ser destacada. */
+  wordPop?: boolean;
+  /** A palavra falada ganha um marca-texto colorido (contorno grosso na cor de destaque). */
+  wordMarker?: boolean;
 }
 
 export const CAPTION_STYLES: Record<CaptionStyleId, CaptionStyle> = {
@@ -150,5 +156,45 @@ export const CAPTION_STYLES: Record<CaptionStyleId, CaptionStyle> = {
     maxWordsPerBlock: 5,
     wordHighlight: false,
     fadeMs: 80,
+  },
+  reels_pop: {
+    id: "reels_pop",
+    label: "Reels pop (palavra salta)",
+    font: "Montserrat",
+    sizeRatio: 0.06,
+    bold: true,
+    uppercase: true,
+    primary: "#FFFFFF",
+    highlight: "#FFD54A",
+    outline: "#000000",
+    outlineWidthRatio: 0.0045,
+    box: false,
+    boxColor: "#000000",
+    boxAlpha: 0,
+    maxCharsPerLine: 16,
+    maxWordsPerBlock: 3,
+    wordHighlight: true,
+    fadeMs: 0,
+    wordPop: true,
+  },
+  marker: {
+    id: "marker",
+    label: "Marca-texto",
+    font: "Montserrat",
+    sizeRatio: 0.052,
+    bold: true,
+    uppercase: true,
+    primary: "#FFFFFF",
+    highlight: "#C9A227",
+    outline: "#000000",
+    outlineWidthRatio: 0.0035,
+    box: false,
+    boxColor: "#000000",
+    boxAlpha: 0,
+    maxCharsPerLine: 18,
+    maxWordsPerBlock: 4,
+    wordHighlight: true,
+    fadeMs: 0,
+    wordMarker: true,
   },
 };

@@ -1,5 +1,6 @@
 import type { TranscriptData, TranscriptWord } from "./analysis";
 import { CAPTION_STYLES, type CaptionStyle, type CaptionStyleId } from "./caption-styles";
+import { readableOn } from "./color";
 import { FORMAT_PRESETS } from "./presets";
 import { type CaptionBlock, type Timeline, placeClips, round3 } from "./timeline";
 
@@ -221,6 +222,19 @@ export function toAss(tl: Pick<Timeline, "clips" | "captions" | "format">, cues:
   const maxChars = width < height ? style.maxCharsPerLine : Math.round(style.maxCharsPerLine * 1.6);
   const fade = style.fadeMs > 0 ? `{\\fad(${style.fadeMs},${Math.round(style.fadeMs / 2)})}` : "";
   const hl = assColor(style.highlight);
+  const primaryColor = assColor(style.primary);
+  const outlineColor0 = style.box ? assColor(style.boxColor, 1 - style.boxAlpha) : assColor(style.outline);
+  const markerBord = Math.max(4, Math.round(fontSize * 0.16));
+  // palavra falada: cor de destaque; "pop" = escala que volta ao normal; "marca-texto" = contorno grosso colorido
+  const activeWord = (w: string) => {
+    if (style.wordMarker) {
+      return `{\\3c${hl}\\bord${markerBord}\\c${assColor(readableOn(style.highlight))}}${w}{\\3c${outlineColor0}\\bord${outline}\\c${primaryColor}}`;
+    }
+    if (style.wordPop) {
+      return `{\\c${hl}\\fscx122\\fscy122\\t(0,120,\\fscx100\\fscy100)}${w}{\\c${primaryColor}\\fscx100\\fscy100}`;
+    }
+    return `{\\c${hl}}${w}{\\c${primaryColor}}`;
+  };
   const casing = (s: string) => (style.uppercase ? s.toLocaleUpperCase("pt-BR") : s);
 
   for (const cue of cues) {
@@ -232,7 +246,7 @@ export function toAss(tl: Pick<Timeline, "clips" | "captions" | "format">, cues:
         const end = i === cue.words.length - 1 ? cue.end : cue.words[i + 1].start;
         if (end - start < 0.02) return;
         const text = flatWords
-          .map((fw, j) => (j === i ? `{\\c${hl}}${fw.w}{\\c${assColor(style.primary)}}` : fw.w) + (fw.br ? "\\N" : " "))
+          .map((fw, j) => (j === i ? activeWord(fw.w) : fw.w) + (fw.br ? "\\N" : " "))
           .join("")
           .replace(/ \\N/g, "\\N")
           .trim();

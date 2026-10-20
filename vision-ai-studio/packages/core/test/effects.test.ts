@@ -98,3 +98,54 @@ describe("acabamento profissional", () => {
     expect(c.operations.map((o) => o.op)).toEqual(expect.arrayContaining(["set_style", "set_captions", "add_logo"]));
   });
 });
+
+describe("legendas animadas, novas transições e efeitos sonoros", () => {
+  it("efeitos sonoros: whoosh em cada transição, pop no gancho/CTA e impacto na cartela", async () => {
+    const { sfxEvents } = await import("../src");
+    const tl = parseTimeline({
+      format: { preset: "instagram_reels_9x16" },
+      clips: [
+        { id: "a", assetId: A, sourceStart: 0, sourceEnd: 3 },
+        { id: "b", assetId: A, sourceStart: 10, sourceEnd: 13 },
+      ],
+      transitions: { type: "slide", durationSec: 0.5 },
+      texts: [{ id: "h", text: "Olha isso", role: "hook", anchor: "start", offsetSec: 0.5, durationSec: 2, position: "top" }],
+      logos: [{ assetId: LOGO, mode: "end_card" }],
+      audio: { sfx: true },
+    });
+    expect(sfxEvents(tl)).toEqual([
+      { kind: "pop", at: 0.5 },
+      { kind: "whoosh", at: 2.72 },
+      { kind: "impact", at: 6 },
+    ]);
+    expect(sfxEvents({ ...tl, audio: { ...tl.audio, sfx: false } })).toEqual([]);
+  });
+
+  it("deslizar e glitch geram filtros só nas bordas do clipe", () => {
+    const tl = parseTimeline({ format: { preset: "youtube_16x9" }, clips: [{ id: "a", assetId: A, sourceStart: 0, sourceEnd: 3 }] });
+    const slide = clipEffectsChain({ ...tl, transitions: { type: "slide", durationSec: 0.6 } }, { inSec: 0.3, outSec: 0.3 }, 3, 1280, 720, 30);
+    expect(slide).toContain("pad=3840:720:1280:0:black");
+    expect(slide).toContain("crop=1280:720:");
+    const glitch = clipEffectsChain({ ...tl, transitions: { type: "glitch", durationSec: 0.6 } }, { inSec: 0.3, outSec: 0 }, 3, 1280, 720, 30);
+    expect(glitch).toContain("rgbashift");
+    expect(glitch).toContain("enable='lt(t,0.3)'");
+  });
+
+  it("legenda Reels pop e marca-texto animam a palavra falada no ASS", async () => {
+    const { toAss, captionCues } = await import("../src");
+    const base = {
+      format: { preset: "instagram_reels_9x16" },
+      clips: [{ id: "a", assetId: A, sourceStart: 0, sourceEnd: 5 }],
+      captions: {
+        enabled: true,
+        blocks: [{ id: "b1", assetId: A, start: 0.5, end: 2, text: "corte perfeito hoje", words: [{ text: "corte", start: 0.5, end: 1 }, { text: "perfeito", start: 1, end: 1.5 }, { text: "hoje", start: 1.5, end: 2 }] }],
+      },
+    };
+    const pop = parseTimeline({ ...base, captions: { ...base.captions, style: "reels_pop" } });
+    const popAss = toAss(pop, captionCues(pop), { width: 1080, height: 1920 });
+    expect(popAss).toContain("\\fscx122\\fscy122\\t(0,120,\\fscx100\\fscy100)}PERFEITO");
+    const marker = parseTimeline({ ...base, captions: { ...base.captions, style: "marker" } });
+    const markerAss = toAss(marker, captionCues(marker), { width: 1080, height: 1920 });
+    expect(markerAss).toMatch(/\\3c&H0027A2C9\\bord\d+\\c&H00111111}HOJE/);
+  });
+});

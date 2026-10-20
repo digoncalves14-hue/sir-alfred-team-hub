@@ -224,7 +224,19 @@ export function parseCommandLocally(input: string): EditPlan {
     ops.push({ op: "set_transitions", type: "none", duration_sec: null });
     said.push("remover as transições");
   } else if (/transic/.test(t)) {
-    const type = /flash|branc/.test(t) ? "flash" : /desfoq|blur/.test(t) ? "blur" : /fade|suave|preto/.test(t) ? "fade" : "zoom";
+    const type = /glitch|falha/.test(t)
+      ? "glitch"
+      : /desliz|slide/.test(t)
+        ? "slide"
+        : /luz|quente|light/.test(t)
+          ? "light"
+          : /flash|branc/.test(t)
+            ? "flash"
+            : /desfoq|blur/.test(t)
+              ? "blur"
+              : /fade|suave|preto/.test(t)
+                ? "fade"
+                : "zoom";
     ops.push({ op: "set_transitions", type, duration_sec: null });
     said.push("colocar transições nos cortes");
   }
@@ -253,8 +265,19 @@ export function parseCommandLocally(input: string): EditPlan {
     ops.push({ op: "add_logo", placement: "end_card", duration_sec: null });
     said.push("aplicar um acabamento profissional (estilo dinâmico com transições, cor, zoom, legendas e cartela com a logo)");
   }
-  if (/efeito especial|particula|glitch/.test(t)) {
-    ops.push({ op: "unsupported", request: "efeitos especiais", reason: "Efeitos especiais (partículas, glitch) ainda não estão disponíveis. Transições, cor, zoom dinâmico e textos animados estão." });
+  if (/efeitos? sonoro|som (de|nas?) transic|whoosh|sound ?effect/.test(t)) {
+    ops.push({ op: "set_sfx", enabled: !/\b(sem|tire|remova|desative)\b[^.]{0,20}(efeitos? sonoro|som)/.test(t) });
+    said.push("ajustar os efeitos sonoros");
+  }
+  if (/legendas? animad|legenda (que )?pul|palavra salta/.test(t)) {
+    ops.push({ op: "set_captions", enabled: true, style: "reels_pop", position: null });
+    said.push("colocar legendas animadas");
+  } else if (/marca.?texto/.test(t)) {
+    ops.push({ op: "set_captions", enabled: true, style: "marker", position: null });
+    said.push("colocar legendas com marca-texto");
+  }
+  if (/efeito especial|particula/.test(t)) {
+    ops.push({ op: "unsupported", request: "efeitos especiais", reason: "Efeitos especiais com partículas ainda não estão disponíveis. Transições (inclusive glitch e deslizar), cor, zoom dinâmico, efeitos sonoros e textos animados estão." });
   }
   if (/narrac|locucao|voz (masculina|feminina|artificial)/.test(t)) {
     ops.push({ op: "unsupported", request: "narração com voz artificial", reason: "A narração por voz artificial ainda não está integrada (Fase 3)." });

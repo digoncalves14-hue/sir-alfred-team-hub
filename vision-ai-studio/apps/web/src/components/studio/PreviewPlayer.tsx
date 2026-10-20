@@ -12,11 +12,13 @@ import {
   placeTexts,
   previewTransitionState,
   readableOn,
+  sfxEvents,
   timelineDuration,
   transitionEdges,
   type Timeline,
 } from "@vision/core";
 import { fmtTime } from "@/lib/format";
+import { cx } from "../ui";
 import type { StudioAsset } from "./types";
 
 export interface PlayerHandle {
@@ -146,6 +148,22 @@ export const PreviewPlayer = forwardRef<PlayerHandle, Props>(function PreviewPla
 
   useEffect(() => applyVolume(idx), [applyVolume, idx]);
 
+  // efeitos sonoros na prévia (mesmos instantes do render), sintetizados no navegador
+  const sfx = useMemo(() => sfxEvents(timeline), [timeline]);
+  const lastSfxTime = useRef(0);
+  const audioCtx = useRef<AudioContext | null>(null);
+  useEffect(() => {
+    const prev = lastSfxTime.current;
+    lastSfxTime.current = time;
+    if (!playing || muted || time < prev || time - prev > 0.5) return;
+    for (const e of sfx) {
+      if (e.at > prev && e.at <= time) {
+        audioCtx.current ??= new AudioContext();
+        playSfx(audioCtx.current, e.kind, volume);
+      }
+    }
+  }, [time, playing, muted, volume, sfx]);
+
   const loop = useCallback(() => {
     let i = idxRef.current;
     if (endCardStart.current !== null) {
@@ -256,8 +274,9 @@ export const PreviewPlayer = forwardRef<PlayerHandle, Props>(function PreviewPla
   const curPlaced = placed[idx];
   const tr = curPlaced && !inEndCard
     ? previewTransitionState(timeline.transitions.type, edges[idx] ?? { inSec: 0, outSec: 0 }, time - curPlaced.outStart, curPlaced.outEnd - curPlaced.outStart)
-    : { overlay: null, overlayOpacity: 0, scale: 1, blurPx: 0 };
-  const layerFilter = [look.css, tr.blurPx ? `blur(${tr.blurPx}px)` : ""].filter(Boolean).join(" ") || undefined;
+    : { overlay: null, overlayOpacity: 0, scale: 1, blurPx: 0, translateX: 0, glitch: false };
+  const layerFilter = [look.css, tr.blurPx ? `blur(${tr.blurPx}px)` : "", tr.glitch ? "hue-rotate(70deg) contrast(1.4) saturate(1.6)" : ""].filter(Boolean).join(" ") || undefined;
+  const layerTransform = [tr.translateX ? `translateX(${tr.translateX * 100}%)` : "", tr.scale !== 1 ? `scale(${tr.scale})` : ""].filter(Boolean).join(" ") || undefined;
   const accent = endCard?.accentColor ?? brandAccent ?? "#C9A227";
   const unit = portrait ? size.h : size.h * 1.35;
   const activeTexts = inEndCard ? [] : texts.filter((p) => time >= p.start && time < p.end);
@@ -286,7 +305,7 @@ export const PreviewPlayer = forwardRef<PlayerHandle, Props>(function PreviewPla
           style={{ aspectRatio: `${preset.aspect.w} / ${preset.aspect.h}`, height: ratio < 1 ? "100%" : undefined, width: ratio >= 1 ? "100%" : undefined, maxHeight: "100%", maxWidth: "100%" }}
           onClick={() => (playing ? pause() : void play())}
         >
-          <div className="absolute inset-0" style={{ transform: tr.scale !== 1 ? `scale(${tr.scale})` : undefined, filter: layerFilter }}>
+          <div className={cx("absolute inset-0", tr.glitch && "vis-glitch")} style={{ transform: layerTransform, filter: layerFilter }}>
           {timeline.format.reframe === "fit_blur" && curAsset?.thumbnailUrl && (cur?.zoom ?? 1) <= 1.001 && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={curAsset.thumbnailUrl} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-xl brightness-75" />
@@ -353,11 +372,25 @@ export const PreviewPlayer = forwardRef<PlayerHandle, Props>(function PreviewPla
                 }}
               >
                 {cs.wordHighlight && cue.words.length > 1
-                  ? cue.words.map((w, i) => (
-                      <span key={i} style={{ color: time >= w.start && (i === cue.words.length - 1 || time < cue.words[i + 1].start) ? highlight : primary }}>
-                        {w.text}{i < cue.words.length - 1 ? " " : ""}
-                      </span>
-                    ))
+                  ? cue.words.map((w, i) => {
+                      const active = time >= w.start && (i === cue.words.length - 1 || time < cue.words[i + 1].start);
+                      return (
+                        <span key={i}>
+                          <span
+                            key={active ? `on-${i}` : `off-${i}`}
+                            className={active && cs.wordPop ? "vis-pop inline-block" : "inline-block"}
+                            style={
+                              active && cs.wordMarker
+                                ? { background: highlight, color: readableOn(highlight), padding: `0 ${fontPx * 0.12}px`, borderRadius: fontPx * 0.12, textShadow: "none", WebkitTextStroke: "0" }
+                                : { color: active ? highlight : primary }
+                            }
+                          >
+                            {w.text}
+                          </span>
+                          {i < cue.words.length - 1 ? " " : ""}
+                        </span>
+                      );
+                    })
                   : cue.text}
               </span>
             </div>
@@ -422,6 +455,8 @@ const FX_CSS = `
 @keyframes visFade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes visRise { from { opacity: 0; margin-top: 3% } to { opacity: 1; margin-top: 0 } }
 @keyframes visPush { from { transform: scale(1) } to { transform: scale(1.06) } }
+@keyframes visGlitch { 0% { transform: translate(0,0) } 25% { transform: translate(-2%,1%) } 50% { transform: translate(2%,-1%) } 75% { transform: translate(-1%,-1%) } 100% { transform: translate(0,0) } }
+.vis-glitch { animation: visGlitch .12s steps(2) infinite }
 .vis-pop { animation: visPop .32s ease-out both }
 .vis-fade { animation: visFade .3s ease-out both }
 .vis-fadein { animation: visFade .45s ease-out both }
@@ -480,6 +515,56 @@ function OverlayText({
       </span>
     </div>
   );
+}
+
+/** Mesmos efeitos do render, sintetizados com Web Audio (whoosh = ruído filtrado; pop e impacto = osciladores). */
+function playSfx(ctx: AudioContext, kind: "whoosh" | "pop" | "impact", volume: number) {
+  const now = ctx.currentTime;
+  const out = ctx.createGain();
+  out.gain.value = Math.max(0, Math.min(1, volume));
+  out.connect(ctx.destination);
+  if (kind === "whoosh") {
+    const len = Math.round(ctx.sampleRate * 0.56);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let b = 0;
+    for (let i = 0; i < len; i++) {
+      b = 0.97 * b + 0.03 * (Math.random() * 2 - 1);
+      d[i] = b * 6;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.setValueAtTime(700, now);
+    bp.frequency.exponentialRampToValueAtTime(2600, now + 0.3);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.5, now + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.56);
+    src.connect(bp).connect(g).connect(out);
+    src.start(now);
+    return;
+  }
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  if (kind === "pop") {
+    osc.frequency.setValueAtTime(1800, now);
+    osc.frequency.exponentialRampToValueAtTime(420, now + 0.12);
+    g.gain.setValueAtTime(0.45, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    osc.connect(g).connect(out);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  } else {
+    osc.frequency.setValueAtTime(108, now);
+    osc.frequency.exponentialRampToValueAtTime(48, now + 0.5);
+    g.gain.setValueAtTime(0.9, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+    osc.connect(g).connect(out);
+    osc.start(now);
+    osc.stop(now + 0.95);
+  }
 }
 
 function byIdUrl(assets: StudioAsset[], id: string): string | null {

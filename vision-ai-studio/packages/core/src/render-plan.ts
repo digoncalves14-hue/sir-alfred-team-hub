@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { FORMAT_PRESETS, Resolution, even, outputDimensions } from "./presets";
 import { type Clip, type Timeline, clipDuration, clipsDuration, endCardDuration, round3 } from "./timeline";
-import { clipEffectsChain, endCardLayout, transitionEdges } from "./effects";
+import { SFX_SOURCES, clipEffectsChain, endCardLayout, sfxEvents, transitionEdges } from "./effects";
 
 /**
  * Converte uma timeline validada em argumentos do FFmpeg.
@@ -207,6 +207,17 @@ export function buildRenderCommand(
       graph.push(`${aLabel}[mus]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[amix]`);
     }
     aLabel = "[amix]";
+  }
+  // efeitos sonoros sintetizados (whoosh, pop, impacto), posicionados no tempo do vídeo final
+  const sfx = sfxEvents(tl).filter((e) => e.at < total - 0.05);
+  if (sfx.length) {
+    sfx.forEach((e, i) => {
+      const ms = Math.round(e.at * 1000);
+      graph.push(`${SFX_SOURCES[e.kind].src},aformat=sample_fmts=fltp:channel_layouts=stereo,adelay=${ms}|${ms}[sfx${i}]`);
+    });
+    graph.push(`${sfx.map((_, i) => `[sfx${i}]`).join("")}amix=inputs=${sfx.length}:duration=longest:dropout_transition=0:normalize=0,apad,atrim=0:${n(total)}[sfxmix]`);
+    graph.push(`${aLabel}[sfxmix]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[asfx]`);
+    aLabel = "[asfx]";
   }
   if (tl.audio.normalize) {
     graph.push(`${aLabel}loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[anorm]`);

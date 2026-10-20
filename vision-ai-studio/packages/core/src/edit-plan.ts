@@ -115,7 +115,7 @@ export const OpSyncToBeat = z.object({
 });
 export const OpSetTransitions = z.object({
   op: z.literal("set_transitions"),
-  type: z.enum(TRANSITION_IDS).describe("none = corte seco; fade = pelo preto; flash = branco; zoom = punch; blur = desfoque"),
+  type: z.enum(TRANSITION_IDS).describe("none = corte seco; fade = pelo preto; flash = branco; zoom = punch; blur = desfoque; slide = deslizar; glitch = falha digital; light = flash de luz quente"),
   duration_sec: z.number().nullable().describe("Duração da transição (0.2 a 1.0; null = padrão 0.4)"),
 });
 export const OpSetLook = z.object({
@@ -145,6 +145,10 @@ export const OpSetEndCard = z.object({
   headline: z.string().nullable().describe("Frase curta abaixo da logo (slogan/nome), até 60 caracteres; null = sem"),
   cta: z.string().nullable().describe("Chamada para ação curta (ex.: AGENDE SEU HORÁRIO), até 40 caracteres; null = sem"),
   duration_sec: z.number().nullable().describe("Duração da cartela (2 a 6 s; null = manter)"),
+});
+export const OpSetSfx = z.object({
+  op: z.literal("set_sfx"),
+  enabled: z.boolean().describe("Efeitos sonoros: whoosh nas transições, pop nos textos e impacto na cartela"),
 });
 export const OpUnsupported = z.object({
   op: z.literal("unsupported"),
@@ -178,6 +182,7 @@ export const EditOperation = z.discriminatedUnion("op", [
   OpClearTexts,
   OpDynamicZoom,
   OpSetEndCard,
+  OpSetSfx,
   OpUnsupported,
 ]);
 export type EditOperation = z.infer<typeof EditOperation>;

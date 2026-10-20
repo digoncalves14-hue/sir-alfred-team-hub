@@ -189,6 +189,20 @@ export function buildRenderCommand(
     graph.push(`${aLabel}afftdn=nf=-25[adn]`);
     aLabel = "[adn]";
   }
+  // narração entra antes da música: o ducking passa a reagir também à voz do narrador
+  const vo = tl.audio.voiceover;
+  if (vo) {
+    const voPath = inputs.audios.get(vo.assetId);
+    if (!voPath) throw new Error("Arquivo da narração não encontrado.");
+    args.push("-i", voPath);
+    const k = inputIndex++;
+    const ms = Math.round(vo.startSec * 1000);
+    graph.push(
+      `[${k}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${round3(vo.volume)},adelay=${ms}|${ms},apad,atrim=0:${n(total)}[vo]`,
+    );
+    graph.push(`${aLabel}[vo]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[avo]`);
+    aLabel = "[avo]";
+  }
   const music = tl.audio.music;
   if (music) {
     const mPath = inputs.audios.get(music.assetId);

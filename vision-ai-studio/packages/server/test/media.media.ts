@@ -22,6 +22,7 @@ import { makeFixtures } from "../../../scripts/make-fixtures";
 const A = "11111111-1111-4111-8111-111111111111";
 const LOGO = "33333333-3333-4333-8333-333333333333";
 const MUSIC = "44444444-4444-4444-8444-444444444444";
+const VOICE = "55555555-5555-4555-8555-555555555555";
 
 let dir: string;
 let files: Record<string, string>;
@@ -256,6 +257,52 @@ describe("processamento real com FFmpeg", () => {
       expect(r.probe.hasAudio, type).toBe(true);
     }
   }, 240_000);
+
+  it("narração entra no tempo certo com a música abaixando sob a voz", async () => {
+    const voice = path.join(dir, "narracao.mp3");
+    // "voz" de teste: 2 s de tom modulado
+    await ffmpeg(["-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i", "sine=f=220:d=2,volume=6,tremolo=f=6:d=0.5", "-c:a", "libmp3lame", voice]);
+    const tl = base({
+      clips: [{ id: "c0", assetId: A, sourceStart: 0, sourceEnd: 6 }] as never,
+      audio: {
+        originalVolume: 0,
+        normalize: false,
+        denoise: false,
+        sfx: false,
+        music: { assetId: MUSIC, volume: 0.5, ducking: true, fadeInSec: 0, fadeOutSec: 0.5 },
+        voiceover: { assetId: VOICE, startSec: 3, volume: 1 },
+      },
+    });
+    const out = path.join(dir, "narracao-out.mp4");
+    const graph = path.join(dir, "narracao.txt");
+    const cmd = buildRenderCommand(
+      tl,
+      {
+        assets: new Map([[A, { path: files.horizontal, width: 1280, height: 720, hasAudio: true, hasVideo: true, duration: probe.durationSec }]]),
+        images: new Map(),
+        audios: new Map([
+          [MUSIC, files.music],
+          [VOICE, voice],
+        ]),
+        assPath: null,
+        fontsDir: null,
+      },
+      { resolution: "720p", encoderPreset: "ultrafast" },
+      out,
+      graph,
+    );
+    await writeFile(graph, cmd.filterGraph);
+    await ffmpeg(cmd.args);
+    const p = await probeFile(out);
+    expect(p.durationSec).toBeGreaterThan(5.9);
+    expect(p.hasAudio).toBe(true);
+    // a voz (220 Hz) aparece só a partir de 3 s
+    const level = async (ss: number) => {
+      const { stderr } = await ffmpeg(["-hide_banner", "-nostats", "-ss", String(ss), "-t", "0.8", "-i", out, "-af", "bandpass=f=220:w=40,volumedetect", "-f", "null", "-"]);
+      return Number(/mean_volume: (-?[\d.]+)/.exec(stderr)?.[1] ?? -99);
+    };
+    expect(await level(3.6)).toBeGreaterThan((await level(1.0)) + 6);
+  }, 120_000);
 
   it("vídeo sem áudio recebe trilha silenciosa", async () => {
     const out = path.join(dir, "mudo-out.mp4");

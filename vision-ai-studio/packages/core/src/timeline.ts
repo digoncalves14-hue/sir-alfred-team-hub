@@ -89,6 +89,15 @@ export const AudioConfig = z.object({
   music: MusicConfig.nullable().default(null),
   /** Efeitos sonoros sintetizados (whoosh nas transições, pop nos textos, impacto na cartela). */
   sfx: z.boolean().default(false),
+  /** Narração (voz gerada por IA ou enviada), posicionada no tempo do vídeo final. */
+  voiceover: z
+    .object({
+      assetId: z.string().uuid(),
+      startSec: z.number().min(0).max(600).default(0),
+      volume: z.number().min(0).max(2).default(1),
+    })
+    .nullable()
+    .default(null),
 });
 
 export const TRANSITION_IDS = ["none", "fade", "flash", "zoom", "blur", "slide", "glitch", "light"] as const;

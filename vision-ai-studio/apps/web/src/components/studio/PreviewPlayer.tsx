@@ -148,6 +148,25 @@ export const PreviewPlayer = forwardRef<PlayerHandle, Props>(function PreviewPla
 
   useEffect(() => applyVolume(idx), [applyVolume, idx]);
 
+  // narração: toca a partir do instante em que começa no vídeo final
+  const voRef = useRef<HTMLAudioElement>(null);
+  const vo = timeline.audio.voiceover;
+  useEffect(() => {
+    const a = voRef.current;
+    if (!a || !vo) return;
+    a.muted = muted;
+    a.volume = Math.max(0, Math.min(1, volume * vo.volume));
+    const local = time - vo.startSec;
+    const inside = local >= 0 && (!a.duration || local < a.duration);
+    if (!playing || !inside) {
+      if (!a.paused) a.pause();
+      if (!playing && inside && Math.abs(a.currentTime - local) > 0.25) a.currentTime = local;
+      return;
+    }
+    if (Math.abs(a.currentTime - local) > 0.3) a.currentTime = local;
+    if (a.paused) void a.play().catch(() => {});
+  }, [time, playing, muted, volume, vo]);
+
   // efeitos sonoros na prévia (mesmos instantes do render), sintetizados no navegador
   const sfx = useMemo(() => sfxEvents(timeline), [timeline]);
   const lastSfxTime = useRef(0);
@@ -431,6 +450,7 @@ export const PreviewPlayer = forwardRef<PlayerHandle, Props>(function PreviewPla
           )}
         </div>
         {music0?.url && <audio ref={music} src={music0.url} preload="auto" loop />}
+        {vo && byId.get(vo.assetId)?.url && <audio ref={voRef} src={byId.get(vo.assetId)!.url!} preload="auto" />}
       </div>
       <div className="mt-2 flex items-center gap-3 px-1">
         <button onClick={() => (playing ? pause() : void play())} className="grid h-9 w-9 place-items-center rounded-full bg-gold-500 text-ink-950 hover:bg-gold-400" aria-label={playing ? "Pausar" : "Reproduzir"}>

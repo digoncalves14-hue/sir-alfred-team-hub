@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { Music2, Upload, VolumeX, Wand2 } from "lucide-react";
 import type { Timeline } from "@vision/core";
 import { uploadFile } from "@/lib/upload-client";
+import { apiFetch } from "@/lib/client";
 import { Alert, Button, Progress, cx } from "../ui";
 import type { Detail, StudioActions } from "./types";
 
@@ -15,6 +16,24 @@ export function AudioPanel({ data, timeline, actions }: { data: Detail; timeline
   const music = data.assets.filter((a) => a.role === "music");
   const cur = timeline.audio.music;
   const logoReady = Boolean(data.brand?.logoAssetId);
+  const [mood, setMood] = useState("");
+  const [script, setScript] = useState("");
+  const [voice, setVoice] = useState<"feminina" | "masculina">("feminina");
+  const [genBusy, setGenBusy] = useState(false);
+  const aiAudio = data.capabilities.aiMusic;
+  // a geração passa pelo assistente (fica no histórico e vira nova versão)
+  const command = async (text: string, done: string) => {
+    setGenBusy(true);
+    try {
+      await apiFetch(`/api/projects/${data.project.id}/commands`, { method: "POST", json: { text } });
+      actions.notify(done, "success");
+      await actions.refresh();
+    } catch (e) {
+      actions.notify((e as Error).message, "error");
+    } finally {
+      setGenBusy(false);
+    }
+  };
 
   const sendMusic = async (f: File | undefined) => {
     if (!f) return;
@@ -34,6 +53,48 @@ export function AudioPanel({ data, timeline, actions }: { data: Detail; timeline
 
   return (
     <div className="space-y-6 p-4">
+      <section className="space-y-3">
+        <p className="label">Trilha e narração com IA</p>
+        {!aiAudio ? (
+          <p className="text-xs text-neutral-500">Indisponível: configure a chave da ElevenLabs (ELEVENLABS_API_KEY) no servidor.</p>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <input className="input flex-1 text-sm" placeholder="Clima da trilha (ex.: elegante, animada, calma)" value={mood} onChange={(e) => setMood(e.target.value)} />
+              <Button size="sm" disabled={genBusy} onClick={() => void command(`Gere uma trilha sonora com IA, instrumental, no clima: ${mood.trim() || "moderno e confiante, combinando com a marca"}`, "Compondo a trilha… acompanhe no Assistente.")}>
+                <Wand2 className="h-4 w-4" /> Gerar trilha
+              </Button>
+            </div>
+            <textarea className="input min-h-20 w-full text-sm" placeholder="Texto da narração (deixe vazio para a IA escrever o roteiro)" value={script} onChange={(e) => setScript(e.target.value)} />
+            <div className="flex items-center gap-2">
+              <select className="input w-auto py-1 text-xs" value={voice} onChange={(e) => setVoice(e.target.value as "feminina" | "masculina")} aria-label="Voz">
+                <option value="feminina">Voz feminina</option>
+                <option value="masculina">Voz masculina</option>
+              </select>
+              <Button
+                size="sm"
+                disabled={genBusy}
+                onClick={() =>
+                  void command(
+                    script.trim()
+                      ? `Adicione a narração com voz ${voice}: "${script.trim().replace(/"/g, "'")}"`
+                      : `Escreva um roteiro curto de narração para este vídeo e adicione com voz ${voice}, com legendas`,
+                    "Gravando a narração… acompanhe no Assistente.",
+                  )
+                }
+              >
+                <Wand2 className="h-4 w-4" /> Gerar narração
+              </Button>
+              {timeline.audio.voiceover && (
+                <button className="text-xs text-neutral-500 hover:text-red-400" onClick={() => void actions.runOps([{ op: "remove_narration" }], "Narração removida")}>
+                  remover narração
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-neutral-500">Áudio gerado pela ElevenLabs; o uso comercial segue os termos do plano da sua conta ElevenLabs.</p>
+          </>
+        )}
+      </section>
       <section className="space-y-3">
         <p className="label">Áudio original</p>
         <label className="block text-xs text-neutral-400">

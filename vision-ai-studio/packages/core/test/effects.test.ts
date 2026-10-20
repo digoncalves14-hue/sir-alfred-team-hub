@@ -149,3 +149,66 @@ describe("legendas animadas, novas transições e efeitos sonoros", () => {
     expect(markerAss).toMatch(/\\3c&H0027A2C9\\bord\d+\\c&H00111111}HOJE/);
   });
 });
+
+describe("trilha e narração por IA", () => {
+  const VO = "55555555-5555-4555-8555-555555555555";
+  const voT = {
+    language: "pt",
+    text: "Venha aprender com a Genesis",
+    words: [
+      { text: "Venha", start: 0, end: 0.4 },
+      { text: "aprender", start: 0.45, end: 1 },
+      { text: "com", start: 1.05, end: 1.2 },
+      { text: "a", start: 1.25, end: 1.3 },
+      { text: "Genesis", start: 1.35, end: 2 },
+    ],
+    segments: [{ text: "Venha aprender com a Genesis", start: 0, end: 2 }],
+  };
+  const vctx = { ...ctx, voiceoverAssetIds: [VO], voiceoverTranscripts: new Map([[VO, voT]]) };
+
+  it("sem provedor, gerar trilha/narração vira 'não executado' com o motivo", () => {
+    const r = run(tl0, [
+      { op: "generate_music", prompt: "upbeat", instrumental: true },
+      { op: "add_narration", text: "Olá", voice: null, start_sec: null },
+    ]);
+    expect(r.unsupported.map((u) => u.request)).toEqual(["gerar trilha sonora com IA", "narração com voz de IA"]);
+  });
+
+  it("narração gerada entra na timeline e ganha legenda no tempo certo; remover limpa tudo", async () => {
+    const { captionCues } = await import("../src");
+    const r = applyEditPlan(
+      tl0,
+      {
+        reply: "",
+        operations: [
+          { op: "set_voiceover", asset_id: VO, start_sec: 3, volume: null },
+          { op: "set_captions", enabled: true, style: "reels_pop", position: null },
+        ],
+      },
+      vctx,
+    );
+    expect(r.timeline.audio.voiceover).toEqual({ assetId: VO, startSec: 3, volume: 1 });
+    const cues = captionCues(r.timeline);
+    expect(cues[0].start).toBe(3);
+    expect(cues.flatMap((c) => c.words.map((w) => w.text))).toContain("Genesis");
+    const off = applyEditPlan(r.timeline, { reply: "", operations: [{ op: "remove_narration" }] }, vctx);
+    expect(off.timeline.audio.voiceover).toBeNull();
+    expect(off.timeline.captions.blocks.some((b) => b.assetId === VO)).toBe(false);
+  });
+
+  it("narração de outro projeto é recusada", () => {
+    const r = run(tl0, [{ op: "set_voiceover", asset_id: VO, start_sec: null, volume: null }]);
+    expect(r.timeline.audio.voiceover).toBeNull();
+    expect(r.warnings.join(" ")).toMatch(/não pertence/);
+  });
+
+  it("interpretador local: gerar trilha e narração com texto entre aspas", () => {
+    const p = parseCommandLocally('gere uma trilha elegante e coloque a narração "Venha conhecer nosso curso" com voz masculina');
+    expect(p.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ op: "generate_music", instrumental: true }),
+        { op: "add_narration", text: "Venha conhecer nosso curso", voice: "masculina", start_sec: null },
+      ]),
+    );
+  });
+});

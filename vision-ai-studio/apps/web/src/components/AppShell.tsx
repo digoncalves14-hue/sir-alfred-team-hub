@@ -58,8 +58,10 @@ export function AppShell({ user, org, children }: { user: { name: string; email:
           ))}
         </nav>
         <div className="mt-auto border-t border-ink-800 pt-4">
-          <p className="truncate text-sm text-neutral-200">{user.name}</p>
-          <p className="truncate text-xs text-neutral-500">{org.name}</p>
+          <Link href="/conta" className="block rounded-lg px-1 py-1 hover:bg-ink-900" title="Minha conta">
+            <p className="truncate text-sm text-neutral-200">{user.name}</p>
+            <p className="truncate text-xs text-neutral-500">{org.name} · Minha conta</p>
+          </Link>
           <button onClick={logout} className="mt-3 flex items-center gap-2 text-xs text-neutral-400 hover:text-white">
             <LogOut className="h-3.5 w-3.5" /> Sair
           </button>

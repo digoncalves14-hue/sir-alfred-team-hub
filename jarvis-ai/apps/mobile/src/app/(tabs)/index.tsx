@@ -1,0 +1,267 @@
+import type { ChatMessage, Health, ToolEvent } from "@jarvis/shared";
+import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
+import { MessageBubble, PendingActionCard } from "@/components/chat";
+import { HoloOrb } from "@/components/HoloOrb";
+import { ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
+import { api, ApiError } from "@/lib/api";
+import { greeting } from "@/logic/format";
+import type { VoicePhase } from "@/logic/voiceMachine";
+import { usePrefs } from "@/providers/PrefsProvider";
+import { useVoiceEngine } from "@/voice/useVoiceEngine";
+import { colors, font, radius, space } from "@/theme";
+
+const deviceTimezone = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+})();
+
+const PHASE_LABEL: Record<VoicePhase, string> = {
+  idle: "Toque no núcleo para falar",
+  listening: "Ouvindo… toque para enviar",
+  processing: "Processando…",
+  speaking: "Falando… toque para interromper",
+  error: "Toque para tentar novamente",
+};
+
+type Conn = { status: "checking" } | { status: "online"; health: Health } | { status: "offline"; message: string };
+
+interface Pending {
+  id: string;
+  summary: string;
+}
+
+export default function JarvisScreen() {
+  const { prefs, setPrefs } = usePrefs();
+  const params = useLocalSearchParams<{ ouvir?: string; conversa?: string }>();
+  const [conn, setConn] = useState<Conn>({ status: "checking" });
+  const [ownerName, setOwnerName] = useState("senhor");
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [typed, setTyped] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const conversationRef = useRef(conversationId);
+  conversationRef.current = conversationId;
+
+  const checkConnection = useCallback(async () => {
+    setConn({ status: "checking" });
+    try {
+      const health = await api.health();
+      setConn({ status: "online", health });
+      const me = await api.me();
+      setOwnerName(me.profile.ownerName);
+    } catch (e) {
+      setConn({ status: "offline", message: e instanceof Error ? e.message : "Servidor indisponível" });
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void checkConnection();
+      api
+        .pendingActions()
+        .then((r) => setPending(r.actions.map((a) => ({ id: a.id, summary: a.summary }))))
+        .catch(() => undefined);
+    }, [checkConnection]),
+  );
+
+  const absorbReply = useCallback((userText: string, reply: ChatMessage, newConversationId: string) => {
+    setConversationId(newConversationId);
+    const now = new Date().toISOString();
+    setMessages((prev) => [...prev, { id: `local-${now}`, role: "user", content: userText, toolEvents: [], createdAt: now }, reply]);
+    const newPending = reply.toolEvents.filter((e): e is ToolEvent & { pendingActionId: string } => e.status === "pending" && !!e.pendingActionId);
+    if (newPending.length) setPending((prev) => [...newPending.map((e) => ({ id: e.pendingActionId, summary: e.summary })), ...prev]);
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+  }, []);
+
+  const send = useCallback(
+    async (text: string, inputMode: "voice" | "text"): Promise<string | null> => {
+      setError(null);
+      try {
+        const res = await api.chat({ message: text, conversationId: conversationRef.current, inputMode, timezone: deviceTimezone });
+        absorbReply(text, res.reply, res.conversationId);
+        return res.speech;
+      } catch (e) {
+        const message = e instanceof ApiError ? e.message : "Falha ao falar com o Jarvis.";
+        setError(message);
+        if (e instanceof ApiError && e.status === 401) router.replace("/login");
+        // Fala o erro de forma honesta, sem fingir que algo foi feito.
+        return message;
+      }
+    },
+    [absorbReply],
+  );
+
+  const voice = useVoiceEngine({
+    onUtterance: (text) => send(text, "voice"),
+    speakReplies: prefs.speakReplies,
+    speech: { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice },
+  });
+  const { phase, transcript, level, error: voiceError } = voice.state;
+
+  // Atalhos/Siri/Botão de Ação: jarvis://?ouvir=1 inicia a escuta direto.
+  const autoListened = useRef(false);
+  useEffect(() => {
+    if (params.ouvir && !autoListened.current) {
+      autoListened.current = true;
+      void voice.start(prefs.continuousConversation);
+    }
+  }, [params.ouvir, prefs.continuousConversation, voice]);
+
+  const onOrbPress = () => {
+    if (phase === "idle" || phase === "error") void voice.start(prefs.continuousConversation);
+    else if (phase === "listening") voice.finish();
+    else if (phase === "speaking") void voice.interrupt();
+  };
+
+  const sendTyped = async () => {
+    const text = typed.trim();
+    if (!text || sending) return;
+    setTyped("");
+    setSending(true);
+    const speech = await send(text, "text");
+    setSending(false);
+    if (speech) void voice.say(speech);
+  };
+
+  const resolveAction = async (id: string, confirm: boolean) => {
+    setBusyAction(id);
+    try {
+      const r = confirm ? await api.confirmAction(id) : await api.rejectAction(id);
+      const now = new Date().toISOString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `act-${id}`,
+          role: "assistant",
+          content: r.message,
+          toolEvents: [{ tool: r.action.tool, label: "", status: r.action.status === "confirmed" ? "executed" : r.action.status === "rejected" ? "rejected" : "failed", summary: r.action.summary }],
+          createdAt: now,
+        },
+      ]);
+      void voice.say(r.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao resolver a ação.");
+    } finally {
+      setPending((prev) => prev.filter((p) => p.id !== id));
+      setBusyAction(null);
+    }
+  };
+
+  const newConversation = async () => {
+    await voice.stop();
+    setConversationId(undefined);
+    setMessages([]);
+    setError(null);
+  };
+
+  const connPill =
+    conn.status === "checking" ? (
+      <Pill label="CONECTANDO" color={colors.textDim} />
+    ) : conn.status === "offline" ? (
+      <Pill label="OFFLINE" color={colors.red} />
+    ) : conn.health.ai.configured ? (
+      <Pill label="ONLINE" color={colors.green} />
+    ) : (
+      <Pill label="IA NÃO CONFIGURADA" color={colors.amber} />
+    );
+
+  return (
+    <Screen>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }} keyboardVerticalOffset={80}>
+        <View style={styles.header}>
+          <View>
+            <Text style={font.title}>JARVIS</Text>
+            <Text style={font.small}>
+              {greeting()}, {ownerName}.
+            </Text>
+          </View>
+          <View style={{ alignItems: "flex-end", gap: space(2) }}>
+            {connPill}
+            <View style={{ flexDirection: "row", gap: space(4) }}>
+              <Pressable onPress={() => setPrefs({ speakReplies: !prefs.speakReplies })} accessibilityLabel={prefs.speakReplies ? "Desativar áudio" : "Ativar áudio"}>
+                <Icon name={prefs.speakReplies ? "speaker.wave.2.fill" : "speaker.slash.fill"} color={prefs.speakReplies ? colors.cyan : colors.textDim} />
+              </Pressable>
+              <Pressable onPress={newConversation} accessibilityLabel="Nova conversa">
+                <Icon name="square.and.pencil" />
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.orbArea}>
+          <HoloOrb
+            phase={phase}
+            level={level}
+            size={messages.length > 0 ? 230 : 290}
+            onPress={onOrbPress}
+            onLongPress={() => void voice.stop()}
+            accessibilityLabel={PHASE_LABEL[phase]}
+          />
+          <Text style={[font.mono, { marginTop: space(2) }]}>{PHASE_LABEL[phase].toUpperCase()}</Text>
+          {voice.state.sessionActive ? <Text style={font.small}>Conversa contínua ativa · segure o núcleo para encerrar</Text> : null}
+          {transcript && (phase === "listening" || phase === "processing") ? (
+            <Text style={[font.body, styles.transcript]} numberOfLines={3}>
+              “{transcript}”
+            </Text>
+          ) : null}
+        </View>
+
+        {conn.status === "offline" ? <ErrorBanner message={conn.message} onRetry={checkConnection} /> : null}
+        {error || voiceError ? <ErrorBanner message={(voiceError ?? error)!} /> : null}
+
+        <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: space(2), gap: space(2) }}>
+          {pending.map((p) => (
+            <PendingActionCard key={p.id} summary={p.summary} busy={busyAction === p.id} onConfirm={() => resolveAction(p.id, true)} onReject={() => resolveAction(p.id, false)} />
+          ))}
+          {messages.slice(-12).map((m) => (
+            <MessageBubble key={m.id} message={m} />
+          ))}
+        </ScrollView>
+
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            placeholder="Ou digite para o Jarvis…"
+            placeholderTextColor={colors.textFaint}
+            value={typed}
+            onChangeText={setTyped}
+            onSubmitEditing={sendTyped}
+            returnKeyType="send"
+            editable={!sending}
+          />
+          <Pressable onPress={sendTyped} style={styles.sendBtn} accessibilityLabel="Enviar">
+            <Icon name={sending ? "ellipsis" : "arrow.up.circle.fill"} size={30} />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  orbArea: { alignItems: "center", paddingVertical: space(2) },
+  transcript: { marginTop: space(2), textAlign: "center", color: colors.textDim, fontStyle: "italic", paddingHorizontal: space(4) },
+  inputRow: { flexDirection: "row", alignItems: "center", gap: space(2), paddingVertical: space(2) },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.card,
+    borderRadius: radius.pill,
+    paddingHorizontal: space(4),
+    paddingVertical: space(3),
+    color: colors.text,
+    fontSize: 16,
+  },
+  sendBtn: { padding: space(1) },
+});

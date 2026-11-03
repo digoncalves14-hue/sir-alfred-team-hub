@@ -1,0 +1,82 @@
+/**
+ * Registro de ferramentas (Tool Registry).
+ *
+ * Cada ferramenta declara:
+ *  - esquema de entrada (zod) → convertido em JSON Schema para o modelo e
+ *    usado para VALIDAR a entrada antes de executar;
+ *  - nível de risco:
+ *      read    → consulta, executa direto;
+ *      write   → alteração reversível de baixo impacto, executa direto e registra;
+ *      confirm → envio/exclusão/irreversível: NUNCA executa sem confirmação explícita.
+ *
+ * Novas ferramentas (agenda, e-mail, conectores empresariais) entram aqui sem
+ * alterar o orquestrador.
+ */
+import { z } from "zod";
+import type { Profile } from "@jarvis/shared";
+import type { UserStore } from "../store/types";
+import type { ToolSpec } from "../ai/types";
+
+export type ToolRisk = "read" | "write" | "confirm";
+
+export interface ToolContext {
+  store: UserStore;
+  profile: Profile;
+  conversationId: string | null;
+  now: Date;
+}
+
+export interface ToolOutcome {
+  /** Texto devolvido ao modelo. */
+  content: string;
+  /** Resumo curto e honesto para o usuário (feedback visual). */
+  summary: string;
+  isError?: boolean;
+}
+
+export interface ToolDefinition<S extends z.ZodType = z.ZodType> {
+  name: string;
+  /** Rótulo amigável exibido no app. */
+  label: string;
+  description: string;
+  input: S;
+  risk: ToolRisk;
+  /** Para ferramentas `confirm`: descreve exatamente o que será feito. */
+  describe?: (input: z.infer<S>, ctx: ToolContext) => Promise<string> | string;
+  execute: (input: z.infer<S>, ctx: ToolContext) => Promise<ToolOutcome>;
+}
+
+export function defineTool<S extends z.ZodType>(def: ToolDefinition<S>): ToolDefinition<S> {
+  return def;
+}
+
+export class ToolRegistry {
+  private readonly tools = new Map<string, ToolDefinition>();
+
+  register(...defs: ToolDefinition<z.ZodType>[]): this {
+    for (const d of defs) {
+      if (this.tools.has(d.name)) throw new Error(`Ferramenta duplicada: ${d.name}`);
+      if (d.risk === "confirm" && !d.describe) throw new Error(`Ferramenta ${d.name} exige describe() para confirmação.`);
+      this.tools.set(d.name, d);
+    }
+    return this;
+  }
+
+  get(name: string): ToolDefinition | undefined {
+    return this.tools.get(name);
+  }
+
+  list(): ToolDefinition[] {
+    return [...this.tools.values()];
+  }
+
+  /** Especificações para o modelo, em ordem determinística (estável para cache). */
+  specs(): ToolSpec[] {
+    return this.list()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((t) => {
+        const { $schema: _ignored, ...schema } = z.toJSONSchema(t.input, { io: "input" }) as Record<string, unknown>;
+        return { name: t.name, description: t.description, inputSchema: schema };
+      });
+  }
+}

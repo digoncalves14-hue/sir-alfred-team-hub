@@ -1,0 +1,30 @@
+{
+  "name": "jarvis-ai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "JARVIS AI — assistente pessoal por voz para iPhone (Expo + Node + Supabase)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w @jarvis/server",
+    "start:server": "npm run start -w @jarvis/server",
+    "dev:mobile": "npm run start -w @jarvis/mobile",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/server && tsc -p apps/mobile --noEmit",
+    "test": "vitest run --project unit",
+    "test:integration": "JARVIS_TEST_DB=1 vitest run --project integration",
+    "test:all": "npm run test && npm run test:integration",
+    "db:test:up": "bash scripts/test-db.sh up",
+    "db:test:down": "bash scripts/test-db.sh down",
+    "verify:mobile": "npm run verify -w @jarvis/mobile"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "~6.0.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20.19"
+  }
+}

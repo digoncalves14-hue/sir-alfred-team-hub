@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "JARVIS AI",
+    "slug": "jarvis-ai",
+    "scheme": "jarvis",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#03060F",
+    "ios": {
+      "bundleIdentifier": "com.digoncalves.jarvisai",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "config": { "usesNonExemptEncryption": false },
+      "infoPlist": {
+        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
+        "NSLocalNetworkUsageDescription": "O JARVIS AI acessa o servidor do assistente na sua rede local durante o desenvolvimento."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "O JARVIS AI usa o microfone para ouvir seus comandos de voz enquanto você conversa com ele.",
+          "speechRecognitionPermission": "O JARVIS AI transcreve sua voz em texto para entender seus comandos."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "O JARVIS AI usa o microfone para ouvir seus comandos de voz enquanto você conversa com ele.",
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-local-authentication",
+        { "faceIDPermission": "O JARVIS AI usa o Face ID para proteger o acesso às suas conversas e memórias." }
+      ],
+      "expo-secure-store",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        { "image": "./assets/splash-icon.png", "imageWidth": 180, "resizeMode": "contain", "backgroundColor": "#03060F" }
+      ]
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}

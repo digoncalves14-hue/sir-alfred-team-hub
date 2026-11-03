@@ -20,6 +20,8 @@ export interface Prefs {
   deviceCalendar: boolean;
   /** Compartilhar localização aproximada (cidade) com o app aberto. */
   deviceLocation: boolean;
+  /** Experimental: falar por cima interrompe o Jarvis. */
+  bargeIn: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -32,6 +34,7 @@ export const DEFAULT_PREFS: Prefs = {
   pushEnabled: false,
   deviceCalendar: false,
   deviceLocation: false,
+  bargeIn: false,
 };
 
 const KEY = "jarvis.prefs.v1";

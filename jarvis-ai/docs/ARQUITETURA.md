@@ -87,6 +87,23 @@ export const createEventTool = defineTool({
 | GET | `/v1/intents/summary` · `/v1/intents/agenda?dia=` | Siri em segundo plano (auth `Device <chave>`) |
 | POST | `/v1/intents/tasks` · `/v1/intents/memory` | Registrar tarefa / salvar memória pela Siri |
 
+## Fase 5 — assistente avançado
+
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | `/v1/chat/stream` | Conversa em streaming (SSE): eventos `delta`, `tool`, `done`, `error` |
+| GET/POST · PATCH/DELETE | `/v1/routines` · `/v1/routines/:id` | Rotinas personalizadas |
+| POST | `/v1/actions/confirm-batch` | Confirma várias ações pendentes (tarefas em múltiplas etapas) |
+| POST | `/v1/memories/reindex` | Gera vetores para memórias antigas (memória semântica) |
+| GET | `/v1/usage` | Agora com mês × limite, consumo por recurso e por dia |
+
+Fluxo de baixa latência: o app (fetch em streaming do Expo) recebe `delta`s; o `SentenceBuffer` libera frases
+completas (sem cortar "Sr." ou "R$ 1.234,56") e cada uma entra na fila do AVSpeechSynthesizer. O texto salvo na
+conversa é exatamente o que foi falado (inclui frases ditas entre as etapas das ferramentas).
+
+No servidor, o provedor Claude usa `messages.stream` com `eager_input_streaming` nas ferramentas; o orquestrador
+continua validando toda entrada com zod e não executa ferramentas em `max_tokens`/recusa.
+
 ## Fase 4 — conectores de negócios
 
 | Método | Rota | Descrição |

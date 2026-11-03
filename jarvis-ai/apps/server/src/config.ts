@@ -21,7 +21,9 @@ const EnvSchema = z.object({
   AI_MODEL: z.string().default("claude-opus-5-5"),
   AI_EFFORT: z.enum(["low", "medium", "high", "xhigh", "max"]).default("low"),
   AI_FALLBACKS: bool.default(true),
-  AI_MAX_TOOL_ITERATIONS: z.coerce.number().int().min(1).max(12).default(6),
+  AI_MAX_TOOL_ITERATIONS: z.coerce.number().int().min(1).max(16).default(8),
+  // Modelo usado quando o usuário liga o "modo econômico" (e para resumir conversas longas).
+  AI_MODEL_ECONOMY: z.string().default("claude-sonnet-5-5"),
   AI_HISTORY_MESSAGES: z.coerce.number().int().min(2).max(60).default(20),
 
   // Voz premium opcional (ElevenLabs). Sem chave, o app usa a voz nativa do iOS (gratuita).
@@ -53,6 +55,11 @@ const EnvSchema = z.object({
   HUB_PUBLISHABLE_KEY: z.string().min(20).optional(),
   // client_id do app OAuth "JARVIS AI" cadastrado no Hub (cliente público, sem segredo).
   HUB_OAUTH_CLIENT_ID: z.string().min(8).optional(),
+
+  // ---- Fase 5: memória semântica opcional (Voyage AI) ----
+  VOYAGE_API_KEY: z.string().min(10).optional(),
+  EMBEDDINGS_MODEL: z.string().default("voyage-3.5-lite"),
+  EMBEDDINGS_PRICE_PER_MTOKENS_USD: z.coerce.number().min(0).default(0.02),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

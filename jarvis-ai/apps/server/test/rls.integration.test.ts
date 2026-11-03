@@ -286,4 +286,24 @@ describe.skipIf(!enabled)("RLS no PostgreSQL (migração real)", () => {
     expect((await as(B, (c) => c.query("select id from public.jarvis_reports"))).rows).toHaveLength(0);
     expect((await as(A, (c) => c.query("select title from public.jarvis_reports"))).rows).toHaveLength(1);
   });
+
+  // ------------------------------- Fase 5 -------------------------------
+  it("rotinas são privadas; embeddings e resumos ficam nas linhas do próprio usuário", async () => {
+    const rid = await as(A, async (c) =>
+      (await c.query("insert into public.jarvis_routines (name, trigger_phrase, instructions) values ('Abertura', 'abertura da loja', 'Diga a hora') returning id")).rows[0].id,
+    );
+    expect((await as(B, (c) => c.query("select id from public.jarvis_routines"))).rows).toHaveLength(0);
+    expect((await as(B, (c) => c.query("update public.jarvis_routines set enabled = false where id = $1", [rid]))).rowCount).toBe(0);
+    await expect(as(A, (c) => c.query("insert into public.jarvis_routines (name, trigger_phrase, instructions, run_time) values ('x', 'abc', 'fazer algo', '7h')"))).rejects.toThrow(/check constraint/);
+
+    const mid = await as(A, async (c) => (await c.query("insert into public.jarvis_memories (category, content) values ('outro', 'teste vetor') returning id")).rows[0].id);
+    expect((await as(A, (c) => c.query("update public.jarvis_memories set embedding = '{0.1,0.2}', embedding_model = 'm' where id = $1", [mid]))).rowCount).toBe(1);
+    expect((await as(B, (c) => c.query("update public.jarvis_memories set embedding = '{9}' where id = $1", [mid]))).rowCount).toBe(0);
+  });
+
+  it("consumo aceita os novos tipos (embedding, summary) e recusa outros", async () => {
+    await as(A, (c) => c.query("insert into public.jarvis_usage (kind, provider, model, cost_usd) values ('embedding', 'voyage', 'v', 0.0001), ('summary', 'anthropic', 'm', 0.001)"));
+    await expect(as(A, (c) => c.query("insert into public.jarvis_usage (kind, provider, model) values ('mineracao', 'x', 'y')"))).rejects.toThrow(/check constraint/);
+    await expect(as(A, (c) => c.query("update public.jarvis_profiles set monthly_cost_limit_usd = -1 where user_id = $1", [A]))).rejects.toThrow(/check constraint/);
+  });
 });

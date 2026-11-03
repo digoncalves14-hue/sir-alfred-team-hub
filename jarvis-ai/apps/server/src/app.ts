@@ -3,6 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import { z, ZodError } from "zod";
 import {
   ChatRequestSchema,
+  type StreamEvent,
   DeviceActionSchema,
   MemoryCategorySchema,
   MemoryCreateSchema,
@@ -16,7 +17,10 @@ import {
 import { AppError, notFound } from "./errors";
 import type { Authenticator } from "./auth";
 import type { Orchestrator } from "./agent/orchestrator";
-import { startOfDayInTimezone, isValidTimezone } from "./agent/time";
+import { startOfDayInTimezone, isValidTimezone, localDate } from "./agent/time";
+import { startOfMonthInTimezone } from "./agent/orchestrator";
+import type { MemoryIndex } from "./memory/index";
+import { registerPhase5Routes } from "./routes/phase5";
 import type { AIProvider } from "./ai/types";
 import type { TtsProvider } from "./tts/elevenlabs";
 import type { UserStore } from "./store/types";
@@ -27,7 +31,7 @@ import { registerPhase4Routes, type Phase4Deps } from "./routes/phase4";
 import type { Scheduler } from "./scheduler/scheduler";
 import { timingSafeEqual } from "node:crypto";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 
 export interface AppDeps {
   authenticate: Authenticator;
@@ -40,6 +44,8 @@ export interface AppDeps {
   logger?: boolean;
   phase2?: Phase2Deps;
   phase4?: Phase4Deps;
+  memory?: MemoryIndex | null;
+  economyModel?: string | null;
   scheduler?: Scheduler | null;
   cronSecret?: string;
 }
@@ -107,6 +113,8 @@ export async function buildApp(deps: AppDeps) {
     push: { configured: Boolean(deps.phase2?.system) },
     scheduler: { running: deps.scheduler?.active ?? false, cron: Boolean(deps.scheduler && deps.cronSecret) },
     business: { connectors: Boolean(deps.phase4?.connectors), hub: Boolean(deps.phase4?.connectors?.hub), sheets: Boolean(deps.phase4?.connectors?.google) },
+    memory: { semantic: Boolean(deps.memory?.semantic) },
+    streaming: true,
   }));
 
   // Cron externo (ex.: cron-job.org, GitHub Actions) para hospedagens que "dormem".
@@ -135,6 +143,33 @@ export async function buildApp(deps: AppDeps) {
       const body = ChatRequestSchema.parse(req.body);
       return deps.orchestrator.runTurn(req.store, body);
     });
+
+    // Fase 5: resposta em streaming (Server-Sent Events) — o app começa a falar na 1ª frase.
+    v1.post("/chat/stream", async (req, reply) => {
+      const body = ChatRequestSchema.parse(req.body);
+      reply.hijack();
+      const raw = reply.raw;
+      raw.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-cache, no-transform", connection: "keep-alive", "x-accel-buffering": "no" });
+      const send = (event: StreamEvent) => raw.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+      try {
+        const response = await deps.orchestrator.runTurn(req.store, body, {
+          onText: (text) => send({ type: "delta", text }),
+          onTool: (event) => send({ type: "tool", event }),
+        });
+        send({ type: "done", response });
+      } catch (err) {
+        const status = err instanceof AppError ? err.statusCode : 500;
+        if (!(err instanceof AppError)) req.log.error({ err }, "erro no streaming");
+        send({
+          type: "error",
+          code: err instanceof AppError ? err.code : "erro_interno",
+          message: err instanceof AppError ? err.message : "Erro interno no servidor. Tente novamente.",
+          status,
+        });
+      } finally {
+        raw.end();
+      }
+    });
     v1.get("/conversations", async (req) => ({ conversations: await req.store.listConversations(50) }));
     v1.get("/conversations/:id/messages", async (req) => {
       const { id } = IdParams.parse(req.params);
@@ -160,6 +195,7 @@ export async function buildApp(deps: AppDeps) {
       const sensitive = detectSensitive(body.content);
       if (sensitive) throw new AppError("dado_sensivel", 422, `Por segurança, não armazenamos ${sensitive}.`);
       const memory = await req.store.createMemory({ ...body, source: "user" });
+      await deps.memory?.index(req.store, memory);
       return reply.status(201).send({ memory });
     });
     v1.patch("/memories/:id", async (req) => {
@@ -171,6 +207,7 @@ export async function buildApp(deps: AppDeps) {
       }
       const memory = await req.store.updateMemory(id, patch);
       if (!memory) throw notFound("Memória");
+      if (patch.content) await deps.memory?.index(req.store, memory);
       await req.store.logAction({ tool: "app:corrigir_memoria", status: "executed", summary: "Memória corrigida pelo usuário" });
       return { memory };
     });
@@ -215,15 +252,36 @@ export async function buildApp(deps: AppDeps) {
     v1.get("/usage", async (req): Promise<UsageSummary> => {
       const profile = await req.store.getProfile();
       const now = new Date();
-      const [today, month] = await Promise.all([
+      const since30 = new Date(now.getTime() - 30 * 86_400_000);
+      const monthStart = startOfMonthInTimezone(now, profile.timezone);
+      const [today, last30, rows] = await Promise.all([
         req.store.usageSince(startOfDayInTimezone(now, profile.timezone)),
-        req.store.usageSince(new Date(now.getTime() - 30 * 86_400_000)),
+        req.store.usageSince(since30),
+        req.store.usageRows(monthStart < since30 ? monthStart : since30),
       ]);
+      const monthRows = rows.filter((r) => new Date(r.createdAt) >= monthStart);
+      const byKind = new Map<string, { costUsd: number; requests: number }>();
+      for (const r of monthRows) {
+        const k = byKind.get(r.kind) ?? { costUsd: 0, requests: 0 };
+        byKind.set(r.kind, { costUsd: k.costUsd + r.costUsd, requests: k.requests + 1 });
+      }
+      const byDay = new Map<string, number>();
+      for (let i = 13; i >= 0; i--) byDay.set(localDate(new Date(now.getTime() - i * 86_400_000), profile.timezone), 0);
+      for (const r of rows) {
+        const d = localDate(new Date(r.createdAt), profile.timezone);
+        if (byDay.has(d)) byDay.set(d, byDay.get(d)! + r.costUsd);
+      }
+      const round = (n: number) => Math.round(n * 10000) / 10000;
       return {
         today,
-        last30Days: { costUsd: month.costUsd, requests: month.requests },
+        last30Days: { costUsd: last30.costUsd, requests: last30.requests },
         dailyLimitUsd: profile.dailyCostLimitUsd,
-        model: deps.provider.model,
+        model: deps.orchestrator.modelFor(profile) ?? deps.provider.model,
+        month: { costUsd: round(monthRows.reduce((s, r) => s + r.costUsd, 0)), requests: monthRows.length, limitUsd: profile.monthlyCostLimitUsd },
+        byKind: [...byKind.entries()].map(([kind, v]) => ({ kind, costUsd: round(v.costUsd), requests: v.requests })).sort((a, b) => b.costUsd - a.costUsd),
+        byDay: [...byDay.entries()].map(([date, costUsd]) => ({ date, costUsd: round(costUsd) })),
+        economyMode: profile.economyMode,
+        economyModel: deps.economyModel ?? null,
       };
     });
 
@@ -246,6 +304,7 @@ export async function buildApp(deps: AppDeps) {
     await registerPhase2Routes(v1, deps.phase2 ?? { system: null, google: null, box: null });
     await registerPhase3UserRoutes(v1, { system: deps.phase2?.system ?? null, google: deps.phase2?.google ?? null, orchestrator: deps.orchestrator });
     await registerPhase4Routes(v1, deps.phase4 ?? { system: null, box: null, connectors: null, reports: null });
+    await registerPhase5Routes(v1, { orchestrator: deps.orchestrator, memory: deps.memory ?? null });
   }, { prefix: "/v1" });
 
   await registerIntentRoutes(app, { system: deps.phase2?.system ?? null, google: deps.phase2?.google ?? null });

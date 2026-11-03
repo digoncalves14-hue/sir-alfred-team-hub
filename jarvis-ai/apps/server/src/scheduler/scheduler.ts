@@ -19,6 +19,7 @@ export interface TickReport {
   summaries: number;
   meetingReminders: number;
   automations: number;
+  routines: number;
   errors: number;
 }
 
@@ -54,7 +55,7 @@ export class Scheduler {
   }
 
   async tick(): Promise<TickReport> {
-    const report: TickReport = { reminders: 0, summaries: 0, meetingReminders: 0, automations: 0, errors: 0 };
+    const report: TickReport = { reminders: 0, summaries: 0, meetingReminders: 0, automations: 0, routines: 0, errors: 0 };
     if (this.busy) return report; // evita execuções sobrepostas
     this.busy = true;
     const now = this.deps.clock?.() ?? new Date();
@@ -71,14 +72,36 @@ export class Scheduler {
       }
       await this.meetingReminders(candidates, now, report);
       await this.automations(now, report);
+      await this.routines(now, report);
     } catch (e) {
       report.errors++;
       this.deps.log?.warn({ err: String(e) }, "falha no agendador");
     } finally {
       this.busy = false;
     }
-    if (report.reminders + report.summaries + report.meetingReminders + report.automations + report.errors > 0) this.deps.log?.info({ ...report }, "agendador");
+    if (report.reminders + report.summaries + report.meetingReminders + report.automations + report.routines + report.errors > 0) this.deps.log?.info({ ...report }, "agendador");
     return report;
+  }
+
+  /**
+   * Rotinas agendadas: o servidor NÃO executa sozinho (ações podem exigir confirmação);
+   * envia um aviso e a rotina roda quando o usuário toca na notificação, com o app aberto.
+   */
+  private async routines(now: Date, report: TickReport) {
+    const list = await this.deps.system.listScheduledRoutines();
+    for (const r of list) {
+      if (!r.runTime || !isDue({ weekday: r.weekday, runTime: r.runTime, timezone: r.timezone }, now)) continue;
+      const key = runKey(now, r.timezone, r.weekday !== null);
+      if (r.lastRunKey === key || !(await this.deps.system.claimRoutineRun(r.id, key))) continue;
+      try {
+        if (await this.notify(r.userId, "sistema", `Rotina: ${r.name}`, "Toque para o Jarvis executar agora.", `rotina:${r.id}:${key}`, `jarvis://?rotina=${r.id}`)) {
+          report.routines++;
+        }
+      } catch (e) {
+        report.errors++;
+        this.deps.log?.warn({ err: String(e), routine: r.id }, "falha ao avisar rotina");
+      }
+    }
   }
 
   /** Automações do usuário: relatórios semanais e alertas diários (só notifica alertas quando há algo). */

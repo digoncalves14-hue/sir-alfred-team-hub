@@ -44,6 +44,16 @@ das respostas no seu uso; diminua `AI_HISTORY_MESSAGES`.
 | Google Calendar/Gmail API | US$ 0 nas cotas normais de uso pessoal | |
 | Cron externo (se o backend dormir) | cron-job.org e similares: US$ 0 | Alternativa a manter o servidor sempre ligado |
 
+**Fase 5 — como economizar:**
+- **Modo econômico** (Ajustes): usa `AI_MODEL_ECONOMY` (padrão Sonnet 5.5, ~metade do custo do Opus 5.5; Haiku 5.5
+  custa ~1/40). Você liga e desliga quando quiser.
+- **Limite mensal** (padrão US$ 20) bloqueia novas chamadas ao atingir; aviso único aos 80%.
+- **Memória semântica (Voyage, opcional):** ~US$ 0,02 por 1 milhão de tokens — guardar mil memórias custa menos de
+  US$ 0,01. Sem chave, custo zero.
+- **Resumo de conversa longa:** uma chamada a cada ~20 mensagens novas, no modelo econômico (~US$ 0,003–0,01).
+- **Streaming** não muda o custo; só reduz a espera.
+- O painel mostra o gasto por recurso (conversa, voz premium, memória semântica, resumos) e por dia.
+
 **Fase 4:** indicadores, relatórios e automações são calculados sem IA (custo zero); as APIs do Hub e do Google
 Planilhas são gratuitas no uso pessoal. Só a conversa sobre os números usa IA.
 

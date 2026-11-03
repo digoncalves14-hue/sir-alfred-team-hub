@@ -110,6 +110,7 @@ function RootNavigator() {
         <Stack.Screen name="space/[id]" options={{ headerShown: true, title: "Negócio", headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.cyan, headerBackTitle: "Voltar" }} />
         <Stack.Screen name="report/[id]" options={{ headerShown: true, title: "Relatório", headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.cyan, headerBackTitle: "Voltar" }} />
         <Stack.Screen name="hub-oauth" options={{ headerShown: false }} />
+        <Stack.Screen name="routines" options={{ headerShown: true, title: "Rotinas", headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.cyan, headerBackTitle: "Voltar" }} />
         <Stack.Screen
           name="conversation/[id]"
           options={{ headerShown: true, title: "Conversa", headerStyle: { backgroundColor: colors.bg }, headerTintColor: colors.cyan, headerBackTitle: "Voltar" }}

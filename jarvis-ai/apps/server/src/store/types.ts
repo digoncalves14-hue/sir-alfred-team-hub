@@ -8,6 +8,7 @@ import type {
   Connector,
   ConnectorType,
   Report,
+  Routine,
   Task,
   TaskUpdate,
   ChatMessage,
@@ -27,7 +28,7 @@ export interface PendingActionRecord extends Omit<PendingAction, "device"> {
 }
 
 export interface UsageRecord {
-  kind: "chat" | "tts";
+  kind: "chat" | "tts" | "embedding" | "summary";
   provider: string;
   model: string;
   inputTokens?: number;
@@ -127,6 +128,29 @@ export interface UserStore {
   createAutomation(input: { kind: AutomationKind; space: Space | null; weekday: number | null; runTime: string; enabled: boolean }): Promise<Automation>;
   updateAutomation(id: string, patch: Partial<{ weekday: number | null; runTime: string; enabled: boolean; space: Space | null }>): Promise<Automation | null>;
   deleteAutomation(id: string): Promise<boolean>;
+
+  // ---- Fase 5 ----
+  listRoutines(): Promise<Routine[]>;
+  createRoutine(input: Omit<Routine, "id" | "lastRunAt">): Promise<Routine>;
+  updateRoutine(id: string, patch: Partial<Omit<Routine, "id" | "lastRunAt">>): Promise<Routine | null>;
+  deleteRoutine(id: string): Promise<boolean>;
+
+  getConversationSummary(id: string): Promise<{ summary: string | null; upto: number }>;
+  setConversationSummary(id: string, summary: string, upto: number): Promise<void>;
+  countMessages(conversationId: string): Promise<number>;
+
+  setMemoryEmbedding(id: string, embedding: number[], model: string): Promise<void>;
+  listMemoryEmbeddings(model: string): Promise<{ id: string; embedding: number[] }[]>;
+
+  /** true se este é o primeiro aviso de orçamento para a chave (ex.: "2026-11:80"). */
+  claimBudgetAlert(key: string): Promise<boolean>;
+  usageRows(since: Date): Promise<{ kind: string; costUsd: number; createdAt: string }[]>;
+}
+
+export interface ScheduledRoutine extends Routine {
+  userId: string;
+  timezone: string;
+  lastRunKey: string | null;
 }
 
 export interface ConnectorRecord extends Connector {
@@ -246,4 +270,8 @@ export interface SystemStore {
   listEnabledAutomations(): Promise<DueAutomation[]>;
   /** true se ESTA execução ganhou o período (evita relatórios duplicados). */
   claimAutomationRun(id: string, runKey: string): Promise<boolean>;
+
+  // ---- Fase 5 ----
+  listScheduledRoutines(): Promise<ScheduledRoutine[]>;
+  claimRoutineRun(id: string, runKey: string): Promise<boolean>;
 }

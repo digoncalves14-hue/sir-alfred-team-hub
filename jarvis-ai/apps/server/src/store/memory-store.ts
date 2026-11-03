@@ -16,6 +16,7 @@ import type {
   MemoryCategory,
   Profile,
   Report,
+  Routine,
   Space,
   Task,
   TaskUpdate,
@@ -24,6 +25,7 @@ import { rankByQuery } from "./search";
 import type {
   ConnectorRecord,
   DueAutomation,
+  ScheduledRoutine,
   IntegrationSecret,
   PendingActionRecord,
   SystemStore,
@@ -50,6 +52,10 @@ interface Db {
   connectors: ConnectorRecord[];
   reports: (Report & { userId: string; data: unknown })[];
   automations: (Automation & { userId: string; lastRunKey: string | null })[];
+  routines: (Routine & { userId: string; lastRunKey: string | null })[];
+  summaries: Map<string, { summary: string; upto: number }>;
+  embeddings: Map<string, { embedding: number[]; model: string }>;
+  budgetAlerts: Set<string>;
 }
 
 export function createMemoryDb(): Db {
@@ -70,6 +76,10 @@ export function createMemoryDb(): Db {
     connectors: [],
     reports: [],
     automations: [],
+    routines: [],
+    summaries: new Map(),
+    embeddings: new Map(),
+    budgetAlerts: new Set(),
   };
 }
 
@@ -82,6 +92,8 @@ export const DEFAULT_PROFILE: Profile = {
   dailySummaryEnabled: true,
   dailySummaryTime: "08:00",
   meetingReminderMinutes: 10,
+  monthlyCostLimitUsd: 20,
+  economyMode: false,
 };
 
 let clock = Date.now();
@@ -350,6 +362,62 @@ export class MemoryUserStore implements UserStore {
     return this.db.automations.length < before;
   }
 
+  // ---- Fase 5 ----
+  async listRoutines() {
+    return this.db.routines.filter((r) => r.userId === this.userId).map(({ userId: _u, lastRunKey: _k, ...r }) => r);
+  }
+  async createRoutine(input: Parameters<UserStore["createRoutine"]>[0]) {
+    const r = { id: randomUUID(), ...input, lastRunAt: null, userId: this.userId, lastRunKey: null };
+    this.db.routines.push(r);
+    const { userId: _u, lastRunKey: _k, ...pub } = r;
+    return pub;
+  }
+  async updateRoutine(id: string, patch: Parameters<UserStore["updateRoutine"]>[1]) {
+    const r = this.db.routines.find((x) => x.id === id && x.userId === this.userId);
+    if (!r) return null;
+    Object.assign(r, stripUndefined(patch));
+    const { userId: _u, lastRunKey: _k, ...pub } = r;
+    return pub;
+  }
+  async deleteRoutine(id: string) {
+    const before = this.db.routines.length;
+    this.db.routines = this.db.routines.filter((r) => !(r.id === id && r.userId === this.userId));
+    return this.db.routines.length < before;
+  }
+  async getConversationSummary(id: string) {
+    const own = this.db.conversations.some((c) => c.id === id && c.userId === this.userId);
+    const s = own ? this.db.summaries.get(id) : undefined;
+    return { summary: s?.summary ?? null, upto: s?.upto ?? 0 };
+  }
+  async setConversationSummary(id: string, summary: string, upto: number) {
+    if (this.db.conversations.some((c) => c.id === id && c.userId === this.userId)) this.db.summaries.set(id, { summary, upto });
+  }
+  async countMessages(conversationId: string) {
+    return this.db.messages.filter((m) => m.conversationId === conversationId && m.userId === this.userId).length;
+  }
+  async setMemoryEmbedding(id: string, embedding: number[], model: string) {
+    if (this.db.memories.some((m) => m.id === id && m.userId === this.userId)) this.db.embeddings.set(id, { embedding, model });
+  }
+  async listMemoryEmbeddings(model: string) {
+    return this.db.memories
+      .filter((m) => m.userId === this.userId)
+      .flatMap((m) => {
+        const e = this.db.embeddings.get(m.id);
+        return e && e.model === model ? [{ id: m.id, embedding: e.embedding }] : [];
+      });
+  }
+  async claimBudgetAlert(key: string) {
+    const k = `${this.userId}:${key}`;
+    if (this.db.budgetAlerts.has(k)) return false;
+    this.db.budgetAlerts.add(k);
+    return true;
+  }
+  async usageRows(since: Date) {
+    return this.db.usage
+      .filter((u) => u.userId === this.userId && u.createdAt >= since)
+      .map((u) => ({ kind: u.kind, costUsd: u.costUsd, createdAt: u.createdAt.toISOString() }));
+  }
+
   async listDeviceTokens() {
     return this.db.deviceTokens.filter((t) => t.userId === this.userId).map(({ userId: _u, tokenHash: _h, ...t }) => t);
   }
@@ -562,6 +630,20 @@ export class MemorySystemStore implements SystemStore {
     if (!a || a.lastRunKey === runKey) return false;
     a.lastRunKey = runKey;
     a.lastRunAt = now();
+    return true;
+  }
+
+  // ---- Fase 5 ----
+  async listScheduledRoutines(): Promise<ScheduledRoutine[]> {
+    return this.db.routines
+      .filter((r) => r.enabled && r.scheduleEnabled && r.runTime)
+      .map((r) => ({ ...r, timezone: (this.db.profiles.get(r.userId) ?? DEFAULT_PROFILE).timezone }));
+  }
+  async claimRoutineRun(id: string, runKey: string) {
+    const r = this.db.routines.find((x) => x.id === id);
+    if (!r || r.lastRunKey === runKey) return false;
+    r.lastRunKey = runKey;
+    r.lastRunAt = now();
     return true;
   }
 }

@@ -93,6 +93,9 @@ export const ProfileSchema = z.object({
   dailySummaryTime: z.string(),
   /** 0 = desativado. */
   meetingReminderMinutes: z.number().int(),
+  monthlyCostLimitUsd: z.number(),
+  /** Modo econômico: usa o modelo mais barato configurado no servidor. */
+  economyMode: z.boolean(),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
@@ -106,6 +109,8 @@ export const ProfileUpdateSchema = z
     dailySummaryEnabled: z.boolean(),
     dailySummaryTime: HHMM,
     meetingReminderMinutes: z.number().int().min(0).max(120),
+    monthlyCostLimitUsd: z.number().min(0).max(1000),
+    economyMode: z.boolean(),
   })
   .partial();
 export type ProfileUpdate = z.infer<typeof ProfileUpdateSchema>;
@@ -165,6 +170,8 @@ export const ChatRequestSchema = z.object({
   timezone: z.string().max(64).optional(),
   /** Dados lidos no iPhone com permissão do usuário (somente leitura). */
   deviceContext: z.lazy(() => DeviceContextSchema).optional(),
+  /** Executa uma rotina específica (ex.: aberta por notificação agendada). */
+  routineId: z.string().uuid().optional(),
 });
 export type ChatRequest = z.input<typeof ChatRequestSchema>;
 
@@ -187,6 +194,8 @@ export const ChatResponseSchema = z.object({
     outputTokens: z.number(),
     costUsd: z.number(),
   }),
+  /** Aviso ao usuário (ex.: 80% do limite mensal). */
+  notice: z.string().optional(),
 });
 export type ChatResponse = z.infer<typeof ChatResponseSchema>;
 
@@ -228,6 +237,12 @@ export const UsageSummarySchema = z.object({
   last30Days: z.object({ costUsd: z.number(), requests: z.number() }),
   dailyLimitUsd: z.number(),
   model: z.string(),
+  /** Fase 5 — mês corrente, por recurso e por dia. */
+  month: z.object({ costUsd: z.number(), requests: z.number(), limitUsd: z.number() }).default({ costUsd: 0, requests: 0, limitUsd: 0 }),
+  byKind: z.array(z.object({ kind: z.string(), costUsd: z.number(), requests: z.number() })).default([]),
+  byDay: z.array(z.object({ date: z.string(), costUsd: z.number() })).default([]),
+  economyMode: z.boolean().default(false),
+  economyModel: z.string().nullable().default(null),
 });
 export type UsageSummary = z.infer<typeof UsageSummarySchema>;
 
@@ -252,6 +267,8 @@ export const HealthSchema = z.object({
   business: z
     .object({ connectors: z.boolean(), hub: z.boolean(), sheets: z.boolean() })
     .default({ connectors: false, hub: false, sheets: false }),
+  memory: z.object({ semantic: z.boolean() }).default({ semantic: false }),
+  streaming: z.boolean().default(false),
 });
 export type Health = z.infer<typeof HealthSchema>;
 
@@ -519,3 +536,53 @@ export const ReportSchema = z.object({
   createdAt: z.string(),
 });
 export type Report = z.infer<typeof ReportSchema>;
+
+// ---------------------------------------------------------------------------
+// Fase 5 — streaming, rotinas, ações em lote
+// ---------------------------------------------------------------------------
+/** Eventos do POST /v1/chat/stream (Server-Sent Events). */
+export const StreamEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("delta"), text: z.string() }),
+  z.object({ type: z.literal("tool"), event: ToolEventSchema }),
+  z.object({ type: z.literal("done"), response: ChatResponseSchema }),
+  z.object({ type: z.literal("error"), code: z.string(), message: z.string(), status: z.number() }),
+]);
+export type StreamEvent = z.infer<typeof StreamEventSchema>;
+
+export const RoutineSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  triggerPhrase: z.string(),
+  instructions: z.string(),
+  weekday: z.number().int().min(0).max(6).nullable(),
+  runTime: z.string().nullable(),
+  scheduleEnabled: z.boolean(),
+  enabled: z.boolean(),
+  lastRunAt: z.string().nullable(),
+});
+export type Routine = z.infer<typeof RoutineSchema>;
+
+const HHMM5 = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
+export const RoutineCreateSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  triggerPhrase: z.string().trim().min(3).max(80),
+  instructions: z.string().trim().min(5).max(2000),
+  weekday: z.number().int().min(0).max(6).nullable().default(null),
+  runTime: HHMM5.nullable().default(null),
+  scheduleEnabled: z.boolean().default(false),
+  enabled: z.boolean().default(true),
+});
+export type RoutineCreate = z.input<typeof RoutineCreateSchema>;
+export const RoutineUpdateSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80),
+    triggerPhrase: z.string().trim().min(3).max(80),
+    instructions: z.string().trim().min(5).max(2000),
+    weekday: z.number().int().min(0).max(6).nullable(),
+    runTime: HHMM5.nullable(),
+    scheduleEnabled: z.boolean(),
+    enabled: z.boolean(),
+  })
+  .partial();
+
+export const BatchConfirmRequestSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(10) });

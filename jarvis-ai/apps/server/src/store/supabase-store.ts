@@ -15,6 +15,7 @@ import type {
   Memory,
   Profile,
   Report,
+  Routine,
   Space,
   Task,
   TaskUpdate,
@@ -47,6 +48,8 @@ const toProfile = (r: Row): Profile => ({
   dailySummaryEnabled: r.daily_summary_enabled === undefined ? true : Boolean(r.daily_summary_enabled),
   dailySummaryTime: r.daily_summary_time ? String(r.daily_summary_time) : "08:00",
   meetingReminderMinutes: r.meeting_reminder_minutes === undefined ? 10 : Number(r.meeting_reminder_minutes),
+  monthlyCostLimitUsd: r.monthly_cost_limit_usd === undefined ? 20 : Number(r.monthly_cost_limit_usd),
+  economyMode: Boolean(r.economy_mode),
 });
 
 export const toProfileRow = (r: Row): Profile => toProfile(r);
@@ -81,6 +84,19 @@ export const toAutomation = (r: Row): Automation => ({
   space: (r.space as Automation["space"]) ?? null,
   weekday: r.weekday === null || r.weekday === undefined ? null : Number(r.weekday),
   runTime: String(r.run_time),
+  enabled: Boolean(r.enabled),
+  lastRunAt: (r.last_run_at as string | null) ?? null,
+});
+
+export const ROUTINE_COLUMNS = "id, name, trigger_phrase, instructions, weekday, run_time, schedule_enabled, enabled, last_run_at";
+export const toRoutine = (r: Row): Routine => ({
+  id: String(r.id),
+  name: String(r.name),
+  triggerPhrase: String(r.trigger_phrase),
+  instructions: String(r.instructions),
+  weekday: r.weekday === null || r.weekday === undefined ? null : Number(r.weekday),
+  runTime: (r.run_time as string | null) ?? null,
+  scheduleEnabled: Boolean(r.schedule_enabled),
   enabled: Boolean(r.enabled),
   lastRunAt: (r.last_run_at as string | null) ?? null,
 });
@@ -161,6 +177,8 @@ export class SupabaseUserStore implements UserStore {
     if (patch.dailySummaryEnabled !== undefined) row.daily_summary_enabled = patch.dailySummaryEnabled;
     if (patch.dailySummaryTime !== undefined) row.daily_summary_time = patch.dailySummaryTime;
     if (patch.meetingReminderMinutes !== undefined) row.meeting_reminder_minutes = patch.meetingReminderMinutes;
+    if (patch.monthlyCostLimitUsd !== undefined) row.monthly_cost_limit_usd = patch.monthlyCostLimitUsd;
+    if (patch.economyMode !== undefined) row.economy_mode = patch.economyMode;
     const updated = check(await this.sb.from("jarvis_profiles").update(row).eq("user_id", this.userId).select("*").single(), "perfil");
     return toProfile(updated);
   }
@@ -523,5 +541,91 @@ export class SupabaseUserStore implements UserStore {
   async deleteAutomation(id: string) {
     const rows = check(await this.sb.from("jarvis_automations").delete().eq("id", id).select("id"), "automação");
     return (rows ?? []).length > 0;
+  }
+
+  // ---- Fase 5 ----
+  async listRoutines() {
+    const rows = check(await this.sb.from("jarvis_routines").select(ROUTINE_COLUMNS).order("created_at", { ascending: true }), "rotinas");
+    return ((rows ?? []) as Row[]).map(toRoutine);
+  }
+  async createRoutine(input: Parameters<UserStore["createRoutine"]>[0]) {
+    const r = check(
+      await this.sb
+        .from("jarvis_routines")
+        .insert({
+          user_id: this.userId,
+          name: input.name,
+          trigger_phrase: input.triggerPhrase,
+          instructions: input.instructions,
+          weekday: input.weekday,
+          run_time: input.runTime,
+          schedule_enabled: input.scheduleEnabled,
+          enabled: input.enabled,
+        })
+        .select(ROUTINE_COLUMNS)
+        .single(),
+      "rotina",
+    );
+    return toRoutine(r as Row);
+  }
+  async updateRoutine(id: string, patch: Parameters<UserStore["updateRoutine"]>[1]) {
+    const row: Row = {};
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.triggerPhrase !== undefined) row.trigger_phrase = patch.triggerPhrase;
+    if (patch.instructions !== undefined) row.instructions = patch.instructions;
+    if (patch.weekday !== undefined) row.weekday = patch.weekday;
+    if (patch.runTime !== undefined) row.run_time = patch.runTime;
+    if (patch.scheduleEnabled !== undefined) row.schedule_enabled = patch.scheduleEnabled;
+    if (patch.enabled !== undefined) row.enabled = patch.enabled;
+    const r = check(await this.sb.from("jarvis_routines").update(row).eq("id", id).select(ROUTINE_COLUMNS).maybeSingle(), "rotina");
+    return r ? toRoutine(r as Row) : null;
+  }
+  async deleteRoutine(id: string) {
+    const rows = check(await this.sb.from("jarvis_routines").delete().eq("id", id).select("id"), "rotina");
+    return (rows ?? []).length > 0;
+  }
+
+  async getConversationSummary(id: string) {
+    const r = check(await this.sb.from("jarvis_conversations").select("summary, summary_upto").eq("id", id).maybeSingle(), "conversa") as Row | null;
+    return { summary: (r?.summary as string | null) ?? null, upto: Number(r?.summary_upto ?? 0) };
+  }
+  async setConversationSummary(id: string, summary: string, upto: number) {
+    check(await this.sb.from("jarvis_conversations").update({ summary, summary_upto: upto }).eq("id", id), "conversa");
+  }
+  async countMessages(conversationId: string) {
+    const res = await this.sb.from("jarvis_messages").select("id", { count: "exact", head: true }).eq("conversation_id", conversationId);
+    if (res.error) throw new AppError("erro_banco", 502, `Falha ao contar mensagens: ${res.error.message}`);
+    return res.count ?? 0;
+  }
+
+  async setMemoryEmbedding(id: string, embedding: number[], model: string) {
+    check(await this.sb.from("jarvis_memories").update({ embedding, embedding_model: model }).eq("id", id), "memória");
+  }
+  async listMemoryEmbeddings(model: string) {
+    const rows = check(
+      await this.sb.from("jarvis_memories").select("id, embedding").eq("embedding_model", model).not("embedding", "is", null).limit(2000),
+      "memórias",
+    ) as Row[] | null;
+    return (rows ?? []).map((r) => ({ id: String(r.id), embedding: (r.embedding as number[]) ?? [] }));
+  }
+
+  async claimBudgetAlert(key: string) {
+    const rows = check(
+      await this.sb
+        .from("jarvis_profiles")
+        .update({ budget_alert_key: key })
+        .eq("user_id", this.userId)
+        .or(`budget_alert_key.is.null,budget_alert_key.neq.${key}`)
+        .select("user_id"),
+      "perfil",
+    );
+    return (rows ?? []).length > 0;
+  }
+  async usageRows(since: Date) {
+    const rows = check(
+      await this.sb.from("jarvis_usage").select("kind, cost_usd, created_at").gte("created_at", since.toISOString()).limit(20000),
+      "consumo",
+    ) as Row[] | null;
+    return (rows ?? []).map((r) => ({ kind: String(r.kind), costUsd: Number(r.cost_usd), createdAt: String(r.created_at) }));
   }
 }

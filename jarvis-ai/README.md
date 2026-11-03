@@ -3,7 +3,7 @@
 Assistente pessoal em português, com voz, memória persistente e ações autorizadas.
 App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQL com RLS) + Claude (Anthropic).
 
-> **Status: Fases 1 (MVP), 2 (Produtividade), 3 (Integração iOS) e 4 (Negócios) implementadas e verificadas no ambiente de desenvolvimento.**
+> **Status: as 5 fases do plano (MVP, Produtividade, Integração iOS, Negócios e Assistente avançado) implementadas e verificadas no ambiente de desenvolvimento.**
 > Ainda **não** foram instaladas em um iPhone físico nem testadas contra as APIs reais do Google: isso exige a
 > sua conta Apple Developer, Supabase, chave da IA e um projeto no Google Cloud
 > (veja [Passo a passo](#passo-a-passo-para-rodar-no-iphone) e [`docs/GOOGLE.md`](docs/GOOGLE.md)).
@@ -35,6 +35,13 @@ App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQ
 | **Aba Negócios** (dashboards por empresa) | ✅ Fase 4 | Indicadores, alertas, fontes, relatórios. Ver [`docs/NEGOCIOS.md`](docs/NEGOCIOS.md) |
 | **Relatórios e automações** | ✅ Fase 4 | Relatório semanal, pendências, tarefas atrasadas, estoque baixo — você liga/desliga e escolhe dia/horário |
 | APIs próprias (loja Black Bear, Barton) | ⏳ | Via planilha até haver API autorizada; arquitetura de conectores pronta |
+| **Respostas em streaming** | ✅ Fase 5 | O texto chega em tempo real e o Jarvis começa a falar na 1ª frase (menor latência percebida) |
+| Interromper falando por cima | 🧪 Fase 5 | Experimental (Ajustes › Voz), com cancelamento de eco do iPhone; melhor com fones |
+| **Memória semântica** | ✅ Fase 5 | Encontra por significado (embeddings Voyage, opcional) + palavras-chave; sem chave, só palavras |
+| Resumo automático de conversas longas | ✅ Fase 5 | Partes antigas viram resumo e continuam no contexto |
+| **Tarefas em múltiplas etapas** | ✅ Fase 5 | Até 8 etapas por pedido; "Confirmar todas" para várias ações pendentes |
+| **Rotinas personalizadas** | ✅ Fase 5 | Frase de ativação ("Jarvis, abertura da barbearia") + etapas + lembrete agendado opcional |
+| **Controle de custos** | ✅ Fase 5 | Limite diário e mensal, aviso aos 80%, modo econômico (você decide), consumo por recurso e por dia |
 | **Siri, Atalhos, Spotlight e Botão de Ação** (App Intents) | ✅ Fase 3 | "Conversar com Jarvis", resumo do dia, agenda, registrar tarefa — sem configuração manual. Ver [`docs/IOS.md`](docs/IOS.md) |
 | Siri responde sem abrir o app | ✅ Fase 3 | Chave do aparelho de escopo restrito, no Keychain, revogável; exige backend HTTPS |
 | Calendário e Lembretes do iPhone | ✅ Fase 3 | Leitura como contexto (com permissão); criar evento/lembrete **após confirmação** |
@@ -83,6 +90,7 @@ jarvis-ai/
 │       ├── src/push/           # Notificações push (Expo → APNs)
 │       ├── src/scheduler/      # Lembretes, resumo diário, avisos de reunião, automações
 │       ├── src/business/       # Conectores (Hub, Planilhas), indicadores, relatórios
+│       ├── src/memory/         # Memória semântica (busca híbrida)
 │       └── test/               # Testes unitários, de API e de integração (RLS)
 ├── packages/shared/            # Contratos (zod) usados pelo app e pelo servidor
 ├── supabase/migrations/        # Migração SQL com Row Level Security
@@ -117,7 +125,8 @@ ou nos painéis dos serviços.
 
 1. Crie um projeto (recomendo um projeto **separado** do Sir Alfred Team Hub).
 2. Abra **SQL Editor** e execute, nesta ordem, `supabase/migrations/20261103000000_jarvis_phase1.sql`,
-   `20261104000000_jarvis_phase2.sql`, `20261105000000_jarvis_phase3.sql` e `20261106000000_jarvis_phase4.sql`.
+   `20261104000000_jarvis_phase2.sql`, `20261105000000_jarvis_phase3.sql`, `20261106000000_jarvis_phase4.sql` e
+   `20261107000000_jarvis_phase5.sql`.
    (Ou, com a Supabase CLI: `supabase link` e `supabase db push` dentro de `jarvis-ai/`.)
 3. Em **Authentication → Providers → Email**, mantenha e-mail/senha ativado. Para uso pessoal,
    você pode desativar “Confirm email” ou confirmar pelo link enviado.
@@ -214,9 +223,9 @@ Detalhes, frases e privacidade: [`docs/IOS.md`](docs/IOS.md). O link `jarvis://?
 ```bash
 cd jarvis-ai
 npm run typecheck          # shared + server + mobile
-npm test                   # 141 testes: orquestrador, Google e Hub (simulados), planilhas, indicadores, automações, iPhone/Siri, API, segurança, voz
+npm test                   # 158 testes: streaming, memória semântica, rotinas, custos, Google e Hub (simulados), negócios, iPhone/Siri, API, segurança, voz
 npm run db:test:up         # sobe um PostgreSQL local descartável
-npm run test:integration   # aplica as migrações reais e testa o RLS (16 testes)
+npm run test:integration   # aplica as migrações reais e testa o RLS (18 testes)
 npm run db:test:down
 npm run verify:mobile      # typecheck + bundle iOS (Metro/Hermes)
 ```

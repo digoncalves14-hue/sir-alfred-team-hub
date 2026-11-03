@@ -2,16 +2,19 @@
 
 ## O que foi verificado e o que não foi
 
-**Verificado neste ambiente (Linux, sem iPhone) — Fases 1 a 4:**
+**Verificado neste ambiente (Linux, sem iPhone) — Fases 1 a 5:**
 - Verificação de tipos de todo o projeto (shared, server, mobile).
-- 141 testes automatizados (Fase 4: leitura de planilhas brasileiras, indicadores de vendas/estoque/pedidos/
+- 158 testes automatizados (Fase 5: eventos SSE em streaming, texto falado = texto salvo, modo econômico,
+  limite mensal e aviso único de 80%, busca semântica com queda para palavras-chave, reindexação, resumo de
+  conversa longa, rotinas por frase/id/agenda, confirmação em lote, divisão de frases para a fala;
+  Fase 4: leitura de planilhas brasileiras, indicadores de vendas/estoque/pedidos/
   cronograma/metas, indicadores do Hub, OAuth do Hub com rotação de refresh token, automações uma vez por período;
   Fase 3: chaves de aparelho, endpoints da Siri, ações executadas no iPhone,
   contexto do aparelho, links de ligação/SMS/WhatsApp/e-mail): orquestrador (ferramentas, confirmação, expiração, limites, recusa), API HTTP
   (autenticação, isolamento entre usuários, memória, exportação, ações, integrações, tarefas, push, cron),
   segurança, voz e palavra de ativação; Fase 2 com simulação das APIs do Google e do Expo Push exercitando os
   clientes reais (OAuth/PKCE, criar/reagendar/cancelar evento, buscar/ler/rascunhar/enviar e-mail, agendador).
-- 16 testes de integração aplicando as migrações reais em PostgreSQL 16 e checando o RLS (inclusive que o
+- 18 testes de integração aplicando as migrações reais em PostgreSQL 16 e checando o RLS (inclusive que o
   usuário não lê o token cifrado nem o hash das chaves de aparelho, e que um lembrete só é reivindicado uma vez).
 - Fase 3: `expo prebuild` gera o projeto com os App Intents no alvo principal (fase Sources), nome alternativo
   "Jarvis", região pt-BR, iOS 17, permissões de Calendário/Lembretes/Contatos/Localização em português, e o
@@ -31,6 +34,20 @@
 - `expo-doctor`: 18 de 20 checagens passaram; as 2 restantes precisam de acesso à internet da Expo, bloqueado aqui.
 
 ## Limitações conhecidas
+
+### Fase 5
+- **Interromper falando** é experimental: depende do cancelamento de eco do iOS com a voz do próprio Jarvis; em
+  ambientes barulhentos pode interromper sem querer. Vem desligado; com fones funciona melhor.
+- **Streaming com voz premium (ElevenLabs):** o texto aparece em tempo real, mas a voz premium fala no fim (uma
+  chamada por resposta, para não multiplicar o custo). A voz do iPhone fala frase a frase.
+- **Memória semântica** exige `VOYAGE_API_KEY` (opcional). Sem ela, a busca é por palavras (como antes). Memórias
+  antigas ganham vetor ao usar "Reindexar memórias" em Ajustes.
+- **Resumo de conversas longas** usa uma chamada de IA a cada ~20 mensagens novas (modelo econômico, cobrado como
+  "Resumos" no painel).
+- **Rotinas agendadas** não rodam sozinhas no servidor: chega uma notificação e a rotina executa quando você toca
+  (assim, ações que exigem confirmação continuam com você).
+- **Modo econômico** troca o modelo (padrão `claude-sonnet-5-5`, configurável): mais barato, possivelmente menos
+  elaborado. É sempre escolha sua em Ajustes.
 
 ### Fase 4
 - **Hub:** a conexão real depende de cadastrar o cliente OAuth do Jarvis no Supabase do Hub (script incluso). O
@@ -93,7 +110,12 @@ Nuvemshop), Barton, AppBarber.
 - WhatsApp: primeiro, abrir conversas com mensagem pronta (`whatsapp://send`), sem automação não oficial;
   WhatsApp Business Platform apenas quando configurado oficialmente.
 
-### Fase 5 — Assistente avançado
-- Streaming de texto e voz para menor latência; barge-in por voz.
-- Memória semântica (pgvector) e resumo automático de conversas longas.
-- Tarefas em múltiplas etapas, rotinas personalizadas e limites de custo por recurso.
+### Fase 5 — Assistente avançado ✅ (implementada)
+Streaming de texto com fala frase a frase, interrupção por voz (experimental), memória semântica e resumos
+automáticos, tarefas em múltiplas etapas, rotinas personalizadas e controle de custos (diário, mensal, por recurso,
+modo econômico).
+
+### Próximos passos sugeridos
+- Conectores diretos (loja da Black Bear, Barton, AppBarber) quando houver API autorizada.
+- Validar no iPhone e ajustar: frases da Siri, interrupção por voz, vozes pt-BR.
+- Publicar no TestFlight para uso diário.

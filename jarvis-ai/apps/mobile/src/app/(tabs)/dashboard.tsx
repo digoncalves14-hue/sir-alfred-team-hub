@@ -25,6 +25,8 @@ const SPACE_SCOPE: Record<Space, string> = {
   educacao: "Genesis Barber, cursos e mentorias CODE S.O.S.",
 };
 
+const KIND_LABEL: Record<string, string> = { chat: "Conversa", tts: "Voz premium", embedding: "Memória semântica", summary: "Resumos" };
+
 export default function Dashboard() {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
@@ -241,8 +243,26 @@ export default function Dashboard() {
               <View style={styles.barBg}>
                 <View style={[styles.barFg, { width: `${pct * 100}%`, backgroundColor: pct > 0.85 ? colors.red : pct > 0.6 ? colors.amber : colors.cyan }]} />
               </View>
+              {usage.month.limitUsd > 0 ? (
+                <Text style={font.small}>
+                  Mês: {formatUsd(usage.month.costUsd)} de {formatUsd(usage.month.limitUsd)} ({Math.round((usage.month.costUsd / usage.month.limitUsd) * 100)}%)
+                </Text>
+              ) : null}
+              <View style={styles.bars}>
+                {usage.byDay.map((d) => {
+                  const max = Math.max(...usage.byDay.map((x) => x.costUsd), 0.0001);
+                  return <View key={d.date} style={[styles.bar, { height: 4 + (d.costUsd / max) * 40, opacity: d.costUsd ? 1 : 0.25 }]} />;
+                })}
+              </View>
+              <Text style={font.small}>Últimos 14 dias</Text>
+              {usage.byKind.length ? (
+                <Text style={font.small}>
+                  {usage.byKind.map((k) => `${KIND_LABEL[k.kind] ?? k.kind}: ${formatUsd(k.costUsd)}`).join(" · ")}
+                </Text>
+              ) : null}
               <Text style={font.small}>
-                30 dias: {formatUsd(usage.last30Days.costUsd)} em {usage.last30Days.requests} requisições · modelo {usage.model}
+                Modelo: {usage.model}
+                {usage.economyMode ? " (modo econômico)" : ""}
               </Text>
               <Text style={font.small}>Valores estimados a partir dos tokens; a fatura oficial é a do provedor.</Text>
             </>
@@ -303,6 +323,8 @@ const styles = StyleSheet.create({
   big: { fontSize: 28, fontWeight: "700", color: colors.text },
   barBg: { height: 8, backgroundColor: colors.cyanFaint, borderRadius: radius.pill, overflow: "hidden" },
   barFg: { height: 8, borderRadius: radius.pill },
+  bars: { flexDirection: "row", alignItems: "flex-end", gap: 3, height: 46, marginTop: space(2) },
+  bar: { flex: 1, backgroundColor: colors.cyan, borderRadius: 2 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space(2) },
   spaceCard: { width: "48.5%" },
   addRow: { flexDirection: "row", alignItems: "center", gap: space(2), marginBottom: space(2) },

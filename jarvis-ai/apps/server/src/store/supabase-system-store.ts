@@ -5,8 +5,8 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { GoogleService, MemoryCategory, Space } from "@jarvis/shared";
-import { AUTOMATION_COLUMNS, check, CONNECTOR_COLUMNS, REPORT_COLUMNS, TASK_COLUMNS, toAutomation, toConnector, toMemoryRow, toProfileRow, toReport, toTask } from "./supabase-store";
-import type { ConnectorRecord, DueAutomation, IntegrationSecret, SystemStore, TaskInput } from "./types";
+import { AUTOMATION_COLUMNS, ROUTINE_COLUMNS, toRoutine, check, CONNECTOR_COLUMNS, REPORT_COLUMNS, TASK_COLUMNS, toAutomation, toConnector, toMemoryRow, toProfileRow, toReport, toTask } from "./supabase-store";
+import type { ConnectorRecord, DueAutomation, IntegrationSecret, ScheduledRoutine, SystemStore, TaskInput } from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -350,6 +350,43 @@ export class SupabaseSystemStore implements SystemStore {
         .or(`last_run_key.is.null,last_run_key.neq.${runKey}`)
         .select("id"),
       "automação",
+    );
+    return (rows ?? []).length > 0;
+  }
+
+  // ---- Fase 5 ----
+  async listScheduledRoutines(): Promise<ScheduledRoutine[]> {
+    const rows = (check(
+      await this.sb
+        .from("jarvis_routines")
+        .select(`user_id, last_run_key, ${ROUTINE_COLUMNS}`)
+        .eq("enabled", true)
+        .eq("schedule_enabled", true)
+        .not("run_time", "is", null)
+        .limit(2000),
+      "rotinas",
+    ) ?? []) as Row[];
+    if (rows.length === 0) return [];
+    const ids = [...new Set(rows.map((r) => String(r.user_id)))];
+    const profiles = (check(await this.sb.from("jarvis_profiles").select("user_id, timezone").in("user_id", ids), "perfis") ?? []) as Row[];
+    const tz = new Map(profiles.map((p) => [String(p.user_id), String(p.timezone)]));
+    return rows.map((r) => ({
+      ...toRoutine(r),
+      userId: String(r.user_id),
+      lastRunKey: (r.last_run_key as string | null) ?? null,
+      timezone: tz.get(String(r.user_id)) ?? "America/Sao_Paulo",
+    }));
+  }
+
+  async claimRoutineRun(id: string, runKey: string) {
+    const rows = check(
+      await this.sb
+        .from("jarvis_routines")
+        .update({ last_run_key: runKey, last_run_at: new Date().toISOString() })
+        .eq("id", id)
+        .or(`last_run_key.is.null,last_run_key.neq.${runKey}`)
+        .select("id"),
+      "rotina",
     );
     return (rows ?? []).length > 0;
   }

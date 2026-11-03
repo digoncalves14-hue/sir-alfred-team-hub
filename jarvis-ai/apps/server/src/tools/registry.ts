@@ -19,6 +19,7 @@ import type { ToolSpec } from "../ai/types";
 import type { GoogleUser } from "../google/gateway";
 import type { ConnectorService } from "../business/connectors";
 import type { ReportGenerator } from "../business/reports";
+import type { MemoryIndex } from "../memory/index";
 
 export type ToolRisk = "read" | "write" | "confirm";
 
@@ -31,6 +32,8 @@ export interface ToolContext {
   google: GoogleUser | null;
   /** Conectores e relatórios dos negócios (Fase 4); null quando não configurados. */
   business?: { connectors: ConnectorService; reports: ReportGenerator } | null;
+  /** Memória semântica (Fase 5); null = busca por palavras. */
+  memory?: MemoryIndex | null;
 }
 
 export interface ToolOutcome {

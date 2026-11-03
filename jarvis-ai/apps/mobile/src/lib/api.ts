@@ -26,6 +26,8 @@ import {
   ConnectorSchema,
   ReportSchema,
   SpaceOverviewSchema,
+  RoutineSchema,
+  type RoutineCreate,
   type AutomationCreate,
   type SheetConnectorCreate,
   type GoogleService,
@@ -188,6 +190,19 @@ export const api = {
     json(zod.object({ automation: AutomationSchema }), `/v1/automations/${id}`, { method: "PATCH", body: body(patch) }),
   deleteAutomation: (id: string) => raw(`/v1/automations/${id}`, { method: "DELETE" }).then(() => undefined),
   runAutomation: (id: string) => json(zod.object({ report: ReportSchema }), `/v1/automations/${id}/run`, { method: "POST", timeoutMs: 90_000 }),
+
+  // ---- Fase 5 ----
+  confirmBatch: (ids: string[]) =>
+    json(zod.object({ results: zod.array(zod.object({ id: zod.string(), ok: zod.boolean(), message: zod.string() })) }), "/v1/actions/confirm-batch", {
+      method: "POST",
+      body: body({ ids }),
+      timeoutMs: 90_000,
+    }),
+  routines: () => json(zod.object({ routines: zod.array(RoutineSchema) }), "/v1/routines"),
+  createRoutine: (r: RoutineCreate) => json(zod.object({ routine: RoutineSchema }), "/v1/routines", { method: "POST", body: body(r) }),
+  updateRoutine: (id: string, patch: Partial<RoutineCreate>) => json(zod.object({ routine: RoutineSchema }), `/v1/routines/${id}`, { method: "PATCH", body: body(patch) }),
+  deleteRoutine: (id: string) => raw(`/v1/routines/${id}`, { method: "DELETE" }).then(() => undefined),
+  reindexMemories: () => json(zod.object({ indexed: zod.number() }), "/v1/memories/reindex", { method: "POST", timeoutMs: 120_000 }),
 
   /** Áudio MP3 da voz premium (ElevenLabs), quando configurada no backend. */
   tts: async (text: string): Promise<ArrayBuffer> => (await raw("/v1/tts", { method: "POST", body: body({ text }), headers: { accept: "audio/mpeg" } })).arrayBuffer(),

@@ -9,7 +9,7 @@
  * - Cache de prompt nas instruções estáveis (ferramentas + sistema).
  */
 import Anthropic from "@anthropic-ai/sdk";
-import type { AIProvider, CompletionRequest, CompletionResult, ModelPart, ModelTurn } from "./types";
+import type { AIProvider, CompletionOptions, CompletionRequest, CompletionResult, ModelPart, ModelTurn } from "./types";
 
 export interface AnthropicProviderOptions {
   apiKey?: string;
@@ -57,25 +57,45 @@ export class AnthropicProvider implements AIProvider {
     return this.client !== null;
   }
 
-  async complete(req: CompletionRequest): Promise<CompletionResult> {
+  async complete(req: CompletionRequest, opts: CompletionOptions = {}): Promise<CompletionResult> {
     if (!this.client) throw new Error("ANTHROPIC_API_KEY não configurada no backend.");
+    const streaming = Boolean(opts.onText);
 
-    const response = await this.client.beta.messages.create({
-      model: this.opts.model,
-      max_tokens: 16000,
+    const params = {
+      model: req.model ?? this.opts.model,
+      max_tokens: req.maxTokens ?? 16000,
       output_config: { effort: this.opts.effort },
       ...(this.opts.fallbacks ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const } : {}),
       system: [
-        { type: "text", text: req.system, cache_control: { type: "ephemeral" } },
-        { type: "text", text: req.context },
+        { type: "text" as const, text: req.system, cache_control: { type: "ephemeral" as const } },
+        ...(req.context ? [{ type: "text" as const, text: req.context }] : []),
       ],
       tools: req.tools.map((t) => ({
         name: t.name,
         description: t.description,
         input_schema: t.inputSchema as Anthropic.Beta.Messages.BetaTool.InputSchema,
+        // Em streaming, a entrada da ferramenta chega sem buffer; o orquestrador valida
+        // TODA entrada com zod antes de executar e não executa em max_tokens/recusa.
+        ...(streaming ? { eager_input_streaming: true } : {}),
       })),
       messages: toAnthropicMessages(req.turns),
-    });
+    };
+
+    let response: Anthropic.Beta.Messages.BetaMessage;
+    if (streaming) {
+      try {
+        const stream = this.client.beta.messages.stream(params);
+        stream.on("text", (delta) => opts.onText!(delta));
+        response = await stream.finalMessage();
+      } catch (err) {
+        // Erros de API (limite, autenticação...) sobem; só um JSON de ferramenta ilegível
+        // no streaming cai para uma chamada normal (sem streaming).
+        if (err instanceof Anthropic.APIError) throw err;
+        response = await this.client.beta.messages.create({ ...params, tools: params.tools.map(({ eager_input_streaming: _e, ...t }) => t) });
+      }
+    } else {
+      response = await this.client.beta.messages.create(params);
+    }
 
     const parts: ModelPart[] = [];
     for (const block of response.content) {

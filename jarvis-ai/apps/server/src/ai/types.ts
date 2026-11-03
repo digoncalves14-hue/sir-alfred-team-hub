@@ -31,6 +31,14 @@ export interface CompletionRequest {
   context: string;
   turns: ModelTurn[];
   tools: ToolSpec[];
+  /** Substitui o modelo padrão nesta chamada (ex.: modo econômico, resumos). */
+  model?: string;
+  maxTokens?: number;
+}
+
+export interface CompletionOptions {
+  /** Recebe o texto conforme é gerado (streaming). */
+  onText?: (delta: string) => void;
 }
 
 export interface CompletionUsage {
@@ -53,5 +61,5 @@ export interface AIProvider {
   readonly name: string;
   readonly model: string;
   readonly configured: boolean;
-  complete(req: CompletionRequest): Promise<CompletionResult>;
+  complete(req: CompletionRequest, opts?: CompletionOptions): Promise<CompletionResult>;
 }

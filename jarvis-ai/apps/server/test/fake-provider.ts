@@ -1,4 +1,4 @@
-import type { AIProvider, CompletionRequest, CompletionResult, ModelPart } from "../src/ai/types";
+import type { AIProvider, CompletionOptions, CompletionRequest, CompletionResult, ModelPart } from "../src/ai/types";
 
 type Step = (req: CompletionRequest) => Partial<CompletionResult> & { parts: ModelPart[] };
 
@@ -15,18 +15,20 @@ export class ScriptedProvider implements AIProvider {
     this.configured = configured;
   }
 
-  async complete(req: CompletionRequest): Promise<CompletionResult> {
+  async complete(req: CompletionRequest, opts: CompletionOptions = {}): Promise<CompletionResult> {
     // Cópia profunda: o orquestrador continua mutando o array de turnos.
     this.requests.push(structuredClone(req));
     const step = this.steps.shift();
     if (!step) throw new Error("ScriptedProvider: nenhum passo restante");
     const out = step(req);
+    // Simula o streaming: o texto chega em pedaços (palavra a palavra).
+    if (opts.onText) for (const p of out.parts) if (p.type === "text") for (const piece of p.text.match(/\S+\s*/g) ?? []) opts.onText(piece);
     const hasCalls = out.parts.some((p) => p.type === "tool_call");
     return {
       raw: out.parts,
       stopReason: out.stopReason ?? (hasCalls ? "tool_use" : "end"),
       usage: out.usage ?? { inputTokens: 1000, outputTokens: 100, cacheReadTokens: 0, cacheWriteTokens: 0 },
-      model: out.model ?? this.model,
+      model: out.model ?? req.model ?? this.model,
       parts: out.parts,
     };
   }

@@ -13,7 +13,7 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-spe
 import { useCallback, useEffect, useReducer, useRef } from "react";
 import { initialVoiceState, voiceReducer } from "@/logic/voiceMachine";
 import { isStopCommand, stripWakeWord } from "@/logic/wakeWord";
-import { speak, stopSpeaking, type SpeakOptions } from "./tts";
+import { createSpeechStream, speak, stopSpeaking, type SpeakOptions, type SpeechStream } from "./tts";
 
 const END_OF_SPEECH_MS = 1600;
 const NO_SPEECH_MS = 8000;
@@ -31,10 +31,15 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 export interface VoiceEngineOptions {
-  /** Envia o texto ao Jarvis e devolve o texto a ser falado (ou null se não houver fala). */
-  onUtterance: (text: string) => Promise<string | null>;
+  /**
+   * Envia o texto ao Jarvis. Com `sink`, o texto em streaming deve ser empurrado nele
+   * (fala frase a frase) e a função devolve null; ou devolve um texto para falar inteiro.
+   */
+  onUtterance: (text: string, sink: SpeechStream | null) => Promise<string | null>;
   speakReplies: boolean;
   speech: SpeakOptions;
+  /** Experimental: falar por cima interrompe o Jarvis (cancelamento de eco do iOS). */
+  bargeIn?: boolean;
 }
 
 export function useVoiceEngine(opts: VoiceEngineOptions) {
@@ -49,6 +54,8 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   const lastTranscript = useRef("");
   const endTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Escuta durante a fala do Jarvis (interrupção por voz). */
+  const bargeRef = useRef(false);
 
   const clearTimers = () => {
     if (endTimer.current) clearTimeout(endTimer.current);
@@ -90,6 +97,15 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
 
   useSpeechRecognitionEvent("result", (e) => {
     const text = e.results[0]?.transcript ?? "";
+    if (bargeRef.current) {
+      // O usuário começou a falar enquanto o Jarvis fala → interrompe e volta a ouvir.
+      if (stateRef.current.phase === "speaking" && text.trim().length >= 4) {
+        bargeRef.current = false;
+        ExpoSpeechRecognitionModule.abort();
+        void stopSpeaking().then(() => setTimeout(() => dispatch({ type: "INTERRUPT" }), 250));
+      }
+      return;
+    }
     if (e.isFinal) {
       gotFinal.current = true;
       clearTimers();
@@ -108,6 +124,7 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
 
   useSpeechRecognitionEvent("error", (e) => {
     clearTimers();
+    if (bargeRef.current || stateRef.current.phase === "speaking") return; // escuta de interrupção: erros são silenciosos
     if (e.error === "aborted" || e.error === "no-speech" || e.error === "speech-timeout") return; // tratado em "end"
     dispatch({ type: "ERROR", message: ERROR_MESSAGES[e.error] ?? `Erro no reconhecimento de fala (${e.error}).` });
   });
@@ -120,6 +137,31 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
     dispatch(partial ? { type: "FINAL", text: partial } : { type: "NO_SPEECH" });
   });
 
+  // ---- Interrupção por voz (experimental): ouve enquanto o Jarvis fala ----
+  useEffect(() => {
+    if (state.phase !== "speaking" || !optsRef.current.bargeIn) return;
+    try {
+      ExpoSpeechRecognitionModule.start({
+        lang: "pt-BR",
+        interimResults: true,
+        continuous: true,
+        addsPunctuation: false,
+        // Cancelamento de eco: evita que o Jarvis "ouça" a própria voz.
+        iosVoiceProcessingEnabled: true,
+        iosCategory: { category: "playAndRecord", categoryOptions: ["defaultToSpeaker", "allowBluetooth"], mode: "voiceChat" },
+      });
+      bargeRef.current = true;
+    } catch {
+      bargeRef.current = false;
+    }
+    return () => {
+      if (bargeRef.current) {
+        bargeRef.current = false;
+        ExpoSpeechRecognitionModule.abort();
+      }
+    };
+  }, [state.phase]);
+
   // ---- Texto final → Jarvis → fala ----
   useEffect(() => {
     if (state.phase !== "listening" || !state.finalized) return;
@@ -131,20 +173,25 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
     const text = stripWakeWord(raw);
     dispatch({ type: "SUBMITTED" });
     (async () => {
+      // Fala em streaming: a 1ª frase completa já passa o estado para "falando".
+      const sink = optsRef.current.speakReplies
+        ? createSpeechStream(optsRef.current.speech, () => dispatch({ type: "RESPONSE", willSpeak: true }))
+        : null;
       let reply: string | null;
       try {
         // Só a palavra de ativação ("Jarvis") → responde localmente, sem custo de IA.
-        reply = text ? await optsRef.current.onUtterance(text) : "Pois não?";
+        reply = text ? await optsRef.current.onUtterance(text, sink) : "Pois não?";
       } catch (e) {
         dispatch({ type: "ERROR", message: e instanceof Error ? e.message : "Falha ao falar com o Jarvis." });
         return;
       }
-      const willSpeak = Boolean(reply && optsRef.current.speakReplies);
-      dispatch({ type: "RESPONSE", willSpeak });
-      if (willSpeak) {
-        await speak(reply!, optsRef.current.speech);
-        dispatch({ type: "SPEECH_DONE" });
+      if (!sink) {
+        dispatch({ type: "RESPONSE", willSpeak: false });
+        return;
       }
+      if (reply) sink.push(reply);
+      await sink.end();
+      dispatch(sink.started ? { type: "SPEECH_DONE" } : { type: "RESPONSE", willSpeak: false });
     })();
   }, [state.phase, state.finalized, state.transcript]);
 

@@ -89,6 +89,7 @@ export const saveMemoryTool = defineTool({
       };
     }
     const m = await ctx.store.createMemory({ ...input, source: "assistant" });
+    await ctx.memory?.index(ctx.store, m);
     return { content: JSON.stringify({ salvo: true, id: m.id }), summary: `Memória salva: "${preview(m.content)}"` };
   },
 });
@@ -107,7 +108,7 @@ export const searchMemoryTool = defineTool({
   }),
   risk: "read",
   async execute(input, ctx) {
-    const items = await ctx.store.listMemories(input);
+    const items = ctx.memory ? await ctx.memory.search(ctx.store, input) : await ctx.store.listMemories(input);
     if (items.length === 0) {
       return { content: "Nenhuma memória encontrada para esta busca.", summary: "Nenhum registro encontrado na memória" };
     }
@@ -139,6 +140,7 @@ export const updateMemoryTool = defineTool({
     const { id, ...patch } = input;
     const m = await ctx.store.updateMemory(id, patch);
     if (!m) return { content: "Memória não encontrada. Nada foi alterado.", summary: "Memória não encontrada", isError: true };
+    if (patch.content) await ctx.memory?.index(ctx.store, m);
     return { content: JSON.stringify({ atualizado: true, id: m.id }), summary: `Memória corrigida: "${preview(m.content)}"` };
   },
 });

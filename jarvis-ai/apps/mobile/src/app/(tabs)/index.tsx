@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
 import { MessageBubble, PendingActionCard } from "@/components/chat";
 import { HoloOrb } from "@/components/HoloOrb";
-import { ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
+import { Button, Card, ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { executeDeviceAction, gatherDeviceContext, type Chooser } from "@/lib/device";
+import { chatStream } from "@/lib/stream";
+import { createSpeechStream, type SpeechStream } from "@/voice/tts";
 import { greeting } from "@/logic/format";
 import type { VoicePhase } from "@/logic/voiceMachine";
 import { usePrefs } from "@/providers/PrefsProvider";
@@ -49,7 +51,7 @@ const chooseWithAlert: Chooser = (title, options) =>
 
 export default function JarvisScreen() {
   const { prefs, setPrefs } = usePrefs();
-  const params = useLocalSearchParams<{ ouvir?: string; pergunta?: string; n?: string }>();
+  const params = useLocalSearchParams<{ ouvir?: string; pergunta?: string; rotina?: string; n?: string }>();
   const [conn, setConn] = useState<Conn>({ status: "checking" });
   const [ownerName, setOwnerName] = useState("senhor");
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
@@ -59,6 +61,10 @@ export default function JarvisScreen() {
   const [typed, setTyped] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  /** Resposta chegando em streaming (texto parcial + ferramentas em execução). */
+  const [live, setLive] = useState<{ text: string; tools: ToolEvent[] } | null>(null);
+  const streamingRef = useRef(false);
   const scrollRef = useRef<ScrollViewInstance>(null);
   const conversationRef = useRef(conversationId);
   conversationRef.current = conversationId;
@@ -69,6 +75,7 @@ export default function JarvisScreen() {
     setConn({ status: "checking" });
     try {
       const health = await api.health();
+      streamingRef.current = health.streaming;
       setConn({ status: "online", health });
       const me = await api.me();
       setOwnerName(me.profile.ownerName);
@@ -96,16 +103,37 @@ export default function JarvisScreen() {
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }, []);
 
+  /**
+   * Envia ao Jarvis. Com streaming (Fase 5), o texto aparece e é falado frase a frase
+   * (`sink`) e a função devolve null; sem streaming, devolve o texto para falar inteiro.
+   */
   const send = useCallback(
-    async (text: string, inputMode: "voice" | "text"): Promise<string | null> => {
+    async (text: string, inputMode: "voice" | "text", sink: SpeechStream | null = null, routineId?: string): Promise<string | null> => {
       setError(null);
       try {
         // Dados do iPhone (somente o que foi autorizado em Ajustes; no máximo ~2,5 s).
         const deviceContext = await gatherDeviceContext({ calendar: prefsRef.current.deviceCalendar, location: prefsRef.current.deviceLocation });
-        const res = await api.chat({ message: text, conversationId: conversationRef.current, inputMode, timezone: deviceTimezone, deviceContext });
+        const req = { message: text, conversationId: conversationRef.current, inputMode, timezone: deviceTimezone, deviceContext, routineId };
+        if (streamingRef.current) {
+          setLive({ text: "", tools: [] });
+          const res = await chatStream(req, {
+            onDelta: (d) => {
+              sink?.push(d);
+              setLive((l) => (l ? { ...l, text: l.text + d } : l));
+            },
+            onTool: (ev) => setLive((l) => (l ? { ...l, tools: [...l.tools, ev] } : l)),
+          });
+          setLive(null);
+          absorbReply(text, res.reply, res.conversationId);
+          if (res.notice) setNotice(res.notice);
+          return sink ? null : res.speech;
+        }
+        const res = await api.chat(req);
         absorbReply(text, res.reply, res.conversationId);
+        if (res.notice) setNotice(res.notice);
         return res.speech;
       } catch (e) {
+        setLive(null);
         const message = e instanceof ApiError ? e.message : "Falha ao falar com o Jarvis.";
         setError(message);
         if (e instanceof ApiError && e.status === 401) router.replace("/login");
@@ -117,8 +145,9 @@ export default function JarvisScreen() {
   );
 
   const voice = useVoiceEngine({
-    onUtterance: (text) => send(text, "voice"),
+    onUtterance: (text, sink) => send(text, "voice", sink),
     speakReplies: prefs.speakReplies,
+    bargeIn: prefs.bargeIn,
     speech: { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice },
   });
   const { phase, transcript, level, error: voiceError } = voice.state;
@@ -127,17 +156,19 @@ export default function JarvisScreen() {
   // "n" é um identificador por pedido, para que pedidos repetidos também funcionem.
   const handledIntent = useRef<string | null>(null);
   useEffect(() => {
-    const key = `${params.n ?? ""}|${params.ouvir ?? ""}|${params.pergunta ?? ""}`;
-    if (key === "||" || handledIntent.current === key) return;
+    const key = `${params.n ?? ""}|${params.ouvir ?? ""}|${params.pergunta ?? ""}|${params.rotina ?? ""}`;
+    if (key === "|||" || handledIntent.current === key) return;
     handledIntent.current = key;
-    if (params.pergunta) {
-      void send(params.pergunta, "text").then((speech) => {
-        if (speech) void voice.say(speech);
-      });
+    if (params.rotina) {
+      // Rotina agendada: o usuário tocou na notificação.
+      void speakTyped("Executar rotina", params.rotina);
+    } else if (params.pergunta) {
+      void speakTyped(params.pergunta);
     } else if (params.ouvir) {
       void voice.start(prefs.continuousConversation);
     }
-  }, [params.n, params.ouvir, params.pergunta, prefs.continuousConversation, voice, send]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.n, params.ouvir, params.pergunta, params.rotina, prefs.continuousConversation]);
 
   const onOrbPress = () => {
     if (phase === "idle" || phase === "error") void voice.start(prefs.continuousConversation);
@@ -145,14 +176,44 @@ export default function JarvisScreen() {
     else if (phase === "speaking") void voice.interrupt();
   };
 
+  /** Texto digitado (ou vindo de Siri/rotina): também fala frase a frase quando há streaming. */
+  async function speakTyped(text: string, routineId?: string) {
+    setSending(true);
+    const sink = prefsRef.current.speakReplies
+      ? createSpeechStream({ voiceIdentifier: prefsRef.current.voiceIdentifier, rate: prefsRef.current.speechRate, premium: prefsRef.current.premiumVoice }, () => undefined)
+      : null;
+    const speech = await send(text, "text", sink, routineId);
+    setSending(false);
+    if (sink) {
+      if (speech) sink.push(speech);
+      await sink.end();
+    }
+  }
+
   const sendTyped = async () => {
     const text = typed.trim();
     if (!text || sending) return;
     setTyped("");
-    setSending(true);
-    const speech = await send(text, "text");
-    setSending(false);
-    if (speech) void voice.say(speech);
+    await speakTyped(text);
+  };
+
+  const confirmAll = async () => {
+    const ids = pending.filter((p) => !p.device).map((p) => p.id);
+    if (ids.length < 2) return;
+    setBusyAction("all");
+    try {
+      const { results } = await api.confirmBatch(ids);
+      const ok = results.filter((r) => r.ok).length;
+      const msg = `${ok} de ${results.length} ações concluídas.${ok < results.length ? ` Falhas: ${results.filter((r) => !r.ok).map((r) => r.message).join("; ")}` : ""}`;
+      const now = new Date().toISOString();
+      setMessages((prev) => [...prev, { id: `batch-${now}`, role: "assistant", content: msg, toolEvents: [], createdAt: now }]);
+      setPending((prev) => prev.filter((p) => !ids.includes(p.id)));
+      void voice.say(msg);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao confirmar.");
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   const resolveAction = async (id: string, confirm: boolean) => {
@@ -253,12 +314,25 @@ export default function JarvisScreen() {
         {error || voiceError ? <ErrorBanner message={(voiceError ?? error)!} /> : null}
 
         <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: space(2), gap: space(2) }}>
+          {notice ? (
+            <Pressable onPress={() => setNotice(null)}>
+              <Card style={{ borderColor: colors.amber }}>
+                <Text style={[font.small, { color: colors.amber }]}>{notice}</Text>
+              </Card>
+            </Pressable>
+          ) : null}
+          {pending.filter((p) => !p.device).length >= 2 ? (
+            <Button title={`Confirmar todas (${pending.filter((p) => !p.device).length})`} icon="checkmark.circle" onPress={confirmAll} loading={busyAction === "all"} />
+          ) : null}
           {pending.map((p) => (
             <PendingActionCard key={p.id} summary={p.summary} busy={busyAction === p.id} onConfirm={() => resolveAction(p.id, true)} onReject={() => resolveAction(p.id, false)} />
           ))}
           {messages.slice(-12).map((m) => (
             <MessageBubble key={m.id} message={m} />
           ))}
+          {live ? (
+            <MessageBubble message={{ id: "live", role: "assistant", content: live.text || "…", toolEvents: live.tools, createdAt: "" }} />
+          ) : null}
         </ScrollView>
 
         <View style={styles.inputRow}>

@@ -8,6 +8,7 @@ import * as Speech from "expo-speech";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { File, Paths } from "expo-file-system";
 import { api } from "@/lib/api";
+import { forSpeech, SentenceBuffer } from "@/logic/sentences";
 
 export interface SpeakOptions {
   voiceIdentifier: string | null;
@@ -108,4 +109,83 @@ export async function stopSpeaking(): Promise<void> {
   }
   await Speech.stop().catch(() => undefined);
   finish?.();
+}
+
+// ---------------------------------------------------------------------------
+// Fase 5 — fala em streaming: cada frase é falada assim que fica completa.
+// ---------------------------------------------------------------------------
+export interface SpeechStream {
+  /** Recebe texto parcial do Jarvis. */
+  push(text: string): void;
+  /** Fim do texto: fala o restante e resolve quando tudo foi dito (ou interrompido). */
+  end(): Promise<void>;
+  /** true depois que a primeira frase começou a ser falada. */
+  readonly started: boolean;
+}
+
+/**
+ * Voz nativa: frases entram na fila do AVSpeechSynthesizer. Voz premium (servidor):
+ * o texto é acumulado e falado no fim (uma chamada só, para não multiplicar o custo).
+ */
+export function createSpeechStream(opts: SpeakOptions, onFirstSentence: () => void): SpeechStream {
+  const buffer = new SentenceBuffer();
+  let started = false;
+  let pending = 0;
+  let ended = false;
+  let full = "";
+  let cancelled = false;
+  let resolveDone: (() => void) | null = null;
+  const done = new Promise<void>((r) => (resolveDone = r));
+  const checkDone = () => {
+    if (ended && pending === 0) resolveDone?.();
+  };
+
+  const say = (sentence: string) => {
+    const clean = forSpeech(sentence);
+    if (!clean || cancelled) return;
+    if (!started) {
+      started = true;
+      onFirstSentence();
+    }
+    pending++;
+    const finish = () => {
+      pending = Math.max(0, pending - 1);
+      checkDone();
+    };
+    // Interrupção (toque ou voz): para tudo e ignora o texto que ainda chegar.
+    currentFinish = () => {
+      cancelled = true;
+      pending = 0;
+      ended = true;
+      checkDone();
+    };
+    Speech.speak(clean, { language: "pt-BR", voice: opts.voiceIdentifier ?? undefined, rate: opts.rate, pitch: 0.95, onDone: finish, onStopped: finish, onError: finish });
+  };
+
+  void ensureAudioMode();
+  return {
+    get started() {
+      return started;
+    },
+    push(text: string) {
+      full += text;
+      if (opts.premium || cancelled) return;
+      for (const s of buffer.push(text)) say(s);
+    },
+    async end() {
+      if (opts.premium) {
+        if (full.trim() && !cancelled) {
+          started = true;
+          onFirstSentence();
+          await speak(full, opts);
+        }
+        return;
+      }
+      const rest = buffer.flush();
+      if (rest) say(rest);
+      ended = true;
+      checkDone();
+      await done;
+    },
+  };
 }

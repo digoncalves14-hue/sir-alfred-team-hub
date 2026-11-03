@@ -14,6 +14,8 @@ import { Scheduler } from "./scheduler/scheduler";
 import { ConnectorService } from "./business/connectors";
 import { HubOAuth } from "./business/hub";
 import { ReportGenerator } from "./business/reports";
+import { MemoryIndex } from "./memory/index";
+import { VoyageEmbeddings } from "./ai/embeddings";
 
 const config = loadConfig();
 
@@ -41,6 +43,13 @@ const hub =
 const connectors = system && box ? new ConnectorService({ system, box, google, hub }) : null;
 const reports = system ? new ReportGenerator({ system, connectors }) : null;
 
+// ---- Fase 5: memória semântica opcional ----
+const memory = new MemoryIndex(
+  config.VOYAGE_API_KEY
+    ? new VoyageEmbeddings({ apiKey: config.VOYAGE_API_KEY, model: config.EMBEDDINGS_MODEL, pricePerMTokens: config.EMBEDDINGS_PRICE_PER_MTOKENS_USD })
+    : null,
+);
+
 let scheduler: Scheduler | null = null;
 
 const app = await buildApp({
@@ -57,7 +66,11 @@ const app = await buildApp({
     historyMessages: config.AI_HISTORY_MESSAGES,
     googleFor: google ? (userId) => google.forUser(userId) : undefined,
     business: connectors && reports ? { connectors, reports } : null,
+    memory,
+    economyModel: config.AI_MODEL_ECONOMY,
   }),
+  memory,
+  economyModel: config.AI_MODEL_ECONOMY,
   phase4: { system, box, connectors, reports },
   phase2: { system, google, box },
   get scheduler() {
@@ -86,6 +99,7 @@ app.log.info(
     push: Boolean(system),
     scheduler: Boolean(system && config.SCHEDULER_ENABLED),
     hub: Boolean(hub),
+    semanticMemory: memory.semantic,
   },
   provider.configured ? "JARVIS iniciado" : "ATENÇÃO: ANTHROPIC_API_KEY ausente — /v1/chat responderá 503",
 );

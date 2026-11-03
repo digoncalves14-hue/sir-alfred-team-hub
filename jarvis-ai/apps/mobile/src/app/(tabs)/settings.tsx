@@ -1,7 +1,7 @@
 import type { DeviceToken, GoogleService, Health, IntegrationStatus, Profile } from "@jarvis/shared";
 import * as LocalAuthentication from "expo-local-authentication";
 import type { Voice } from "expo-speech";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Button, Card, ErrorBanner, Pill, Screen, SectionTitle } from "@/components/ui";
@@ -37,6 +37,8 @@ export default function Settings() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ownerName, setOwnerName] = useState("");
   const [limit, setLimit] = useState("");
+  const [monthly, setMonthly] = useState("");
+  const [reindexing, setReindexing] = useState(false);
   const [health, setHealth] = useState<Health | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -78,6 +80,7 @@ export default function Settings() {
           setProfile(p);
           setOwnerName(p.ownerName);
           setLimit(String(p.dailyCostLimitUsd));
+          setMonthly(String(p.monthlyCostLimitUsd));
         })
         .catch((e) => setError(e instanceof Error ? e.message : "Falha ao carregar o perfil."));
       api.health().then(setHealth).catch(() => setHealth(null));
@@ -197,12 +200,14 @@ export default function Settings() {
 
   const saveProfile = async () => {
     const limitNum = Number(limit.replace(",", "."));
+    const monthlyNum = Number(monthly.replace(",", "."));
+    if (!Number.isFinite(monthlyNum) || monthlyNum < 0 || monthlyNum > 1000) return setError("Limite mensal deve estar entre 0 e 1000 dólares.");
     if (!ownerName.trim()) return setError("Informe como o Jarvis deve chamar você.");
     if (!Number.isFinite(limitNum) || limitNum < 0 || limitNum > 100) return setError("Limite diário deve estar entre 0 e 100 dólares.");
     setSaving(true);
     setError(null);
     try {
-      const r = await api.updateSettings({ ownerName: ownerName.trim(), dailyCostLimitUsd: limitNum });
+      const r = await api.updateSettings({ ownerName: ownerName.trim(), dailyCostLimitUsd: limitNum, monthlyCostLimitUsd: monthlyNum });
       setProfile(r.profile);
       Alert.alert("Salvo", `O Jarvis vai chamar você de "${r.profile.ownerName}".`);
     } catch (e) {
@@ -235,7 +240,43 @@ export default function Settings() {
           <TextInput style={styles.input} value={ownerName} onChangeText={setOwnerName} placeholder="senhor" placeholderTextColor={colors.textFaint} maxLength={60} />
           <Text style={font.small}>Limite diário de custo de IA (US$)</Text>
           <TextInput style={styles.input} value={limit} onChangeText={setLimit} keyboardType="decimal-pad" placeholder="1.00" placeholderTextColor={colors.textFaint} />
+          <Text style={font.small}>Limite mensal de custo de IA (US$) — aviso aos 80%</Text>
+          <TextInput style={styles.input} value={monthly} onChangeText={setMonthly} keyboardType="decimal-pad" placeholder="20" placeholderTextColor={colors.textFaint} />
           <Button title="Salvar" onPress={saveProfile} loading={saving} disabled={!profile} />
+        </Card>
+
+        <SectionTitle>CUSTOS E INTELIGÊNCIA</SectionTitle>
+        <Card style={{ gap: space(2) }}>
+          {profile ? (
+            <Row
+              title="Modo econômico"
+              subtitle="Usa um modelo mais barato (definido no servidor). Respostas podem ficar menos elaboradas; você decide."
+              value={profile.economyMode}
+              onChange={(v) => updateProfile({ economyMode: v })}
+            />
+          ) : null}
+          <Text style={font.small}>
+            Memória semântica: {health?.memory.semantic ? "ativa (encontra por significado)" : "desligada no servidor — busca por palavras"}.
+          </Text>
+          {health?.memory.semantic ? (
+            <Button
+              title="Reindexar memórias"
+              variant="ghost"
+              loading={reindexing}
+              onPress={async () => {
+                setReindexing(true);
+                try {
+                  const r = await api.reindexMemories();
+                  Alert.alert("Memória", `${r.indexed} memória(s) indexada(s).`);
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : "Falha ao reindexar.");
+                } finally {
+                  setReindexing(false);
+                }
+              }}
+            />
+          ) : null}
+          <Button title="Rotinas personalizadas" icon="list.bullet.rectangle" variant="ghost" onPress={() => router.push("/routines")} />
         </Card>
 
         <SectionTitle>INTEGRAÇÕES</SectionTitle>
@@ -376,6 +417,12 @@ export default function Settings() {
         <SectionTitle>VOZ</SectionTitle>
         <Card>
           <Row title="Falar respostas" subtitle="Desative para usar só texto" value={prefs.speakReplies} onChange={(v) => setPrefs({ speakReplies: v })} />
+          <Row
+            title="Interromper falando (experimental)"
+            subtitle="Fale por cima e o Jarvis para. Usa cancelamento de eco do iPhone; funciona melhor com fones."
+            value={prefs.bargeIn}
+            onChange={(v) => setPrefs({ bargeIn: v })}
+          />
           <Row
             title="Conversa contínua"
             subtitle="Volta a ouvir após cada resposta; dois silêncios encerram"

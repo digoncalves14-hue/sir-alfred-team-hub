@@ -81,12 +81,18 @@ export type MemoryUpdate = z.infer<typeof MemoryUpdateSchema>;
 // ---------------------------------------------------------------------------
 // Perfil / configurações
 // ---------------------------------------------------------------------------
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use o formato HH:MM");
+
 export const ProfileSchema = z.object({
   ownerName: z.string(),
   assistantName: z.string(),
   memoryEnabled: z.boolean(),
   timezone: z.string(),
   dailyCostLimitUsd: z.number(),
+  dailySummaryEnabled: z.boolean(),
+  dailySummaryTime: z.string(),
+  /** 0 = desativado. */
+  meetingReminderMinutes: z.number().int(),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
@@ -97,6 +103,9 @@ export const ProfileUpdateSchema = z
     memoryEnabled: z.boolean(),
     timezone: z.string().trim().min(3).max(64),
     dailyCostLimitUsd: z.number().min(0).max(100),
+    dailySummaryEnabled: z.boolean(),
+    dailySummaryTime: HHMM,
+    meetingReminderMinutes: z.number().int().min(0).max(120),
   })
   .partial();
 export type ProfileUpdate = z.infer<typeof ProfileUpdateSchema>;
@@ -200,6 +209,10 @@ export const HealthSchema = z.object({
   version: z.string(),
   ai: z.object({ provider: z.string(), model: z.string(), configured: z.boolean() }),
   tts: z.object({ provider: z.string(), configured: z.boolean() }),
+  google: z.object({ configured: z.boolean() }).default({ configured: false }),
+  push: z.object({ configured: z.boolean() }).default({ configured: false }),
+  /** running: laço interno ativo; cron: disponível via POST /internal/cron/tick. */
+  scheduler: z.object({ running: z.boolean(), cron: z.boolean().default(false) }).default({ running: false, cron: false }),
 });
 export type Health = z.infer<typeof HealthSchema>;
 
@@ -208,3 +221,103 @@ export const TtsRequestSchema = z.object({ text: z.string().trim().min(1).max(15
 /** Erro padronizado da API. */
 export const ApiErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
 export type ApiError = z.infer<typeof ApiErrorSchema>;
+
+// ---------------------------------------------------------------------------
+// Fase 2 — Integrações, tarefas, notificações
+// ---------------------------------------------------------------------------
+export const GOOGLE_SERVICES = ["calendar", "gmail"] as const;
+export const GoogleServiceSchema = z.enum(GOOGLE_SERVICES);
+export type GoogleService = z.infer<typeof GoogleServiceSchema>;
+
+export const IntegrationStatusSchema = z.object({
+  provider: z.literal("google"),
+  /** O backend tem as credenciais OAuth configuradas? */
+  available: z.boolean(),
+  connected: z.boolean(),
+  accountEmail: z.string().nullable(),
+  services: z.array(GoogleServiceSchema),
+  status: z.enum(["active", "error", "revoked"]).nullable(),
+  lastError: z.string().nullable(),
+  connectedAt: z.string().nullable(),
+});
+export type IntegrationStatus = z.infer<typeof IntegrationStatusSchema>;
+
+export const OAuthStartRequestSchema = z.object({ services: z.array(GoogleServiceSchema).min(1) });
+export const OAuthStartResponseSchema = z.object({ authUrl: z.string().url(), redirectUri: z.string() });
+export const OAuthCompleteRequestSchema = z.object({ code: z.string().min(5).max(2000), state: z.string().min(10).max(4000) });
+
+export const TASK_PRIORITIES = ["baixa", "normal", "alta"] as const;
+export const TaskPrioritySchema = z.enum(TASK_PRIORITIES);
+
+export const TaskSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  notes: z.string().nullable(),
+  space: SpaceSchema,
+  priority: TaskPrioritySchema,
+  dueDate: z.string().nullable(),
+  remindAt: z.string().nullable(),
+  status: z.enum(["aberta", "concluida"]),
+  completedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type Task = z.infer<typeof TaskSchema>;
+
+const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use AAAA-MM-DD");
+export const TaskCreateSchema = z.object({
+  title: z.string().trim().min(1).max(300),
+  notes: z.string().trim().max(2000).optional(),
+  space: SpaceSchema.default("pessoal"),
+  priority: TaskPrioritySchema.default("normal"),
+  dueDate: DATE.optional(),
+  /** Instante ISO com fuso (ex.: 2026-11-04T09:00:00-03:00). */
+  remindAt: z.string().datetime({ offset: true }).optional(),
+});
+export type TaskCreate = z.input<typeof TaskCreateSchema>;
+
+export const TaskUpdateSchema = z
+  .object({
+    title: z.string().trim().min(1).max(300),
+    notes: z.string().trim().max(2000).nullable(),
+    space: SpaceSchema,
+    priority: TaskPrioritySchema,
+    dueDate: DATE.nullable(),
+    remindAt: z.string().datetime({ offset: true }).nullable(),
+    status: z.enum(["aberta", "concluida"]),
+  })
+  .partial();
+export type TaskUpdate = z.infer<typeof TaskUpdateSchema>;
+
+export const CalendarEventSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  start: z.string(),
+  end: z.string(),
+  allDay: z.boolean(),
+  location: z.string().nullable(),
+  link: z.string().nullable(),
+});
+export type CalendarEvent = z.infer<typeof CalendarEventSchema>;
+
+export const TodaySchema = z.object({
+  date: z.string(),
+  calendar: z.object({ connected: z.boolean(), events: z.array(CalendarEventSchema), error: z.string().nullable() }),
+  tasks: z.array(TaskSchema),
+  email: z.object({ connected: z.boolean(), importantUnread: z.number().nullable(), error: z.string().nullable() }),
+});
+export type Today = z.infer<typeof TodaySchema>;
+
+export const NotificationSchema = z.object({
+  id: z.string().uuid(),
+  kind: z.enum(["resumo_diario", "lembrete_tarefa", "lembrete_reuniao", "sistema"]),
+  title: z.string(),
+  body: z.string(),
+  readAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type AppNotification = z.infer<typeof NotificationSchema>;
+
+export const PushTokenRequestSchema = z.object({
+  token: z.string().regex(/^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/, "Token Expo inválido"),
+  deviceName: z.string().max(100).optional(),
+});

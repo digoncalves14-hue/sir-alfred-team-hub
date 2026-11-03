@@ -3,10 +3,10 @@
  * então toda consulta passa pelas políticas de Row Level Security.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { AuditEntry, ChatMessage, Conversation, Memory, Profile, ToolEvent } from "@jarvis/shared";
+import type { AppNotification, AuditEntry, ChatMessage, Conversation, GoogleService, Memory, Profile, Task, TaskUpdate, ToolEvent } from "@jarvis/shared";
 import { AppError } from "../errors";
 import { rankByQuery } from "./search";
-import type { PendingActionRecord, UsageRecord, UserStore } from "./types";
+import type { IntegrationInfo, PendingActionRecord, TaskInput, TaskQuery, UsageRecord, UserStore } from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -17,7 +17,7 @@ export function createUserClient(url: string, anonKey: string, accessToken: stri
   });
 }
 
-function check<T>(res: { data: T; error: { message: string; code?: string } | null }, what: string): T {
+export function check<T>(res: { data: T; error: { message: string; code?: string } | null }, what: string): T {
   if (res.error) throw new AppError("erro_banco", 502, `Falha ao acessar ${what}: ${res.error.message}`);
   return res.data;
 }
@@ -28,6 +28,23 @@ const toProfile = (r: Row): Profile => ({
   memoryEnabled: Boolean(r.memory_enabled),
   timezone: String(r.timezone),
   dailyCostLimitUsd: Number(r.daily_cost_limit_usd),
+  dailySummaryEnabled: r.daily_summary_enabled === undefined ? true : Boolean(r.daily_summary_enabled),
+  dailySummaryTime: r.daily_summary_time ? String(r.daily_summary_time) : "08:00",
+  meetingReminderMinutes: r.meeting_reminder_minutes === undefined ? 10 : Number(r.meeting_reminder_minutes),
+});
+
+export const TASK_COLUMNS = "id, title, notes, space, priority, due_date, remind_at, status, completed_at, created_at";
+export const toTask = (r: Row): Task => ({
+  id: String(r.id),
+  title: String(r.title),
+  notes: (r.notes as string | null) ?? null,
+  space: r.space as Task["space"],
+  priority: r.priority as Task["priority"],
+  dueDate: (r.due_date as string | null) ?? null,
+  remindAt: r.remind_at ? new Date(String(r.remind_at)).toISOString() : null,
+  status: r.status as Task["status"],
+  completedAt: (r.completed_at as string | null) ?? null,
+  createdAt: String(r.created_at),
 });
 const toConversation = (r: Row): Conversation => ({
   id: String(r.id),
@@ -88,6 +105,9 @@ export class SupabaseUserStore implements UserStore {
     if (patch.memoryEnabled !== undefined) row.memory_enabled = patch.memoryEnabled;
     if (patch.timezone !== undefined) row.timezone = patch.timezone;
     if (patch.dailyCostLimitUsd !== undefined) row.daily_cost_limit_usd = patch.dailyCostLimitUsd;
+    if (patch.dailySummaryEnabled !== undefined) row.daily_summary_enabled = patch.dailySummaryEnabled;
+    if (patch.dailySummaryTime !== undefined) row.daily_summary_time = patch.dailySummaryTime;
+    if (patch.meetingReminderMinutes !== undefined) row.meeting_reminder_minutes = patch.meetingReminderMinutes;
     const updated = check(await this.sb.from("jarvis_profiles").update(row).eq("user_id", this.userId).select("*").single(), "perfil");
     return toProfile(updated);
   }
@@ -270,6 +290,104 @@ export class SupabaseUserStore implements UserStore {
       requests: list.length,
       inputTokens: list.reduce((s, r) => s + Number(r.input_tokens), 0),
       outputTokens: list.reduce((s, r) => s + Number(r.output_tokens), 0),
+    };
+  }
+
+  // ---- Fase 2 ----
+  async listTasks(q: TaskQuery) {
+    let query = this.sb.from("jarvis_tasks").select(TASK_COLUMNS);
+    const status = q.status ?? "aberta";
+    if (status !== "todas") query = query.eq("status", status);
+    if (q.dueOnOrBefore) query = query.or(`due_date.is.null,due_date.lte.${q.dueOnOrBefore}`);
+    const rows = check(
+      await query.order("due_date", { ascending: true, nullsFirst: false }).order("created_at", { ascending: true }).limit(q.limit ?? 100),
+      "tarefas",
+    );
+    return (rows ?? []).map(toTask);
+  }
+  async getTask(id: string) {
+    const r = check(await this.sb.from("jarvis_tasks").select(TASK_COLUMNS).eq("id", id).maybeSingle(), "tarefa");
+    return r ? toTask(r as Row) : null;
+  }
+  async createTask(input: TaskInput) {
+    const r = check(
+      await this.sb
+        .from("jarvis_tasks")
+        .insert({
+          user_id: this.userId,
+          title: input.title,
+          notes: input.notes ?? null,
+          space: input.space,
+          priority: input.priority,
+          due_date: input.dueDate ?? null,
+          remind_at: input.remindAt ?? null,
+        })
+        .select(TASK_COLUMNS)
+        .single(),
+      "tarefa",
+    );
+    return toTask(r as Row);
+  }
+  async updateTask(id: string, patch: TaskUpdate) {
+    const row: Row = {};
+    if (patch.title !== undefined) row.title = patch.title;
+    if (patch.notes !== undefined) row.notes = patch.notes;
+    if (patch.space !== undefined) row.space = patch.space;
+    if (patch.priority !== undefined) row.priority = patch.priority;
+    if (patch.dueDate !== undefined) row.due_date = patch.dueDate;
+    if (patch.remindAt !== undefined) {
+      row.remind_at = patch.remindAt;
+      row.reminded_at = null;
+    }
+    if (patch.status !== undefined) {
+      row.status = patch.status;
+      row.completed_at = patch.status === "concluida" ? new Date().toISOString() : null;
+    }
+    const r = check(await this.sb.from("jarvis_tasks").update(row).eq("id", id).select(TASK_COLUMNS).maybeSingle(), "tarefa");
+    return r ? toTask(r as Row) : null;
+  }
+  async deleteTask(id: string) {
+    const rows = check(await this.sb.from("jarvis_tasks").delete().eq("id", id).select("id"), "tarefa");
+    return (rows ?? []).length > 0;
+  }
+
+  async listNotifications(limit: number): Promise<AppNotification[]> {
+    const rows = check(
+      await this.sb.from("jarvis_notifications").select("id, kind, title, body, read_at, created_at").order("created_at", { ascending: false }).limit(limit),
+      "notificações",
+    );
+    return (rows ?? []).map((r: Row) => ({
+      id: String(r.id),
+      kind: r.kind as AppNotification["kind"],
+      title: String(r.title),
+      body: String(r.body),
+      readAt: (r.read_at as string | null) ?? null,
+      createdAt: String(r.created_at),
+    }));
+  }
+  async markNotificationRead(id: string) {
+    const rows = check(await this.sb.from("jarvis_notifications").update({ read_at: new Date().toISOString() }).eq("id", id).select("id"), "notificação");
+    return (rows ?? []).length > 0;
+  }
+
+  async getIntegration(provider: "google"): Promise<IntegrationInfo | null> {
+    const r = check(
+      await this.sb
+        .from("jarvis_integrations")
+        .select("account_email, scopes, services, status, last_error, connected_at")
+        .eq("provider", provider)
+        .maybeSingle(),
+      "integração",
+    );
+    if (!r) return null;
+    const row = r as Row;
+    return {
+      accountEmail: (row.account_email as string | null) ?? null,
+      scopes: (row.scopes as string[]) ?? [],
+      services: (row.services as GoogleService[]) ?? [],
+      status: row.status as IntegrationInfo["status"],
+      lastError: (row.last_error as string | null) ?? null,
+      connectedAt: String(row.connected_at),
     };
   }
 }

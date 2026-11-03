@@ -20,8 +20,11 @@ import type { AIProvider } from "./ai/types";
 import type { TtsProvider } from "./tts/elevenlabs";
 import type { UserStore } from "./store/types";
 import { detectSensitive } from "./security/sensitive";
+import { registerPhase2Routes, type Phase2Deps } from "./routes/phase2";
+import type { Scheduler } from "./scheduler/scheduler";
+import { timingSafeEqual } from "node:crypto";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 export interface AppDeps {
   authenticate: Authenticator;
@@ -32,6 +35,9 @@ export interface AppDeps {
   rateLimitPerMinute: number;
   logLevel?: string;
   logger?: boolean;
+  phase2?: Phase2Deps;
+  scheduler?: Scheduler | null;
+  cronSecret?: string;
 }
 
 declare module "fastify" {
@@ -93,7 +99,20 @@ export async function buildApp(deps: AppDeps) {
     version: VERSION,
     ai: { provider: deps.provider.name, model: deps.provider.model, configured: deps.provider.configured },
     tts: { provider: deps.tts.name, configured: deps.tts.configured },
+    google: { configured: Boolean(deps.phase2?.google && deps.phase2.system && deps.phase2.box) },
+    push: { configured: Boolean(deps.phase2?.system) },
+    scheduler: { running: deps.scheduler?.active ?? false, cron: Boolean(deps.scheduler && deps.cronSecret) },
   }));
+
+  // Cron externo (ex.: cron-job.org, GitHub Actions) para hospedagens que "dormem".
+  app.post("/internal/cron/tick", async (req, reply) => {
+    const given = Buffer.from(String(req.headers["x-cron-secret"] ?? ""));
+    const expected = Buffer.from(deps.cronSecret ?? "");
+    if (!deps.cronSecret || !deps.scheduler || given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      return reply.status(404).send({ error: { code: "nao_encontrado", message: "Não encontrado." } });
+    }
+    return deps.scheduler.tick();
+  });
 
   await app.register(async (v1) => {
     v1.addHook("onRequest", authenticate);
@@ -218,6 +237,8 @@ export async function buildApp(deps: AppDeps) {
       });
       return reply.header("content-type", contentType).header("cache-control", "no-store").send(audio);
     });
+
+    await registerPhase2Routes(v1, deps.phase2 ?? { system: null, google: null, box: null });
   }, { prefix: "/v1" });
 
   return app;

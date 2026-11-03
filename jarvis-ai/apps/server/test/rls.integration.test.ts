@@ -22,7 +22,11 @@ const SUPABASE_STUB = `
   do $$ begin
     if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
     if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+    if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
   end $$;
+  -- Como no Supabase: a service_role recebe acesso total às tabelas novas.
+  alter default privileges in schema public grant all on tables to service_role;
+  grant usage on schema public to service_role;
   create schema if not exists auth;
   create table if not exists auth.users (id uuid primary key);
   create or replace function auth.uid() returns uuid language sql stable as
@@ -38,6 +42,22 @@ const A = randomUUID();
 const B = randomUUID();
 
 /** Executa `fn` como um usuário autenticado (equivalente ao JWT no Supabase). */
+async function asService<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+  const c = await db.connect();
+  try {
+    await c.query("begin");
+    await c.query("set local role service_role");
+    const out = await fn(c);
+    await c.query("commit");
+    return out;
+  } catch (e) {
+    await c.query("rollback");
+    throw e;
+  } finally {
+    c.release();
+  }
+}
+
 async function as<T>(userId: string | null, fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const c = await db.connect();
   try {
@@ -151,5 +171,63 @@ describe.skipIf(!enabled)("RLS no PostgreSQL (migração real)", () => {
     // Políticas não são idempotentes por design (create policy); removemos para reaplicar o restante.
     const withoutPolicies = sql.replace(/create policy[\s\S]*?;\n/g, "");
     await expect(db.query(withoutPolicies)).resolves.toBeDefined();
+  });
+
+  // ------------------------------- Fase 2 -------------------------------
+  it("integrações: usuário vê só o status, NUNCA o token cifrado, e não escreve", async () => {
+    await as(A, (c) => c.query("insert into public.jarvis_profiles (user_id) values ($1) on conflict do nothing", [A]));
+    await asService((c) =>
+      c.query(
+        "insert into public.jarvis_integrations (user_id, provider, account_email, services, encrypted_refresh_token) values ($1, 'google', 'a@x.com', '{calendar}', 'v1.cifrado')",
+        [A],
+      ),
+    );
+    const own = await as(A, (c) => c.query("select provider, account_email, services, status from public.jarvis_integrations"));
+    expect(own.rows).toEqual([{ provider: "google", account_email: "a@x.com", services: ["calendar"], status: "active" }]);
+    await expect(as(A, (c) => c.query("select encrypted_refresh_token from public.jarvis_integrations"))).rejects.toThrow(/permission denied/);
+    await expect(as(A, (c) => c.query("select * from public.jarvis_integrations"))).rejects.toThrow(/permission denied/);
+    await expect(
+      as(A, (c) => c.query("insert into public.jarvis_integrations (user_id, provider, encrypted_refresh_token) values ($1, 'google', 'x')", [A])),
+    ).rejects.toThrow(/permission denied/);
+    expect((await as(B, (c) => c.query("select provider from public.jarvis_integrations"))).rows).toHaveLength(0);
+  });
+
+  it("tarefas: CRUD próprio e isolado", async () => {
+    const id = await as(A, async (c) =>
+      (await c.query("insert into public.jarvis_tasks (title, space, priority, due_date, remind_at) values ('Pagar fornecedor', 'black_bear', 'alta', '2026-11-05', now()) returning id")).rows[0].id,
+    );
+    expect((await as(B, (c) => c.query("select id from public.jarvis_tasks"))).rows).toHaveLength(0);
+    expect((await as(B, (c) => c.query("update public.jarvis_tasks set status = 'concluida' where id = $1", [id]))).rowCount).toBe(0);
+    expect((await as(A, (c) => c.query("update public.jarvis_tasks set status = 'concluida' where id = $1", [id]))).rowCount).toBe(1);
+    await expect(as(A, (c) => c.query("insert into public.jarvis_tasks (title, priority) values ('x', 'urgentissima')"))).rejects.toThrow(/check constraint/);
+  });
+
+  it("notificações: criadas só pelo backend; usuário apenas lê e marca como lida", async () => {
+    const id = await asService(async (c) =>
+      (await c.query("insert into public.jarvis_notifications (user_id, kind, title, body, dedupe_key) values ($1, 'sistema', 't', 'b', 'k1') returning id", [A])).rows[0].id,
+    );
+    await expect(
+      asService((c) => c.query("insert into public.jarvis_notifications (user_id, kind, title, body, dedupe_key) values ($1, 'sistema', 't', 'b', 'k1')", [A])),
+    ).rejects.toThrow(/duplicate key/);
+    expect((await as(A, (c) => c.query("update public.jarvis_notifications set read_at = now() where id = $1", [id]))).rowCount).toBe(1);
+    await expect(as(A, (c) => c.query("update public.jarvis_notifications set body = 'alterado' where id = $1", [id]))).rejects.toThrow(/permission denied/);
+    await expect(
+      as(A, (c) => c.query("insert into public.jarvis_notifications (user_id, kind, title, body, dedupe_key) values ($1, 'sistema', 'x', 'y', 'k2')", [A])),
+    ).rejects.toThrow(/permission denied/);
+    expect((await as(B, (c) => c.query("select id from public.jarvis_notifications"))).rows).toHaveLength(0);
+  });
+
+  it("push tokens isolados e preferências de resumo validadas", async () => {
+    await as(A, (c) => c.query("insert into public.jarvis_push_tokens (token) values ('ExponentPushToken[a]')"));
+    expect((await as(B, (c) => c.query("select token from public.jarvis_push_tokens"))).rows).toHaveLength(0);
+    await expect(as(A, (c) => c.query("update public.jarvis_profiles set daily_summary_time = '25:00' where user_id = $1", [A]))).rejects.toThrow(/check constraint/);
+    expect((await as(A, (c) => c.query("update public.jarvis_profiles set daily_summary_time = '07:30' where user_id = $1", [A]))).rowCount).toBe(1);
+  });
+
+  it("reivindicação atômica de lembrete: só uma execução ganha", async () => {
+    const id = await as(A, async (c) => (await c.query("insert into public.jarvis_tasks (title, remind_at) values ('lembrar', now() - interval '1 minute') returning id")).rows[0].id);
+    const claim = () => asService((c) => c.query("update public.jarvis_tasks set reminded_at = now() where id = $1 and reminded_at is null returning id", [id]));
+    const [r1, r2] = await Promise.all([claim(), claim()]);
+    expect((r1.rowCount ?? 0) + (r2.rowCount ?? 0)).toBe(1);
   });
 });

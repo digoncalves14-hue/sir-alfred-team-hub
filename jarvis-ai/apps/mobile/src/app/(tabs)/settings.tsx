@@ -1,4 +1,4 @@
-import type { Health, Profile } from "@jarvis/shared";
+import type { GoogleService, Health, IntegrationStatus, Profile } from "@jarvis/shared";
 import * as LocalAuthentication from "expo-local-authentication";
 import type { Voice } from "expo-speech";
 import { useFocusEffect } from "expo-router";
@@ -7,6 +7,8 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View
 import { Button, Card, ErrorBanner, Pill, Screen, SectionTitle } from "@/components/ui";
 import { api } from "@/lib/api";
 import { config } from "@/lib/config";
+import { connectGoogle } from "@/lib/google";
+import { registerForPush } from "@/lib/push";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePrefs } from "@/providers/PrefsProvider";
 import { listPortugueseVoices, speak } from "@/voice/tts";
@@ -35,6 +37,21 @@ export default function Settings() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [google, setGoogle] = useState<IntegrationStatus | null>(null);
+  const [wanted, setWanted] = useState<GoogleService[]>(["calendar", "gmail"]);
+  const [connecting, setConnecting] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  const loadIntegrations = useCallback(async () => {
+    try {
+      const r = await api.integrations();
+      const g = r.integrations.find((i) => i.provider === "google") ?? null;
+      setGoogle(g);
+      if (g?.connected && g.services.length) setWanted(g.services);
+    } catch {
+      setGoogle(null);
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,8 +64,65 @@ export default function Settings() {
         })
         .catch((e) => setError(e instanceof Error ? e.message : "Falha ao carregar o perfil."));
       api.health().then(setHealth).catch(() => setHealth(null));
-    }, []),
+      void loadIntegrations();
+    }, [loadIntegrations]),
   );
+
+  const updateProfile = async (patch: Partial<Profile>) => {
+    if (!profile) return;
+    const prev = profile;
+    setProfile({ ...profile, ...patch });
+    try {
+      setProfile((await api.updateSettings(patch)).profile);
+    } catch (e) {
+      setProfile(prev);
+      setError(e instanceof Error ? e.message : "Falha ao salvar.");
+    }
+  };
+
+  const doConnect = async () => {
+    if (wanted.length === 0) return setError("Escolha ao menos Agenda ou Gmail.");
+    setConnecting(true);
+    setError(null);
+    try {
+      const r = await connectGoogle(wanted);
+      if (r.ok) Alert.alert("Google conectado", `${r.email ?? "Conta"} — ${r.services.map((s) => (s === "calendar" ? "Agenda" : "Gmail")).join(" e ")}.`);
+      else if (!r.cancelled) setError(r.message);
+      await loadIntegrations();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao conectar.");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const doDisconnect = () =>
+    Alert.alert("Desconectar o Google?", "O Jarvis perderá acesso à Agenda e ao Gmail, e a autorização será revogada no Google.", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Desconectar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.googleDisconnect();
+            await loadIntegrations();
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Falha ao desconectar.");
+          }
+        },
+      },
+    ]);
+
+  const togglePush = async (v: boolean) => {
+    if (!v) return setPrefs({ pushEnabled: false });
+    setPushBusy(true);
+    const r = await registerForPush();
+    setPushBusy(false);
+    if (r.ok) setPrefs({ pushEnabled: true });
+    else setError(r.message);
+  };
+
+  const toggleService = (s: GoogleService) => setWanted((w) => (w.includes(s) ? w.filter((x) => x !== s) : [...w, s]));
 
   useEffect(() => {
     listPortugueseVoices().then(setVoices).catch(() => setVoices([]));
@@ -99,6 +173,85 @@ export default function Settings() {
           <Text style={font.small}>Limite diário de custo de IA (US$)</Text>
           <TextInput style={styles.input} value={limit} onChangeText={setLimit} keyboardType="decimal-pad" placeholder="1.00" placeholderTextColor={colors.textFaint} />
           <Button title="Salvar" onPress={saveProfile} loading={saving} disabled={!profile} />
+        </Card>
+
+        <SectionTitle>INTEGRAÇÕES</SectionTitle>
+        <Card style={{ gap: space(3) }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={[font.body, { fontWeight: "700" }]}>Google</Text>
+            {!google ? null : !google.available ? (
+              <Pill label="NÃO CONFIGURADO NO SERVIDOR" color={colors.textDim} />
+            ) : google.connected && google.status === "active" ? (
+              <Pill label="CONECTADO" color={colors.green} />
+            ) : google.connected ? (
+              <Pill label="RECONECTAR" color={colors.amber} />
+            ) : (
+              <Pill label="DESCONECTADO" color={colors.textDim} />
+            )}
+          </View>
+          {google?.accountEmail ? <Text style={font.small}>{google.accountEmail}</Text> : null}
+          {google?.lastError ? <Text style={[font.small, { color: colors.amber }]}>{google.lastError}</Text> : null}
+          {google?.available ? (
+            <>
+              <View style={styles.voices}>
+                {(["calendar", "gmail"] as const).map((s) => {
+                  const active = wanted.includes(s);
+                  return (
+                    <Pressable key={s} onPress={() => toggleService(s)} style={[styles.voice, active && styles.voiceActive]}>
+                      <Text style={[font.small, { color: active ? colors.bg : colors.text }]}>{s === "calendar" ? "Agenda" : "Gmail"}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={font.small}>
+                Agenda: ver e criar compromissos. Gmail: ler, rascunhar e enviar e-mails (o envio sempre pede sua confirmação). O Jarvis nunca apaga e-mails.
+              </Text>
+              <Button
+                title={google.connected ? "Reconectar / alterar permissões" : "Conectar conta Google"}
+                icon="link"
+                onPress={doConnect}
+                loading={connecting}
+                variant={google.connected ? "ghost" : "primary"}
+              />
+              {google.connected ? <Button title="Desconectar e revogar acesso" variant="danger" onPress={doDisconnect} /> : null}
+            </>
+          ) : (
+            <Text style={font.small}>O backend precisa de GOOGLE_IOS_CLIENT_ID, TOKEN_ENCRYPTION_KEY e SUPABASE_SERVICE_ROLE_KEY. Veja docs/GOOGLE.md.</Text>
+          )}
+        </Card>
+
+        <SectionTitle>NOTIFICAÇÕES</SectionTitle>
+        <Card>
+          <Row
+            title="Notificações neste iPhone"
+            subtitle={health?.push.configured ? "Lembretes, resumo diário e reuniões" : "Push não configurado no servidor"}
+            value={prefs.pushEnabled}
+            onChange={togglePush}
+            disabled={pushBusy || !health?.push.configured}
+          />
+          {profile ? (
+            <>
+              <Row title="Resumo diário" subtitle={`Enviado às ${profile.dailySummaryTime}`} value={profile.dailySummaryEnabled} onChange={(v) => updateProfile({ dailySummaryEnabled: v })} />
+              <View style={styles.voices}>
+                {["06:30", "07:00", "07:30", "08:00", "08:30", "09:00"].map((t) => (
+                  <Pressable key={t} onPress={() => updateProfile({ dailySummaryTime: t })} style={[styles.voice, profile.dailySummaryTime === t && styles.voiceActive]}>
+                    <Text style={[font.small, { color: profile.dailySummaryTime === t ? colors.bg : colors.text }]}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Text style={[font.small, { marginTop: space(3) }]}>Avisar antes de reuniões da agenda</Text>
+              <View style={styles.voices}>
+                {[0, 5, 10, 15, 30].map((m) => (
+                  <Pressable key={m} onPress={() => updateProfile({ meetingReminderMinutes: m })} style={[styles.voice, profile.meetingReminderMinutes === m && styles.voiceActive]}>
+                    <Text style={[font.small, { color: profile.meetingReminderMinutes === m ? colors.bg : colors.text }]}>{m === 0 ? "Desligado" : `${m} min`}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+          <Text style={[font.small, { marginTop: space(3) }]}>
+            Os avisos são enviados pelo servidor, mesmo com o app fechado — desde que o servidor esteja ligado.
+          </Text>
         </Card>
 
         <SectionTitle>VOZ</SectionTitle>

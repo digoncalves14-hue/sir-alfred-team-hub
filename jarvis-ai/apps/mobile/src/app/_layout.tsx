@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
@@ -8,7 +8,8 @@ import { HoloOrb } from "@/components/HoloOrb";
 import { Button, Screen } from "@/components/ui";
 import { missingConfig } from "@/lib/config";
 import { AuthProvider, useAuth } from "@/providers/AuthProvider";
-import { PrefsProvider } from "@/providers/PrefsProvider";
+import { PrefsProvider, usePrefs } from "@/providers/PrefsProvider";
+import { onNotificationTap, registerForPush } from "@/lib/push";
 import { colors, font, space } from "@/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -47,10 +48,26 @@ function MissingConfig() {
 
 function RootNavigator() {
   const { session, loading, locked } = useAuth();
+  const { prefs } = usePrefs();
 
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync().catch(() => undefined);
   }, [loading]);
+
+  // Toque numa notificação → abre a tela indicada (jarvis://dashboard → /dashboard).
+  useEffect(
+    () =>
+      onNotificationTap((url) => {
+        const path = url.replace(/^jarvis:\/\//, "/");
+        router.push((path === "/" ? "/" : path) as never);
+      }),
+    [],
+  );
+
+  // Renova o registro do aparelho para push a cada abertura (tokens podem mudar).
+  useEffect(() => {
+    if (session && prefs.pushEnabled) registerForPush().catch(() => undefined);
+  }, [session, prefs.pushEnabled]);
 
   if (missingConfig.length > 0) return <MissingConfig />;
   if (loading) return null;

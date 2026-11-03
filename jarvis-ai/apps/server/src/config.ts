@@ -31,6 +31,21 @@ const EnvSchema = z.object({
   TTS_COST_PER_1K_CHARS_USD: z.coerce.number().min(0).default(0.1),
 
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
+
+  // ---- Fase 2 ----
+  // service_role: SOMENTE no backend. Necessária para OAuth (gravar token cifrado),
+  // push e agendador (que rodam sem o usuário estar logado).
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(20).optional(),
+  // 32 bytes em base64 (openssl rand -base64 32). Cifra os tokens do Google.
+  TOKEN_ENCRYPTION_KEY: z.string().optional(),
+  // ID do cliente OAuth do tipo iOS (Google Cloud Console). Sem client secret.
+  GOOGLE_IOS_CLIENT_ID: z.string().regex(/\.apps\.googleusercontent\.com$/, "deve terminar em .apps.googleusercontent.com").optional(),
+  // Opcional: token de acesso da Expo se você ativar "push security" no projeto.
+  EXPO_ACCESS_TOKEN: z.string().optional(),
+  SCHEDULER_ENABLED: bool.default(true),
+  SCHEDULER_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(3600).default(60),
+  // Protege POST /internal/cron/tick (para cron externo quando o servidor "dorme").
+  CRON_SECRET: z.string().min(16).optional(),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

@@ -16,6 +16,7 @@ import { z } from "zod";
 import type { Profile } from "@jarvis/shared";
 import type { UserStore } from "../store/types";
 import type { ToolSpec } from "../ai/types";
+import type { GoogleUser } from "../google/gateway";
 
 export type ToolRisk = "read" | "write" | "confirm";
 
@@ -24,6 +25,8 @@ export interface ToolContext {
   profile: Profile;
   conversationId: string | null;
   now: Date;
+  /** Integração Google do usuário; null quando o backend não tem o OAuth configurado. */
+  google: GoogleUser | null;
 }
 
 export interface ToolOutcome {

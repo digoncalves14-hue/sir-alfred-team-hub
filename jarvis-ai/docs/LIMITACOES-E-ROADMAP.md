@@ -2,22 +2,36 @@
 
 ## O que foi verificado e o que não foi
 
-**Verificado neste ambiente (Linux, sem iPhone):**
+**Verificado neste ambiente (Linux, sem iPhone) — Fases 1 e 2:**
 - Verificação de tipos de todo o projeto (shared, server, mobile).
-- 62 testes automatizados: orquestrador (ferramentas, confirmação, expiração, limites, recusa), API HTTP
-  (autenticação, isolamento entre usuários, memória, exportação, ações), segurança, voz e palavra de ativação.
-- 7 testes de integração aplicando a migração real em PostgreSQL 16 e checando o RLS.
+- 101 testes automatizados: orquestrador (ferramentas, confirmação, expiração, limites, recusa), API HTTP
+  (autenticação, isolamento entre usuários, memória, exportação, ações, integrações, tarefas, push, cron),
+  segurança, voz e palavra de ativação; Fase 2 com simulação das APIs do Google e do Expo Push exercitando os
+  clientes reais (OAuth/PKCE, criar/reagendar/cancelar evento, buscar/ler/rascunhar/enviar e-mail, agendador).
+- 12 testes de integração aplicando as migrações reais em PostgreSQL 16 e checando o RLS (inclusive que o
+  usuário não lê o token cifrado e que um lembrete só é reivindicado uma vez).
 - Bundle iOS completo gerado pelo Metro/Hermes (`expo export --platform ios`).
 - Projeto nativo iOS gerado (`expo prebuild`) com as permissões de microfone, fala e Face ID, o esquema
-  `jarvis://` e **sem** modos de segundo plano.
+  `jarvis://`, o esquema de retorno do Google, o direito de push (`aps-environment`) e **sem** modos de segundo plano.
 - Backend iniciado e respondendo (`/health`, rejeição sem login), inclusive com instalação de produção.
 
 **Ainda não verificado (exige seus recursos):**
 - Execução no iPhone físico (reconhecimento de voz, Face ID, áudio, animações a 60/120 fps).
-- Chamadas reais ao Claude, ao Supabase e à ElevenLabs (exigem suas chaves).
+- Chamadas reais ao Claude, ao Supabase, à ElevenLabs, ao Google e ao Expo Push (exigem suas chaves/contas).
+  Os formatos de requisição seguem a documentação pública dessas APIs e foram testados contra simulações.
 - `expo-doctor`: 18 de 20 checagens passaram; as 2 restantes precisam de acesso à internet da Expo, bloqueado aqui.
 
 ## Limitações conhecidas
+
+### Fase 2
+- **Google em modo "Em teste" expira em 7 dias** — publique a tela de consentimento como "Em produção" (uso
+  pessoal, com aviso de app não verificado). Ver `docs/GOOGLE.md`.
+- **Lembretes dependem do servidor ligado** (ou de um cron externo chamando `/internal/cron/tick`). Com o servidor
+  desligado, os avisos atrasam; o resumo diário não é enviado se o atraso passar de 3 horas.
+- **Push só em iPhone físico** e após `eas init` (o token de push depende do projeto EAS).
+- **Agenda:** somente a agenda principal (`primary`). Outras agendas e recorrências complexas ficam para depois.
+- **Gmail:** lê até ~6.000 caracteres de cada e-mail; anexos não são abertos.
+- **Calendário/Lembretes nativos do iPhone (EventKit)** ainda não — Fase 3.
 
 - **Sem escuta permanente:** o iOS não permite que apps de terceiros fiquem ouvindo em segundo plano por uma
   palavra de ativação. O “Jarvis” funciona com o app aberto e o microfone ativo; para chamar com o app
@@ -39,13 +53,8 @@
 
 ## Próximas fases
 
-### Fase 2 — Produtividade
-- Google Calendar via OAuth (escopos mínimos: `calendar.events`), tokens criptografados no backend.
-  Ferramentas: consultar agenda, detectar conflitos, criar/reagendar (`confirm`), cancelar (`confirm`),
-  “organize minha agenda de amanhã” → somente proposta.
-- Gmail via OAuth (`gmail.readonly` + `gmail.send` só quando ativado): resumir, priorizar, rascunhar,
-  enviar com confirmação. Conteúdo de e-mails passa pelo envelope anti-injeção.
-- Tarefas e lembretes; resumo diário; notificações push (Expo Push/APNs) com agendador no backend.
+### Fase 2 — Produtividade ✅ (implementada)
+Google Agenda, Gmail, tarefas e lembretes, resumo diário, notificações push e agendador. Detalhes no README.
 
 ### Fase 3 — Integração iOS
 - Módulo nativo Swift com **App Intents**: “Conversar com Jarvis”, “Resumo do dia”, “Registrar tarefa”,

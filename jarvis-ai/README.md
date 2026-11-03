@@ -3,9 +3,10 @@
 Assistente pessoal em português, com voz, memória persistente e ações autorizadas.
 App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQL com RLS) + Claude (Anthropic).
 
-> **Status: Fase 1 (MVP) implementada e verificada aqui no ambiente de desenvolvimento.**
-> Ainda **não** foi instalada em um iPhone físico: isso exige a sua conta Apple Developer, um projeto
-> Supabase e a chave da IA (veja [Passo a passo](#passo-a-passo-para-rodar-no-iphone)).
+> **Status: Fases 1 (MVP) e 2 (Produtividade) implementadas e verificadas no ambiente de desenvolvimento.**
+> Ainda **não** foram instaladas em um iPhone físico nem testadas contra as APIs reais do Google: isso exige a
+> sua conta Apple Developer, Supabase, chave da IA e um projeto no Google Cloud
+> (veja [Passo a passo](#passo-a-passo-para-rodar-no-iphone) e [`docs/GOOGLE.md`](docs/GOOGLE.md)).
 
 ---
 
@@ -30,7 +31,13 @@ App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQ
 | Controle de custos | ✅ Implementado | Estimativa por requisição, painel de consumo, limite diário configurável |
 | Painel pessoal + espaços empresariais | ✅ Organizacional | Sir Alfred, Black Bear, Barton, Alfie & Fred, Educação: organizam memórias. **Sem dados de negócio conectados** |
 | Abrir por Atalhos / Siri / Botão de Ação | ✅ Via URL | Atalho “Abrir URL” `jarvis://?ouvir=1`. App Intents nativos: Fase 3 |
-| Google Agenda, Gmail, tarefas, resumo diário, push | ⏳ Fase 2 | O Jarvis diz claramente que ainda não está conectado |
+| **Google Agenda** (OAuth, escopo mínimo de eventos) | ✅ Fase 2 | Consultar, apontar conflitos, verificar disponibilidade; criar/reagendar/cancelar **só após confirmação** |
+| “Organize minha agenda de amanhã” | ✅ Fase 2 | Apenas **propõe** — nenhuma alteração sem pedido explícito |
+| **Gmail** | ✅ Fase 2 | Buscar, ler, resumir, prioritários, rascunhos; **enviar só após confirmação**; nunca apaga |
+| Tarefas e lembretes | ✅ Fase 2 | Por voz ou na tela Hoje; prazo, prioridade, espaço, lembrete com push |
+| Resumo diário | ✅ Fase 2 | Push no horário escolhido + “o que temos para hoje?” por voz |
+| Notificações push | ✅ Fase 2 | Lembretes de tarefas, resumo diário e aviso N min antes de reuniões, com o app fechado |
+| Agendador no backend | ✅ Fase 2 | Sem duplicar avisos (deduplicação no banco); alternativa por cron externo |
 | App Intents, Siri nativa, calendário/lembretes do iPhone | ⏳ Fase 3 | |
 | Conectores empresariais, relatórios, automações agendadas | ⏳ Fase 4 | |
 | Menor latência (streaming), memória semântica, rotinas | ⏳ Fase 5 | |
@@ -46,7 +53,7 @@ pela ferramenta, ele não diz que foi feita.
 jarvis-ai/
 ├── apps/
 │   ├── mobile/                 # App iOS (Expo SDK 58, Expo Router, TypeScript)
-│   │   ├── src/app/            # Telas: login, Jarvis, Painel, Histórico, Memória, Ajustes
+│   │   ├── src/app/            # Telas: login, Jarvis, Hoje, Histórico, Memória, Ajustes
 │   │   ├── src/voice/          # Voice Engine: reconhecimento + síntese
 │   │   ├── src/logic/          # Máquina de estados da voz, palavra de ativação (testadas)
 │   │   ├── src/components/     # Orbe holográfico, cartões, chat
@@ -59,6 +66,9 @@ jarvis-ai/
 │       ├── src/store/          # Memory Service sobre Supabase (RLS)
 │       ├── src/security/       # Anti prompt-injection, dados sensíveis
 │       ├── src/tts/            # Voz premium opcional (ElevenLabs)
+│       ├── src/google/         # OAuth (PKCE), Google Agenda, Gmail
+│       ├── src/push/           # Notificações push (Expo → APNs)
+│       ├── src/scheduler/      # Lembretes, resumo diário, avisos de reunião
 │       └── test/               # Testes unitários, de API e de integração (RLS)
 ├── packages/shared/            # Contratos (zod) usados pelo app e pelo servidor
 ├── supabase/migrations/        # Migração SQL com Row Level Security
@@ -66,7 +76,7 @@ jarvis-ai/
 └── Dockerfile.server           # Imagem do backend
 ```
 
-Detalhes: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) · Custos: [`docs/CUSTOS.md`](docs/CUSTOS.md) ·
+Detalhes: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) · Google: [`docs/GOOGLE.md`](docs/GOOGLE.md) · Custos: [`docs/CUSTOS.md`](docs/CUSTOS.md) ·
 Limitações e próximas fases: [`docs/LIMITACOES-E-ROADMAP.md`](docs/LIMITACOES-E-ROADMAP.md)
 
 ---
@@ -86,11 +96,13 @@ ou nos painéis dos serviços.
 | 4 | **Apple Developer Program** | developer.apple.com/programs | US$ 99/ano — necessário para instalar no iPhone via EAS/TestFlight |
 | 5 | (Opcional) ElevenLabs: API key + ID de uma voz masculina pt-BR | elevenlabs.io | Plano pago conforme uso |
 | 6 | Um lugar para hospedar o backend (ou seu computador na mesma rede Wi-Fi para testes) | Render, Railway, Fly.io… | Gratuito a ~US$ 7/mês |
+| 7 | (Fase 2) Supabase **service_role** + chave de criptografia + **cliente OAuth iOS do Google** | Ver [`docs/GOOGLE.md`](docs/GOOGLE.md) | Gratuito |
 
 ### 1. Banco de dados (Supabase)
 
 1. Crie um projeto (recomendo um projeto **separado** do Sir Alfred Team Hub).
-2. Abra **SQL Editor**, cole o conteúdo de `supabase/migrations/20261103000000_jarvis_phase1.sql` e execute.
+2. Abra **SQL Editor** e execute, nesta ordem, `supabase/migrations/20261103000000_jarvis_phase1.sql` e
+   `supabase/migrations/20261104000000_jarvis_phase2.sql`.
    (Ou, com a Supabase CLI: `supabase link` e `supabase db push` dentro de `jarvis-ai/`.)
 3. Em **Authentication → Providers → Email**, mantenha e-mail/senha ativado. Para uso pessoal,
    você pode desativar “Confirm email” ou confirmar pelo link enviado.
@@ -117,6 +129,11 @@ docker run -p 8787:8787 --env-file apps/server/.env jarvis-server
 
 Em Render/Railway/Fly.io: aponte para `jarvis-ai/Dockerfile.server`, configure as mesmas variáveis do `.env`
 no painel do serviço e use a URL **HTTPS** gerada no app.
+
+**Lembretes, resumo diário e avisos de reunião** dependem do agendador do backend, que precisa estar
+**sempre ligado** (planos gratuitos que "dormem" não servem). Alternativa: defina `CRON_SECRET` e configure um
+cron gratuito (ex.: cron-job.org) para chamar a cada minuto:
+`POST https://SEU-BACKEND/internal/cron/tick` com o cabeçalho `x-cron-secret: <CRON_SECRET>`.
 
 ### 3. App (development build)
 
@@ -162,6 +179,8 @@ Depois, no App Store Connect, adicione-se como testador interno e instale pelo a
 4. Depois: “Qual foi nossa última decisão sobre a Black Bear?”
 5. Em **Ajustes**: defina como ele deve chamar você, escolha a voz (baixe uma voz pt-BR “Aprimorada” no iPhone
    para soar mais natural), ative o Face ID e ajuste o limite diário de custo.
+6. Fase 2: em **Ajustes → Integrações**, conecte o Google; em **Notificações**, ative o push e escolha o horário
+   do resumo diário. Para push, o projeto precisa estar vinculado ao EAS (`npx eas-cli@latest init`).
 
 ### 6. Atalho de voz, Siri e Botão de Ação
 
@@ -177,9 +196,9 @@ No app **Atalhos** → novo atalho → ação **Abrir URL** → `jarvis://?ouvir
 ```bash
 cd jarvis-ai
 npm run typecheck          # shared + server + mobile
-npm test                   # 62 testes: orquestrador, ferramentas, API HTTP, segurança, voz, palavra de ativação
+npm test                   # 101 testes: orquestrador, ferramentas, Google (simulado), agendador, API HTTP, segurança, voz
 npm run db:test:up         # sobe um PostgreSQL local descartável
-npm run test:integration   # aplica a migração real e testa o RLS (7 testes)
+npm run test:integration   # aplica as migrações reais e testa o RLS (12 testes)
 npm run db:test:down
 npm run verify:mobile      # typecheck + bundle iOS (Metro/Hermes)
 ```
@@ -200,3 +219,5 @@ O workflow `.github/workflows/jarvis-ai.yml` roda tudo isso no GitHub Actions a 
 - Limite de requisições por minuto, limite diário de custo, logs estruturados sem tokens nem conteúdo das conversas.
 - Dados sensíveis (senhas, cartões, CPF, chaves) são recusados na memória.
 - O Jarvis não executa operações financeiras.
+- Tokens do Google: cifrados (AES-256-GCM) no backend, numa coluna que o usuário logado não lê; OAuth com PKCE
+  e escopos mínimos; revogação pelo app. O agendador usa a service_role **somente no backend**, filtrando por usuário.

@@ -14,6 +14,14 @@ import {
   PendingActionSchema,
   ProfileSchema,
   UsageSummarySchema,
+  IntegrationStatusSchema,
+  NotificationSchema,
+  OAuthStartResponseSchema,
+  TaskSchema,
+  TodaySchema,
+  type GoogleService,
+  type TaskCreate,
+  type TaskUpdate,
   type ChatRequest,
   type MemoryCreate,
   type MemoryUpdate,
@@ -112,6 +120,26 @@ export const api = {
 
   audit: () => json(zod.object({ entries: zod.array(AuditEntrySchema) }), "/v1/audit"),
   usage: () => json(UsageSummarySchema, "/v1/usage"),
+
+  // ---- Fase 2 ----
+  integrations: () => json(zod.object({ integrations: zod.array(IntegrationStatusSchema) }), "/v1/integrations"),
+  googleStart: (services: GoogleService[]) => json(OAuthStartResponseSchema, "/v1/integrations/google/start", { method: "POST", body: body({ services }) }),
+  googleComplete: (code: string, state: string) =>
+    json(zod.object({ connected: zod.boolean(), accountEmail: zod.string().nullable(), services: zod.array(zod.string()) }), "/v1/integrations/google/complete", {
+      method: "POST",
+      body: body({ code, state }),
+    }),
+  googleDisconnect: () => raw("/v1/integrations/google", { method: "DELETE" }).then(() => undefined),
+
+  today: () => json(TodaySchema, "/v1/today", { timeoutMs: 30_000 }),
+  tasks: (status: "aberta" | "concluida" | "todas" = "aberta") => json(zod.object({ tasks: zod.array(TaskSchema) }), `/v1/tasks?status=${status}`),
+  createTask: (t: TaskCreate) => json(zod.object({ task: TaskSchema }), "/v1/tasks", { method: "POST", body: body(t) }),
+  updateTask: (id: string, patch: TaskUpdate) => json(zod.object({ task: TaskSchema }), `/v1/tasks/${id}`, { method: "PATCH", body: body(patch) }),
+  deleteTask: (id: string) => raw(`/v1/tasks/${id}`, { method: "DELETE" }).then(() => undefined),
+
+  notifications: () => json(zod.object({ notifications: zod.array(NotificationSchema) }), "/v1/notifications"),
+  markNotificationRead: (id: string) => raw(`/v1/notifications/${id}/read`, { method: "POST" }).then(() => undefined),
+  registerPushToken: (token: string, deviceName?: string) => raw("/v1/push-tokens", { method: "POST", body: body({ token, deviceName }) }).then(() => undefined),
 
   /** Áudio MP3 da voz premium (ElevenLabs), quando configurada no backend. */
   tts: async (text: string): Promise<ArrayBuffer> => (await raw("/v1/tts", { method: "POST", body: body({ text }), headers: { accept: "audio/mpeg" } })).arrayBuffer(),

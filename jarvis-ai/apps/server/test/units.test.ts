@@ -76,12 +76,23 @@ describe("custos", () => {
 describe("registro de ferramentas", () => {
   it("gera JSON Schema determinístico sem $schema", () => {
     const specs = createDefaultRegistry().specs();
-    expect(specs.map((s) => s.name)).toEqual(["apagar_memoria", "buscar_memoria", "corrigir_memoria", "obter_data_hora", "salvar_memoria"]);
+    const names = specs.map((s) => s.name);
+    expect(names).toEqual([...names].sort());
+    expect(names).toEqual(expect.arrayContaining(["apagar_memoria", "buscar_memoria", "agenda_criar_evento", "email_enviar", "tarefa_criar", "resumo_do_dia"]));
+    for (const s of specs) expect(s.description.length, s.name).toBeGreaterThan(20);
     const save = specs.find((s) => s.name === "salvar_memoria")!;
     expect(save.inputSchema.type).toBe("object");
     expect(save.inputSchema).not.toHaveProperty("$schema");
     expect((save.inputSchema.required as string[]).sort()).toEqual(["category", "content"]);
   });
+  it("toda ação que envia, exclui ou altera terceiros exige confirmação", () => {
+    const reg = createDefaultRegistry();
+    for (const name of ["apagar_memoria", "agenda_criar_evento", "agenda_reagendar_evento", "agenda_cancelar_evento", "email_enviar", "tarefa_apagar"]) {
+      expect(reg.get(name)?.risk, name).toBe("confirm");
+    }
+    expect(reg.list().filter((t) => t.name.includes("email")).every((t) => t.name === "email_enviar" ? t.risk === "confirm" : t.risk !== "confirm")).toBe(true);
+  });
+
   it("exige describe() em ferramentas de confirmação", () => {
     expect(() =>
       new ToolRegistry().register({ name: "x", label: "x", description: "", input: z.object({}), risk: "confirm", execute: async () => ({ content: "", summary: "" }) }),

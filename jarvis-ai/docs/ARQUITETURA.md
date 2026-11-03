@@ -20,9 +20,9 @@
 | AI Orchestrator | `apps/server/src/agent/orchestrator.ts` | ✅ |
 | Tool Registry | `apps/server/src/tools/registry.ts` | ✅ |
 | Memory Service | `apps/server/src/store/` + tabela `jarvis_memories` | ✅ |
-| Integrations Service | Interface de ferramentas pronta; conectores reais na Fase 2/4 | ⏳ |
-| Automation Engine | Fase 4 (agendador no backend + push) | ⏳ |
-| Notifications Service | Fase 2 | ⏳ |
+| Integrations Service | `apps/server/src/google/` (OAuth PKCE, Calendar, Gmail) | ✅ Fase 2 |
+| Automation Engine | `apps/server/src/scheduler/` (lembretes, resumo diário, reuniões) | ✅ Fase 2 (automações personalizadas: Fase 4) |
+| Notifications Service | `apps/server/src/push/expo.ts` + `apps/mobile/src/lib/push.ts` | ✅ Fase 2 |
 | Authentication | Supabase Auth + `apps/server/src/auth.ts` + Face ID no app | ✅ |
 | Business Dashboard | `apps/mobile/src/app/(tabs)/dashboard.tsx` (organizacional) | ✅ parcial |
 | Settings | `apps/mobile/src/app/(tabs)/settings.tsx` + `PATCH /v1/settings` | ✅ |
@@ -74,12 +74,40 @@ export const createEventTool = defineTool({
 | POST | `/v1/actions/:id/confirm` · `/reject` | Confirma (executa) ou cancela |
 | GET | `/v1/audit` · `/v1/usage` | Auditoria e consumo |
 | POST | `/v1/tts` | Áudio MP3 da voz premium (se configurada) |
+| GET | `/v1/integrations` | Status das integrações (sem segredos) |
+| POST | `/v1/integrations/google/start` · `/complete` | Inicia (URL com PKCE) e conclui a conexão com o Google |
+| DELETE | `/v1/integrations/google` | Desconecta e revoga no Google |
+| GET/POST · PATCH/DELETE | `/v1/tasks` · `/v1/tasks/:id` | Tarefas e lembretes |
+| GET | `/v1/today` | Agenda do dia + tarefas + e-mails importantes |
+| GET · POST | `/v1/notifications` · `/v1/notifications/:id/read` | Caixa de notificações |
+| POST/DELETE | `/v1/push-tokens` | Registra/remove o iPhone para push |
+| POST | `/internal/cron/tick` | Executa o agendador (cron externo; exige `x-cron-secret`) |
+
+## Fase 2 — fluxo do Google (app nativo)
+
+```
+App ──POST /integrations/google/start──▶ Backend: gera PKCE + state cifrado (usuário, serviços, validade 10 min)
+App ◀── authUrl ──────────────────────── 
+App ──ASWebAuthenticationSession──▶ Google (login + consentimento)
+App ◀── com.googleusercontent.apps.XXX:/oauth2redirect?code&state
+App ──POST /integrations/google/complete {code,state}──▶ Backend: valida state, troca código (PKCE),
+                                                        cifra o refresh token, grava via service_role
+```
+
+## Fase 2 — agendador
+
+A cada minuto (ou a cada chamada do cron externo): reivindica lembretes vencidos de forma atômica
+(`UPDATE ... WHERE reminded_at IS NULL`), envia o resumo diário no horário de cada usuário (uma vez por dia,
+`last_summary_date`) e avisa reuniões que começam em N minutos. Toda notificação tem uma `dedupe_key` única
+por usuário, então reexecuções ou várias instâncias não duplicam avisos.
 
 ## Banco de dados
 
 Tabelas (todas com RLS `user_id = auth.uid()`): `jarvis_profiles`, `jarvis_conversations`, `jarvis_messages`,
 `jarvis_memories`, `jarvis_pending_actions`, `jarvis_action_log` (somente inserir/ler), `jarvis_usage`
-(somente inserir/ler). O papel `anon` não tem acesso.
+(somente inserir/ler); Fase 2: `jarvis_tasks`, `jarvis_push_tokens`, `jarvis_notifications` (usuário só lê e
+marca como lida), `jarvis_integrations` (usuário só lê colunas de status — **não** a do token cifrado; escrita só
+pelo backend). O papel `anon` não tem acesso.
 
 ## Modelo de IA
 

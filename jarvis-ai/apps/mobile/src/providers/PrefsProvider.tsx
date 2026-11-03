@@ -14,6 +14,8 @@ export interface Prefs {
   speechRate: number;
   /** Exigir Face ID ao abrir o app. */
   biometricLock: boolean;
+  /** Notificações push ativadas neste aparelho. */
+  pushEnabled: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -23,6 +25,7 @@ export const DEFAULT_PREFS: Prefs = {
   voiceIdentifier: null,
   speechRate: 1.0,
   biometricLock: false,
+  pushEnabled: false,
 };
 
 const KEY = "jarvis.prefs.v1";

@@ -14,6 +14,8 @@ import type { AIProvider, ModelPart, ModelTurn } from "../ai/types";
 import { estimateCostUsd } from "../ai/pricing";
 import type { ToolRegistry, ToolContext } from "../tools/registry";
 import type { PendingActionRecord, UserStore } from "../store/types";
+import type { GoogleUser } from "../google/gateway";
+import { IntegrationError } from "../google/errors";
 import { buildContext, SYSTEM_PROMPT } from "./prompt";
 import { toSpeech } from "./speech";
 import { isValidTimezone, startOfDayInTimezone } from "./time";
@@ -24,6 +26,8 @@ export interface OrchestratorDeps {
   maxToolIterations: number;
   historyMessages: number;
   clock?: () => Date;
+  /** Integração Google por usuário (null quando o servidor não tem OAuth configurado). */
+  googleFor?: (userId: string) => GoogleUser | null;
   log?: { info: (obj: object, msg?: string) => void; warn: (obj: object, msg?: string) => void };
 }
 
@@ -80,8 +84,14 @@ export class Orchestrator {
 
     const now = this.now();
     const relevant = profile.memoryEnabled ? await store.listMemories({ query: input.message, limit: 5 }) : [];
-    const context = buildContext(profile, now, relevant);
-    const toolCtx: ToolContext = { store, profile, conversationId: conversation.id, now };
+    const google = this.deps.googleFor?.(store.userId) ?? null;
+    const integrations = {
+      configured: google !== null,
+      calendar: google ? await google.connected("calendar") : false,
+      gmail: google ? await google.connected("gmail") : false,
+    };
+    const context = buildContext(profile, now, relevant, integrations);
+    const toolCtx: ToolContext = { store, profile, conversationId: conversation.id, now, google };
 
     const turns: ModelTurn[] = historyToTurns(history);
     turns.push({ role: "user", parts: [{ type: "text", text: input.message }] });
@@ -182,7 +192,17 @@ export class Orchestrator {
     }
 
     if (tool.risk === "confirm") {
-      const summary = await tool.describe!(parsed.data, ctx);
+      let summary: string;
+      try {
+        // describe() também valida pré-condições (ex.: integração conectada, item existe).
+        summary = await tool.describe!(parsed.data, ctx);
+      } catch (err) {
+        const message = err instanceof IntegrationError ? err.message : `Não foi possível preparar a ação: ${err instanceof Error ? err.message : String(err)}`;
+        return {
+          part: { type: "tool_result", callId: call.id, content: `NÃO EXECUTADO: ${message}`, isError: true },
+          event: { tool: tool.name, label: tool.label, status: "failed", summary: message },
+        };
+      }
       const pending = await ctx.store.createPendingAction({ conversationId: ctx.conversationId, tool: tool.name, input: parsed.data, summary });
       await ctx.store.logAction({ tool: tool.name, status: "pending", summary, input: parsed.data });
       return {
@@ -228,7 +248,13 @@ export class Orchestrator {
 
     const profile = await store.getProfile();
     try {
-      const outcome = await tool.execute(parsed.data, { store, profile, conversationId: pending.conversationId, now: this.now() });
+      const outcome = await tool.execute(parsed.data, {
+        store,
+        profile,
+        conversationId: pending.conversationId,
+        now: this.now(),
+        google: this.deps.googleFor?.(store.userId) ?? null,
+      });
       const status = outcome.isError ? "failed" : "confirmed";
       const action = await store.resolvePendingAction(id, status, { summary: outcome.summary });
       await store.logAction({ tool: tool.name, status, summary: outcome.summary, input: parsed.data });

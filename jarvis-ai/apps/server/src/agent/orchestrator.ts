@@ -8,7 +8,7 @@
  * 4. Registra auditoria e consumo; aplica o limite diário de custo.
  * 5. Nunca declara sucesso sem resultado positivo da ferramenta.
  */
-import type { ChatMessage, ChatResponse, Profile, ToolEvent } from "@jarvis/shared";
+import type { ChatMessage, ChatResponse, DeviceContext, Profile, ToolEvent } from "@jarvis/shared";
 import { AppError } from "../errors";
 import type { AIProvider, ModelPart, ModelTurn } from "../ai/types";
 import { estimateCostUsd } from "../ai/pricing";
@@ -36,6 +36,8 @@ export interface TurnInput {
   conversationId?: string;
   inputMode: "voice" | "text";
   timezone?: string;
+  /** Lido no iPhone com permissão do usuário (calendário, lembretes, localização). */
+  deviceContext?: DeviceContext;
 }
 
 const REFUSAL_REPLY = "Desculpe, não posso ajudar com esse pedido.";
@@ -90,7 +92,7 @@ export class Orchestrator {
       calendar: google ? await google.connected("calendar") : false,
       gmail: google ? await google.connected("gmail") : false,
     };
-    const context = buildContext(profile, now, relevant, integrations);
+    const context = buildContext(profile, now, relevant, integrations, input.deviceContext);
     const toolCtx: ToolContext = { store, profile, conversationId: conversation.id, now, google };
 
     const turns: ModelTurn[] = historyToTurns(history);
@@ -203,7 +205,15 @@ export class Orchestrator {
           event: { tool: tool.name, label: tool.label, status: "failed", summary: message },
         };
       }
-      const pending = await ctx.store.createPendingAction({ conversationId: ctx.conversationId, tool: tool.name, input: parsed.data, summary });
+      const device = tool.deviceAction?.(parsed.data, ctx);
+      const pending = await ctx.store.createPendingAction({
+        conversationId: ctx.conversationId,
+        tool: tool.name,
+        // Ações no iPhone guardam a ação já validada que o app vai executar.
+        input: device ?? parsed.data,
+        summary,
+        executor: device ? "device" : "server",
+      });
       await ctx.store.logAction({ tool: tool.name, status: "pending", summary, input: parsed.data });
       return {
         part: {
@@ -213,7 +223,7 @@ export class Orchestrator {
             `AÇÃO NÃO EXECUTADA — aguardando confirmação explícita do usuário no aplicativo (pedido ${pending.id}). ` +
             `Diga ao usuário exatamente o que será feito ("${summary}") e que ele pode confirmar ou cancelar no cartão exibido.`,
         },
-        event: { tool: tool.name, label: tool.label, status: "pending", summary, pendingActionId: pending.id },
+        event: { tool: tool.name, label: tool.label, status: "pending", summary, pendingActionId: pending.id, ...(device ? { device } : {}) },
       };
     }
 
@@ -241,6 +251,9 @@ export class Orchestrator {
   /** Executa uma ação pendente após confirmação explícita do usuário. */
   async confirmAction(store: UserStore, id: string): Promise<{ action: PendingActionRecord; message: string }> {
     const pending = await this.loadPending(store, id);
+    if (pending.executor === "device") {
+      throw new AppError("executar_no_aparelho", 409, "Esta ação é executada no iPhone. Confirme pelo app no aparelho.");
+    }
     const tool = this.deps.registry.get(pending.tool);
     if (!tool) throw new AppError("ferramenta_indisponivel", 409, "Esta ação não está mais disponível.");
     const parsed = tool.input.safeParse(pending.input);
@@ -274,6 +287,25 @@ export class Orchestrator {
       await store.logAction({ tool: tool.name, status: "failed", summary: `Erro: ${message.slice(0, 200)}` });
       return { action, message: "A ação falhou e não foi concluída." };
     }
+  }
+
+  /** Resultado de uma ação executada no iPhone, reportado pelo app após executá-la. */
+  async reportDeviceAction(store: UserStore, id: string, report: { success: boolean; summary: string }) {
+    const pending = await this.loadPending(store, id);
+    if (pending.executor !== "device") throw new AppError("acao_do_servidor", 409, "Esta ação é executada pelo servidor.");
+    const status = report.success ? "confirmed" : "failed";
+    const action = await store.resolvePendingAction(id, status, { summary: report.summary, reportedBy: "device" });
+    await store.logAction({ tool: pending.tool, status, summary: report.summary });
+    const message = report.success ? `Feito no iPhone: ${report.summary}.` : `Não foi possível concluir no iPhone: ${report.summary}.`;
+    if (pending.conversationId) {
+      await store.addMessage({
+        conversationId: pending.conversationId,
+        role: "assistant",
+        content: message,
+        toolEvents: [{ tool: pending.tool, label: "iPhone", status: report.success ? "executed" : "failed", summary: report.summary }],
+      });
+    }
+    return { action, message };
   }
 
   async rejectAction(store: UserStore, id: string): Promise<{ action: PendingActionRecord; message: string }> {

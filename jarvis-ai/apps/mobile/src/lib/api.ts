@@ -19,6 +19,8 @@ import {
   OAuthStartResponseSchema,
   TaskSchema,
   TodaySchema,
+  DeviceTokenSchema,
+  DeviceTokenCreatedSchema,
   type GoogleService,
   type TaskCreate,
   type TaskUpdate,
@@ -140,6 +142,13 @@ export const api = {
   notifications: () => json(zod.object({ notifications: zod.array(NotificationSchema) }), "/v1/notifications"),
   markNotificationRead: (id: string) => raw(`/v1/notifications/${id}/read`, { method: "POST" }).then(() => undefined),
   registerPushToken: (token: string, deviceName?: string) => raw("/v1/push-tokens", { method: "POST", body: body({ token, deviceName }) }).then(() => undefined),
+
+  // ---- Fase 3 ----
+  reportDeviceAction: (id: string, success: boolean, summary: string) =>
+    json(ActionResolutionSchema, `/v1/actions/${id}/report`, { method: "POST", body: body({ success, summary: summary.slice(0, 300) }) }),
+  createDeviceToken: (name: string) => json(DeviceTokenCreatedSchema, "/v1/device-tokens", { method: "POST", body: body({ name }) }),
+  deviceTokens: () => json(zod.object({ tokens: zod.array(DeviceTokenSchema) }), "/v1/device-tokens"),
+  revokeDeviceToken: (id: string) => raw(`/v1/device-tokens/${id}`, { method: "DELETE" }).then(() => undefined),
 
   /** Áudio MP3 da voz premium (ElevenLabs), quando configurada no backend. */
   tts: async (text: string): Promise<ArrayBuffer> => (await raw("/v1/tts", { method: "POST", body: body({ text }), headers: { accept: "audio/mpeg" } })).arrayBuffer(),

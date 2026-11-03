@@ -16,6 +16,10 @@ export interface Prefs {
   biometricLock: boolean;
   /** Notificações push ativadas neste aparelho. */
   pushEnabled: boolean;
+  /** Compartilhar Calendário/Lembretes do iPhone com o Jarvis (leitura). */
+  deviceCalendar: boolean;
+  /** Compartilhar localização aproximada (cidade) com o app aberto. */
+  deviceLocation: boolean;
 }
 
 export const DEFAULT_PREFS: Prefs = {
@@ -26,6 +30,8 @@ export const DEFAULT_PREFS: Prefs = {
   speechRate: 1.0,
   biometricLock: false,
   pushEnabled: false,
+  deviceCalendar: false,
+  deviceLocation: false,
 };
 
 const KEY = "jarvis.prefs.v1";

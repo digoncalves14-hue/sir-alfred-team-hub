@@ -2,26 +2,42 @@
 
 ## O que foi verificado e o que não foi
 
-**Verificado neste ambiente (Linux, sem iPhone) — Fases 1 e 2:**
+**Verificado neste ambiente (Linux, sem iPhone) — Fases 1, 2 e 3:**
 - Verificação de tipos de todo o projeto (shared, server, mobile).
-- 101 testes automatizados: orquestrador (ferramentas, confirmação, expiração, limites, recusa), API HTTP
+- 115 testes automatizados (inclui Fase 3: chaves de aparelho, endpoints da Siri, ações executadas no iPhone,
+  contexto do aparelho, links de ligação/SMS/WhatsApp/e-mail): orquestrador (ferramentas, confirmação, expiração, limites, recusa), API HTTP
   (autenticação, isolamento entre usuários, memória, exportação, ações, integrações, tarefas, push, cron),
   segurança, voz e palavra de ativação; Fase 2 com simulação das APIs do Google e do Expo Push exercitando os
   clientes reais (OAuth/PKCE, criar/reagendar/cancelar evento, buscar/ler/rascunhar/enviar e-mail, agendador).
-- 12 testes de integração aplicando as migrações reais em PostgreSQL 16 e checando o RLS (inclusive que o
-  usuário não lê o token cifrado e que um lembrete só é reivindicado uma vez).
+- 14 testes de integração aplicando as migrações reais em PostgreSQL 16 e checando o RLS (inclusive que o
+  usuário não lê o token cifrado nem o hash das chaves de aparelho, e que um lembrete só é reivindicado uma vez).
+- Fase 3: `expo prebuild` gera o projeto com os App Intents no alvo principal (fase Sources), nome alternativo
+  "Jarvis", região pt-BR, iOS 17, permissões de Calendário/Lembretes/Contatos/Localização em português, e o
+  módulo nativo local é encontrado pelo autolinking. O plugin é idempotente (duas execuções, uma única referência).
 - Bundle iOS completo gerado pelo Metro/Hermes (`expo export --platform ios`).
 - Projeto nativo iOS gerado (`expo prebuild`) com as permissões de microfone, fala e Face ID, o esquema
   `jarvis://`, o esquema de retorno do Google, o direito de push (`aps-environment`) e **sem** modos de segundo plano.
 - Backend iniciado e respondendo (`/health`, rejeição sem login), inclusive com instalação de produção.
 
 **Ainda não verificado (exige seus recursos):**
+- **Compilação do código Swift** (App Intents e módulo nativo): este ambiente é Linux e o framework AppIntents só
+  existe no Xcode/macOS. O código segue a API pública da Apple, mas a primeira compilação real acontece no EAS Build
+  (ou no seu Mac). Se algo falhar ali, o log do build aponta a linha e eu corrijo.
 - Execução no iPhone físico (reconhecimento de voz, Face ID, áudio, animações a 60/120 fps).
 - Chamadas reais ao Claude, ao Supabase, à ElevenLabs, ao Google e ao Expo Push (exigem suas chaves/contas).
   Os formatos de requisição seguem a documentação pública dessas APIs e foram testados contra simulações.
 - `expo-doctor`: 18 de 20 checagens passaram; as 2 restantes precisam de acesso à internet da Expo, bloqueado aqui.
 
 ## Limitações conhecidas
+
+### Fase 3
+- **Siri em segundo plano exige backend HTTPS** (decisão de segurança para a chave do aparelho).
+- **Frases da Siri** precisam conter o nome do app ("Jarvis"); o reconhecimento das frases em português deve ser
+  confirmado no aparelho. Se a Siri não reconhecer alguma, o atalho continua disponível no app Atalhos.
+- **Intents em segundo plano** respondem com Google Agenda, tarefas e memória do Jarvis; eventos só do Calendário do
+  iPhone aparecem quando você pergunta com o app aberto.
+- **Folha de Compartilhamento:** via um atalho do usuário (não há Share Extension dedicada).
+- **Calendário do iPhone:** eventos são criados no calendário padrão; edição/cancelamento de eventos nativos ficam para depois.
 
 ### Fase 2
 - **Google em modo "Em teste" expira em 7 dias** — publique a tela de consentimento como "Em produção" (uso
@@ -56,11 +72,9 @@
 ### Fase 2 — Produtividade ✅ (implementada)
 Google Agenda, Gmail, tarefas e lembretes, resumo diário, notificações push e agendador. Detalhes no README.
 
-### Fase 3 — Integração iOS
-- Módulo nativo Swift com **App Intents**: “Conversar com Jarvis”, “Resumo do dia”, “Registrar tarefa”,
-  “Consultar agenda” — aparecem no app Atalhos, na Siri e no Botão de Ação sem configuração manual.
-- EventKit (calendário e lembretes do iPhone), Contatos, compartilhamento para o Jarvis (Share Extension),
-  localização sob permissão.
+### Fase 3 — Integração iOS ✅ (implementada)
+App Intents (Siri, Atalhos, Spotlight, Botão de Ação), respostas da Siri em segundo plano, Calendário/Lembretes,
+Contatos, localização, ligações/mensagens/WhatsApp por links oficiais. Detalhes em `docs/IOS.md`.
 
 ### Fase 4 — Negócios
 - Conectores autenticados por espaço (ex.: e-commerce da Black Bear, API autorizada do Barton), relatórios e

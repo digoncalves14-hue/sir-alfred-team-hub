@@ -3,7 +3,7 @@
  * então toda consulta passa pelas políticas de Row Level Security.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { AppNotification, AuditEntry, ChatMessage, Conversation, GoogleService, Memory, Profile, Task, TaskUpdate, ToolEvent } from "@jarvis/shared";
+import type { AppNotification, AuditEntry, ChatMessage, Conversation, DeviceToken, GoogleService, Memory, Profile, Task, TaskUpdate, ToolEvent } from "@jarvis/shared";
 import { AppError } from "../errors";
 import { rankByQuery } from "./search";
 import type { IntegrationInfo, PendingActionRecord, TaskInput, TaskQuery, UsageRecord, UserStore } from "./types";
@@ -32,6 +32,9 @@ const toProfile = (r: Row): Profile => ({
   dailySummaryTime: r.daily_summary_time ? String(r.daily_summary_time) : "08:00",
   meetingReminderMinutes: r.meeting_reminder_minutes === undefined ? 10 : Number(r.meeting_reminder_minutes),
 });
+
+export const toProfileRow = (r: Row): Profile => toProfile(r);
+export const toMemoryRow = (r: Row): Memory => toMemory(r);
 
 export const TASK_COLUMNS = "id, title, notes, space, priority, due_date, remind_at, status, completed_at, created_at";
 export const toTask = (r: Row): Task => ({
@@ -77,6 +80,7 @@ const toPending = (r: Row): PendingActionRecord => ({
   expiresAt: String(r.expires_at),
   conversationId: (r.conversation_id as string | null) ?? null,
   input: r.input,
+  executor: r.executor === "device" ? "device" : "server",
 });
 
 const MEMORY_COLUMNS = "id, category, space, content, source, created_at, updated_at";
@@ -200,7 +204,14 @@ export class SupabaseUserStore implements UserStore {
     const r = check(
       await this.sb
         .from("jarvis_pending_actions")
-        .insert({ user_id: this.userId, conversation_id: input.conversationId, tool_name: input.tool, input: input.input, summary: input.summary })
+        .insert({
+          user_id: this.userId,
+          conversation_id: input.conversationId,
+          tool_name: input.tool,
+          input: input.input,
+          summary: input.summary,
+          executor: input.executor ?? "server",
+        })
         .select("*")
         .single(),
       "ação pendente",
@@ -389,5 +400,27 @@ export class SupabaseUserStore implements UserStore {
       lastError: (row.last_error as string | null) ?? null,
       connectedAt: String(row.connected_at),
     };
+  }
+
+  // ---- Fase 3 ----
+  async listDeviceTokens(): Promise<DeviceToken[]> {
+    const rows = check(
+      await this.sb.from("jarvis_device_tokens").select("id, name, created_at, last_used_at, revoked_at").order("created_at", { ascending: false }).limit(50),
+      "aparelhos",
+    );
+    return ((rows ?? []) as Row[]).map((r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      createdAt: String(r.created_at),
+      lastUsedAt: (r.last_used_at as string | null) ?? null,
+      revokedAt: (r.revoked_at as string | null) ?? null,
+    }));
+  }
+  async revokeDeviceToken(id: string) {
+    const rows = check(
+      await this.sb.from("jarvis_device_tokens").update({ revoked_at: new Date().toISOString() }).eq("id", id).is("revoked_at", null).select("id"),
+      "aparelho",
+    );
+    return (rows ?? []).length > 0;
   }
 }

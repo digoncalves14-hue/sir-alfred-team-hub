@@ -113,6 +113,36 @@ export type ProfileUpdate = z.infer<typeof ProfileUpdateSchema>;
 // ---------------------------------------------------------------------------
 // Conversa
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Fase 3 — ações executadas no próprio iPhone (após confirmação)
+// ---------------------------------------------------------------------------
+const LOCAL_DT = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+export const COMMUNICATION_CHANNELS = ["ligacao", "sms", "whatsapp", "email", "mapa", "link"] as const;
+
+export const DeviceActionSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("lembrete_iphone"),
+    input: z.object({ titulo: z.string().min(1).max(300), dataHora: LOCAL_DT.optional(), notas: z.string().max(2000).optional() }),
+  }),
+  z.object({
+    kind: z.literal("evento_iphone"),
+    input: z.object({ titulo: z.string().min(1).max(200), inicio: LOCAL_DT, duracaoMin: z.number().int().min(5).max(1440), local: z.string().max(200).optional() }),
+  }),
+  z.object({
+    kind: z.literal("comunicacao"),
+    input: z.object({
+      canal: z.enum(COMMUNICATION_CHANNELS),
+      /** Nome a procurar nos contatos do iPhone (a busca acontece no aparelho). */
+      contato: z.string().max(100).optional(),
+      /** Número, e-mail, endereço ou URL explícitos. */
+      destino: z.string().max(500).optional(),
+      mensagem: z.string().max(2000).optional(),
+      assunto: z.string().max(200).optional(),
+    }),
+  }),
+]);
+export type DeviceAction = z.infer<typeof DeviceActionSchema>;
+
 /** Resultado de uma ferramenta, exibido como feedback visual no app. */
 export const ToolEventSchema = z.object({
   tool: z.string(),
@@ -121,6 +151,8 @@ export const ToolEventSchema = z.object({
   status: z.enum(["executed", "pending", "failed", "rejected"]),
   summary: z.string(),
   pendingActionId: z.string().uuid().optional(),
+  /** Presente quando a ação é executada no iPhone após a confirmação. */
+  device: DeviceActionSchema.optional(),
 });
 export type ToolEvent = z.infer<typeof ToolEventSchema>;
 
@@ -131,6 +163,8 @@ export const ChatRequestSchema = z.object({
   inputMode: z.enum(["voice", "text"]).default("text"),
   /** Fuso do aparelho (IANA), usado para interpretar datas relativas. */
   timezone: z.string().max(64).optional(),
+  /** Dados lidos no iPhone com permissão do usuário (somente leitura). */
+  deviceContext: z.lazy(() => DeviceContextSchema).optional(),
 });
 export type ChatRequest = z.input<typeof ChatRequestSchema>;
 
@@ -174,6 +208,8 @@ export const PendingActionSchema = z.object({
   status: z.enum(["pending", "confirmed", "rejected", "expired", "failed"]),
   createdAt: z.string(),
   expiresAt: z.string(),
+  executor: z.enum(["server", "device"]).default("server"),
+  device: DeviceActionSchema.optional(),
 });
 export type PendingAction = z.infer<typeof PendingActionSchema>;
 
@@ -321,3 +357,38 @@ export const PushTokenRequestSchema = z.object({
   token: z.string().regex(/^(ExponentPushToken|ExpoPushToken)\[[^\]]+\]$/, "Token Expo inválido"),
   deviceName: z.string().max(100).optional(),
 });
+
+// ---------------------------------------------------------------------------
+// Fase 3 — contexto do aparelho, tokens de aparelho e intents (Siri/Atalhos)
+// ---------------------------------------------------------------------------
+export const DeviceContextSchema = z.object({
+  calendar: z
+    .array(z.object({ title: z.string().max(200), start: z.string().max(40), end: z.string().max(40), allDay: z.boolean(), calendar: z.string().max(100).optional() }))
+    .max(40)
+    .optional(),
+  reminders: z.array(z.object({ title: z.string().max(300), due: z.string().max(40).nullable(), list: z.string().max(100).optional() })).max(40).optional(),
+  location: z
+    .object({ city: z.string().max(100).nullable(), region: z.string().max(100).nullable(), latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })
+    .optional(),
+});
+export type DeviceContext = z.infer<typeof DeviceContextSchema>;
+
+export const DeviceActionReportSchema = z.object({
+  success: z.boolean(),
+  summary: z.string().trim().min(1).max(300),
+});
+
+export const DeviceTokenSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+});
+export type DeviceToken = z.infer<typeof DeviceTokenSchema>;
+
+export const DeviceTokenCreatedSchema = z.object({ id: z.string().uuid(), token: z.string().startsWith("jdt_") });
+
+export const IntentSpeechSchema = z.object({ speech: z.string() });
+export const IntentTaskRequestSchema = z.object({ titulo: z.string().trim().min(1).max(300) });
+export const IntentMemoryRequestSchema = z.object({ texto: z.string().trim().min(2).max(2000) });

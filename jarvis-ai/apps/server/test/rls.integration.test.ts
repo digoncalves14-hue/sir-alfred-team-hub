@@ -230,4 +230,25 @@ describe.skipIf(!enabled)("RLS no PostgreSQL (migração real)", () => {
     const [r1, r2] = await Promise.all([claim(), claim()]);
     expect((r1.rowCount ?? 0) + (r2.rowCount ?? 0)).toBe(1);
   });
+
+  // ------------------------------- Fase 3 -------------------------------
+  it("tokens de aparelho: usuário vê e revoga os próprios, nunca o hash; criação só pelo backend", async () => {
+    const id = await asService(async (c) =>
+      (await c.query("insert into public.jarvis_device_tokens (user_id, token_hash, name) values ($1, 'hash-secreto', 'iPhone') returning id", [A])).rows[0].id,
+    );
+    expect((await as(A, (c) => c.query("select id, name, revoked_at from public.jarvis_device_tokens"))).rows).toHaveLength(1);
+    await expect(as(A, (c) => c.query("select token_hash from public.jarvis_device_tokens"))).rejects.toThrow(/permission denied/);
+    await expect(as(A, (c) => c.query("insert into public.jarvis_device_tokens (user_id, token_hash) values ($1, 'x')", [A]))).rejects.toThrow(/permission denied/);
+    expect((await as(B, (c) => c.query("select id from public.jarvis_device_tokens"))).rows).toHaveLength(0);
+    expect((await as(B, (c) => c.query("update public.jarvis_device_tokens set revoked_at = now() where id = $1", [id]))).rowCount).toBe(0);
+    expect((await as(A, (c) => c.query("update public.jarvis_device_tokens set revoked_at = now() where id = $1", [id]))).rowCount).toBe(1);
+    await expect(as(A, (c) => c.query("update public.jarvis_device_tokens set token_hash = 'outro' where id = $1", [id]))).rejects.toThrow(/permission denied/);
+  });
+
+  it("ações pendentes aceitam executor do aparelho e rejeitam valores inválidos", async () => {
+    await as(A, (c) => c.query("insert into public.jarvis_pending_actions (tool_name, input, summary, executor) values ('iphone_criar_lembrete', '{}', 's', 'device')"));
+    await expect(
+      as(A, (c) => c.query("insert into public.jarvis_pending_actions (tool_name, input, summary, executor) values ('x', '{}', 's', 'nuvem')")),
+    ).rejects.toThrow(/check constraint/);
+  });
 });

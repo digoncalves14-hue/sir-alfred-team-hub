@@ -82,6 +82,17 @@ export const createEventTool = defineTool({
 | GET · POST | `/v1/notifications` · `/v1/notifications/:id/read` | Caixa de notificações |
 | POST/DELETE | `/v1/push-tokens` | Registra/remove o iPhone para push |
 | POST | `/internal/cron/tick` | Executa o agendador (cron externo; exige `x-cron-secret`) |
+| POST/GET · DELETE | `/v1/device-tokens` · `/v1/device-tokens/:id` | Chave de aparelho para a Siri (criar/listar/revogar) |
+| POST | `/v1/actions/:id/report` | O iPhone informa o resultado real de uma ação executada nele |
+| GET | `/v1/intents/summary` · `/v1/intents/agenda?dia=` | Siri em segundo plano (auth `Device <chave>`) |
+| POST | `/v1/intents/tasks` · `/v1/intents/memory` | Registrar tarefa / salvar memória pela Siri |
+
+## Fase 3 — ações executadas no iPhone
+
+Ferramentas como `iphone_criar_lembrete`, `iphone_criar_evento` e `abrir_comunicacao` têm `deviceAction`: ao serem
+chamadas, viram ação pendente com `executor = device` e a ação validada (`DeviceActionSchema`). O app mostra o
+cartão; ao confirmar, executa localmente (EventKit, Contatos, links oficiais) e envia `POST /actions/:id/report`
+com o resultado real. O servidor recusa `confirm` para essas ações (409).
 
 ## Fase 2 — fluxo do Google (app nativo)
 

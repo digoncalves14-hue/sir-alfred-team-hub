@@ -3,7 +3,7 @@
  * Não é usada em produção (lá o armazenamento é o Supabase/PostgreSQL).
  */
 import { randomUUID } from "node:crypto";
-import type { AppNotification, AuditEntry, ChatMessage, Conversation, Memory, Profile, Task, TaskUpdate } from "@jarvis/shared";
+import type { AppNotification, AuditEntry, ChatMessage, Conversation, DeviceToken, Memory, MemoryCategory, Profile, Space, Task, TaskUpdate } from "@jarvis/shared";
 import { rankByQuery } from "./search";
 import type {
   IntegrationSecret,
@@ -28,6 +28,7 @@ interface Db {
   integrations: (IntegrationSecret & { userId: string; provider: "google" })[];
   pushTokens: { token: string; userId: string; deviceName?: string }[];
   lastSummary: Map<string, string>;
+  deviceTokens: (DeviceToken & { userId: string; tokenHash: string })[];
 }
 
 export function createMemoryDb(): Db {
@@ -44,6 +45,7 @@ export function createMemoryDb(): Db {
     integrations: [],
     pushTokens: [],
     lastSummary: new Map(),
+    deviceTokens: [],
   };
 }
 
@@ -167,6 +169,7 @@ export class MemoryUserStore implements UserStore {
       input: input.input,
       summary: input.summary,
       conversationId: input.conversationId,
+      executor: input.executor ?? ("server" as const),
       status: "pending" as const,
       createdAt: created.toISOString(),
       expiresAt: new Date(created.getTime() + 15 * 60_000).toISOString(),
@@ -271,6 +274,16 @@ export class MemoryUserStore implements UserStore {
     const n = this.db.notifications.find((x) => x.id === id && x.userId === this.userId);
     if (!n) return false;
     n.readAt = now();
+    return true;
+  }
+
+  async listDeviceTokens() {
+    return this.db.deviceTokens.filter((t) => t.userId === this.userId).map(({ userId: _u, tokenHash: _h, ...t }) => t);
+  }
+  async revokeDeviceToken(id: string) {
+    const t = this.db.deviceTokens.find((x) => x.id === id && x.userId === this.userId && !x.revokedAt);
+    if (!t) return false;
+    t.revokedAt = now();
     return true;
   }
 
@@ -388,6 +401,31 @@ export class MemorySystemStore implements SystemStore {
   async markNotificationDelivered(id: string) {
     const n = this.db.notifications.find((x) => x.id === id);
     if (n) n.delivered = true;
+  }
+
+  // ---- Fase 3 ----
+  async createDeviceToken(userId: string, tokenHash: string, name: string) {
+    const id = randomUUID();
+    this.db.deviceTokens.push({ id, userId, tokenHash, name, createdAt: now(), lastUsedAt: null, revokedAt: null });
+    return id;
+  }
+  async resolveDeviceToken(tokenHash: string) {
+    const t = this.db.deviceTokens.find((x) => x.tokenHash === tokenHash && !x.revokedAt);
+    if (!t) return null;
+    t.lastUsedAt = now();
+    return t.userId;
+  }
+  async getProfileFor(userId: string) {
+    return new MemoryUserStore(userId, this.db).getProfile();
+  }
+  async createTaskFor(userId: string, input: TaskInput) {
+    return new MemoryUserStore(userId, this.db).createTask(input);
+  }
+  async createMemoryFor(userId: string, input: { category: MemoryCategory; space: Space; content: string }) {
+    return new MemoryUserStore(userId, this.db).createMemory({ ...input, source: "user" });
+  }
+  async logActionFor(userId: string, entry: { tool: string; status: "executed" | "failed" | "blocked"; summary: string }) {
+    return new MemoryUserStore(userId, this.db).logAction(entry);
   }
 }
 

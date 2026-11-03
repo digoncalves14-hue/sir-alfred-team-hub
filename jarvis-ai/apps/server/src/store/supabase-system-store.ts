@@ -4,9 +4,9 @@
  * criptografado), registro de push e agendador. Toda consulta filtra por user_id.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { GoogleService } from "@jarvis/shared";
-import { check, TASK_COLUMNS, toTask } from "./supabase-store";
-import type { IntegrationSecret, SystemStore } from "./types";
+import type { GoogleService, MemoryCategory, Space } from "@jarvis/shared";
+import { check, TASK_COLUMNS, toMemoryRow, toProfileRow, toTask } from "./supabase-store";
+import type { IntegrationSecret, SystemStore, TaskInput } from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -183,5 +183,76 @@ export class SupabaseSystemStore implements SystemStore {
 
   async markNotificationDelivered(id: string) {
     check(await this.sb.from("jarvis_notifications").update({ delivered: true }).eq("id", id), "notificação");
+  }
+
+  // ---- Fase 3 ----
+  async createDeviceToken(userId: string, tokenHash: string, name: string) {
+    const r = check(
+      await this.sb.from("jarvis_device_tokens").insert({ user_id: userId, token_hash: tokenHash, name }).select("id").single(),
+      "token do aparelho",
+    ) as Row;
+    return String(r.id);
+  }
+
+  async resolveDeviceToken(tokenHash: string) {
+    const rows = check(
+      await this.sb
+        .from("jarvis_device_tokens")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("token_hash", tokenHash)
+        .is("revoked_at", null)
+        .select("user_id"),
+      "token do aparelho",
+    ) as Row[] | null;
+    return rows && rows.length > 0 ? String(rows[0]!.user_id) : null;
+  }
+
+  async getProfileFor(userId: string) {
+    const found = check(await this.sb.from("jarvis_profiles").select("*").eq("user_id", userId).maybeSingle(), "perfil") as Row | null;
+    if (found) return toProfileRow(found);
+    const created = check(
+      await this.sb.from("jarvis_profiles").upsert({ user_id: userId }, { onConflict: "user_id" }).select("*").single(),
+      "perfil",
+    ) as Row;
+    return toProfileRow(created);
+  }
+
+  async createTaskFor(userId: string, input: TaskInput) {
+    const r = check(
+      await this.sb
+        .from("jarvis_tasks")
+        .insert({
+          user_id: userId,
+          title: input.title,
+          notes: input.notes ?? null,
+          space: input.space,
+          priority: input.priority,
+          due_date: input.dueDate ?? null,
+          remind_at: input.remindAt ?? null,
+        })
+        .select(TASK_COLUMNS)
+        .single(),
+      "tarefa",
+    ) as Row;
+    return toTask(r);
+  }
+
+  async createMemoryFor(userId: string, input: { category: MemoryCategory; space: Space; content: string }) {
+    const r = check(
+      await this.sb
+        .from("jarvis_memories")
+        .insert({ user_id: userId, ...input, source: "user" })
+        .select("id, category, space, content, source, created_at, updated_at")
+        .single(),
+      "memória",
+    ) as Row;
+    return toMemoryRow(r);
+  }
+
+  async logActionFor(userId: string, entry: { tool: string; status: "executed" | "failed" | "blocked"; summary: string }) {
+    check(
+      await this.sb.from("jarvis_action_log").insert({ user_id: userId, tool_name: entry.tool, status: entry.status, summary: entry.summary.slice(0, 500) }),
+      "registro de ações",
+    );
   }
 }

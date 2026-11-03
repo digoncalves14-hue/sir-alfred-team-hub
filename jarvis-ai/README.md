@@ -3,7 +3,7 @@
 Assistente pessoal em português, com voz, memória persistente e ações autorizadas.
 App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQL com RLS) + Claude (Anthropic).
 
-> **Status: Fases 1 (MVP) e 2 (Produtividade) implementadas e verificadas no ambiente de desenvolvimento.**
+> **Status: Fases 1 (MVP), 2 (Produtividade) e 3 (Integração iOS) implementadas e verificadas no ambiente de desenvolvimento.**
 > Ainda **não** foram instaladas em um iPhone físico nem testadas contra as APIs reais do Google: isso exige a
 > sua conta Apple Developer, Supabase, chave da IA e um projeto no Google Cloud
 > (veja [Passo a passo](#passo-a-passo-para-rodar-no-iphone) e [`docs/GOOGLE.md`](docs/GOOGLE.md)).
@@ -30,7 +30,12 @@ App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQ
 | Registro de ações (auditoria) | ✅ Implementado | Imutável para o usuário (só inserir/ler) |
 | Controle de custos | ✅ Implementado | Estimativa por requisição, painel de consumo, limite diário configurável |
 | Painel pessoal + espaços empresariais | ✅ Organizacional | Sir Alfred, Black Bear, Barton, Alfie & Fred, Educação: organizam memórias. **Sem dados de negócio conectados** |
-| Abrir por Atalhos / Siri / Botão de Ação | ✅ Via URL | Atalho “Abrir URL” `jarvis://?ouvir=1`. App Intents nativos: Fase 3 |
+| **Siri, Atalhos, Spotlight e Botão de Ação** (App Intents) | ✅ Fase 3 | "Conversar com Jarvis", resumo do dia, agenda, registrar tarefa — sem configuração manual. Ver [`docs/IOS.md`](docs/IOS.md) |
+| Siri responde sem abrir o app | ✅ Fase 3 | Chave do aparelho de escopo restrito, no Keychain, revogável; exige backend HTTPS |
+| Calendário e Lembretes do iPhone | ✅ Fase 3 | Leitura como contexto (com permissão); criar evento/lembrete **após confirmação** |
+| Ligar, SMS, WhatsApp, e-mail, Mapas, links | ✅ Fase 3 | Abre o app de destino com o texto pronto (link oficial `wa.me`); contatos buscados no próprio iPhone |
+| Localização aproximada | ✅ Fase 3 | Cidade/região, só com o app aberto |
+| Compartilhar para o Jarvis | ✅ Fase 3 | Via atalho "Salvar na memória do Jarvis" na Folha de Compartilhamento |
 | **Google Agenda** (OAuth, escopo mínimo de eventos) | ✅ Fase 2 | Consultar, apontar conflitos, verificar disponibilidade; criar/reagendar/cancelar **só após confirmação** |
 | “Organize minha agenda de amanhã” | ✅ Fase 2 | Apenas **propõe** — nenhuma alteração sem pedido explícito |
 | **Gmail** | ✅ Fase 2 | Buscar, ler, resumir, prioritários, rascunhos; **enviar só após confirmação**; nunca apaga |
@@ -58,7 +63,10 @@ jarvis-ai/
 │   │   ├── src/logic/          # Máquina de estados da voz, palavra de ativação (testadas)
 │   │   ├── src/components/     # Orbe holográfico, cartões, chat
 │   │   ├── src/providers/      # Autenticação + Face ID, preferências
-│   │   └── src/lib/            # Cliente da API, Supabase, armazenamento seguro
+│   │   ├── src/lib/            # Cliente da API, Supabase, armazenamento seguro, recursos do iPhone
+│   │   ├── native/ios/         # App Intents (Swift) — Siri, Atalhos, Botão de Ação
+│   │   ├── plugins/            # Config plugin que injeta os App Intents no alvo do app
+│   │   └── modules/jarvis-native/  # Módulo Expo (Swift): Keychain + ponte de intents
 │   └── server/                 # Backend Node.js (Fastify)
 │       ├── src/agent/          # AI Orchestrator (laço de agente), prompt, fala
 │       ├── src/ai/             # Provedor de IA (interface neutra + Claude), preços
@@ -76,7 +84,7 @@ jarvis-ai/
 └── Dockerfile.server           # Imagem do backend
 ```
 
-Detalhes: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) · Google: [`docs/GOOGLE.md`](docs/GOOGLE.md) · Custos: [`docs/CUSTOS.md`](docs/CUSTOS.md) ·
+Detalhes: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) · Google: [`docs/GOOGLE.md`](docs/GOOGLE.md) · iPhone/Siri: [`docs/IOS.md`](docs/IOS.md) · Custos: [`docs/CUSTOS.md`](docs/CUSTOS.md) ·
 Limitações e próximas fases: [`docs/LIMITACOES-E-ROADMAP.md`](docs/LIMITACOES-E-ROADMAP.md)
 
 ---
@@ -101,8 +109,8 @@ ou nos painéis dos serviços.
 ### 1. Banco de dados (Supabase)
 
 1. Crie um projeto (recomendo um projeto **separado** do Sir Alfred Team Hub).
-2. Abra **SQL Editor** e execute, nesta ordem, `supabase/migrations/20261103000000_jarvis_phase1.sql` e
-   `supabase/migrations/20261104000000_jarvis_phase2.sql`.
+2. Abra **SQL Editor** e execute, nesta ordem, `supabase/migrations/20261103000000_jarvis_phase1.sql`,
+   `20261104000000_jarvis_phase2.sql` e `20261105000000_jarvis_phase3.sql`.
    (Ou, com a Supabase CLI: `supabase link` e `supabase db push` dentro de `jarvis-ai/`.)
 3. Em **Authentication → Providers → Email**, mantenha e-mail/senha ativado. Para uso pessoal,
    você pode desativar “Confirm email” ou confirmar pelo link enviado.
@@ -182,12 +190,15 @@ Depois, no App Store Connect, adicione-se como testador interno e instale pelo a
 6. Fase 2: em **Ajustes → Integrações**, conecte o Google; em **Notificações**, ative o push e escolha o horário
    do resumo diário. Para push, o projeto precisa estar vinculado ao EAS (`npx eas-cli@latest init`).
 
-### 6. Atalho de voz, Siri e Botão de Ação
+### 6. Siri, Atalhos e Botão de Ação
 
-No app **Atalhos** → novo atalho → ação **Abrir URL** → `jarvis://?ouvir=1` → nomeie “Conversar com Jarvis”.
+Com um build da Fase 3 instalado, as ações do Jarvis já aparecem na Siri e no app Atalhos:
 
-- **Siri:** “E aí, Siri, conversar com Jarvis” abre o app já ouvindo.
-- **Botão de Ação (iPhone 16 Pro Max):** Ajustes → Botão de Ação → Atalho → “Conversar com Jarvis”.
+- **Siri:** “E aí, Siri, conversar com Jarvis” abre o app já ouvindo; “Resumo do dia no Jarvis” responde sem abrir
+  (depois de ativar em Ajustes → Siri, Atalhos e Botão de Ação; exige backend com HTTPS).
+- **Botão de Ação (iPhone 16 Pro Max):** Ajustes → Botão de Ação → Atalho → JARVIS AI → Conversar.
+
+Detalhes, frases e privacidade: [`docs/IOS.md`](docs/IOS.md). O link `jarvis://?ouvir=1` continua funcionando.
 
 ---
 
@@ -196,9 +207,9 @@ No app **Atalhos** → novo atalho → ação **Abrir URL** → `jarvis://?ouvir
 ```bash
 cd jarvis-ai
 npm run typecheck          # shared + server + mobile
-npm test                   # 101 testes: orquestrador, ferramentas, Google (simulado), agendador, API HTTP, segurança, voz
+npm test                   # 115 testes: orquestrador, ferramentas, Google (simulado), agendador, iPhone/Siri, API, segurança, voz
 npm run db:test:up         # sobe um PostgreSQL local descartável
-npm run test:integration   # aplica as migrações reais e testa o RLS (12 testes)
+npm run test:integration   # aplica as migrações reais e testa o RLS (14 testes)
 npm run db:test:down
 npm run verify:mobile      # typecheck + bundle iOS (Metro/Hermes)
 ```
@@ -221,3 +232,5 @@ O workflow `.github/workflows/jarvis-ai.yml` roda tudo isso no GitHub Actions a 
 - O Jarvis não executa operações financeiras.
 - Tokens do Google: cifrados (AES-256-GCM) no backend, numa coluna que o usuário logado não lê; OAuth com PKCE
   e escopos mínimos; revogação pelo app. O agendador usa a service_role **somente no backend**, filtrando por usuário.
+- Siri em segundo plano: chave por aparelho (só o hash no servidor), limitada a 4 ações, revogável. Ações no iPhone
+  (lembrete, evento, ligação, mensagens) exigem confirmação e só contam como feitas com o retorno real do aparelho.

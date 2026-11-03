@@ -13,7 +13,7 @@
  * alterar o orquestrador.
  */
 import { z } from "zod";
-import type { Profile } from "@jarvis/shared";
+import type { DeviceAction, Profile } from "@jarvis/shared";
 import type { UserStore } from "../store/types";
 import type { ToolSpec } from "../ai/types";
 import type { GoogleUser } from "../google/gateway";
@@ -46,6 +46,11 @@ export interface ToolDefinition<S extends z.ZodType = z.ZodType> {
   risk: ToolRisk;
   /** Para ferramentas `confirm`: descreve exatamente o que será feito. */
   describe?: (input: z.infer<S>, ctx: ToolContext) => Promise<string> | string;
+  /**
+   * Ferramentas executadas NO IPHONE (após a confirmação): devolvem a ação que o app
+   * executa localmente. O servidor só marca como concluída quando o app reporta sucesso.
+   */
+  deviceAction?: (input: z.infer<S>, ctx: ToolContext) => DeviceAction;
   execute: (input: z.infer<S>, ctx: ToolContext) => Promise<ToolOutcome>;
 }
 
@@ -60,6 +65,7 @@ export class ToolRegistry {
     for (const d of defs) {
       if (this.tools.has(d.name)) throw new Error(`Ferramenta duplicada: ${d.name}`);
       if (d.risk === "confirm" && !d.describe) throw new Error(`Ferramenta ${d.name} exige describe() para confirmação.`);
+      if (d.deviceAction && d.risk !== "confirm") throw new Error(`Ferramenta ${d.name} executada no iPhone deve exigir confirmação.`);
       this.tools.set(d.name, d);
     }
     return this;

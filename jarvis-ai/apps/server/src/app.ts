@@ -3,6 +3,7 @@ import rateLimit from "@fastify/rate-limit";
 import { z, ZodError } from "zod";
 import {
   ChatRequestSchema,
+  DeviceActionSchema,
   MemoryCategorySchema,
   MemoryCreateSchema,
   MemoryUpdateSchema,
@@ -21,10 +22,11 @@ import type { TtsProvider } from "./tts/elevenlabs";
 import type { UserStore } from "./store/types";
 import { detectSensitive } from "./security/sensitive";
 import { registerPhase2Routes, type Phase2Deps } from "./routes/phase2";
+import { registerIntentRoutes, registerPhase3UserRoutes } from "./routes/phase3";
 import type { Scheduler } from "./scheduler/scheduler";
 import { timingSafeEqual } from "node:crypto";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 
 export interface AppDeps {
   authenticate: Authenticator;
@@ -239,11 +241,26 @@ export async function buildApp(deps: AppDeps) {
     });
 
     await registerPhase2Routes(v1, deps.phase2 ?? { system: null, google: null, box: null });
+    await registerPhase3UserRoutes(v1, { system: deps.phase2?.system ?? null, google: deps.phase2?.google ?? null, orchestrator: deps.orchestrator });
   }, { prefix: "/v1" });
+
+  await registerIntentRoutes(app, { system: deps.phase2?.system ?? null, google: deps.phase2?.google ?? null });
 
   return app;
 }
 
-function publicAction(a: { id: string; tool: string; summary: string; status: string; createdAt: string; expiresAt: string }) {
-  return { id: a.id, tool: a.tool, summary: a.summary, status: a.status, createdAt: a.createdAt, expiresAt: a.expiresAt };
+function publicAction(a: { id: string; tool: string; summary: string; status: string; createdAt: string; expiresAt: string; executor?: string; input?: unknown }) {
+  const executor = a.executor === "device" ? "device" : "server";
+  // Para ações no iPhone, o app recebe a ação validada que deve executar localmente.
+  const device = executor === "device" ? DeviceActionSchema.safeParse(a.input) : null;
+  return {
+    id: a.id,
+    tool: a.tool,
+    summary: a.summary,
+    status: a.status,
+    createdAt: a.createdAt,
+    expiresAt: a.expiresAt,
+    executor,
+    ...(device?.success ? { device: device.data } : {}),
+  };
 }

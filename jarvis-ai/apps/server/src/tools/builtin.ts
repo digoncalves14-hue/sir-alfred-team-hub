@@ -8,6 +8,7 @@ import { detectSensitive } from "../security/sensitive";
 import { wrapUntrusted } from "../security/untrusted";
 import { defineTool, ToolRegistry, type ToolContext } from "./registry";
 import { PRODUCTIVITY_TOOLS } from "./productivity";
+import { DEVICE_TOOLS } from "./device";
 
 export function formatDateTime(now: Date, timezone: string): { text: string; iso: string; weekday: string } {
   const fmt = new Intl.DateTimeFormat("pt-BR", {
@@ -162,5 +163,5 @@ export const deleteMemoryTool = defineTool({
 });
 
 export function createDefaultRegistry(): ToolRegistry {
-  return new ToolRegistry().register(dateTimeTool, saveMemoryTool, searchMemoryTool, updateMemoryTool, deleteMemoryTool, ...PRODUCTIVITY_TOOLS);
+  return new ToolRegistry().register(dateTimeTool, saveMemoryTool, searchMemoryTool, updateMemoryTool, deleteMemoryTool, ...PRODUCTIVITY_TOOLS, ...DEVICE_TOOLS);
 }

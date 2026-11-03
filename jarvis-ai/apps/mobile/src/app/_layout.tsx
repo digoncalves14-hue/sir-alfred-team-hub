@@ -1,8 +1,9 @@
 import { router, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { jarvisNative, type PendingIntent } from "../../modules/jarvis-native";
+import { AppState, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { HoloOrb } from "@/components/HoloOrb";
 import { Button, Screen } from "@/components/ui";
@@ -63,6 +64,31 @@ function RootNavigator() {
       }),
     [],
   );
+
+  // Siri / Atalhos / Botão de Ação → pedidos deixados pelos App Intents (processados após login e desbloqueio).
+  const [intent, setIntent] = useState<PendingIntent | null>(() => jarvisNative.consumePendingIntent());
+  useEffect(() => {
+    const off = jarvisNative.onIntent(setIntent);
+    // Garantia extra: ao voltar ao primeiro plano, lê um pedido que possa ter chegado antes.
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") {
+        const p = jarvisNative.consumePendingIntent();
+        if (p) setIntent(p);
+      }
+    });
+    return () => {
+      off();
+      sub.remove();
+    };
+  }, []);
+  useEffect(() => {
+    if (!intent || !session || locked) return;
+    const n = String(Date.now());
+    if (intent.action === "listen") router.navigate({ pathname: "/", params: { ouvir: "1", n } });
+    else if (intent.action === "ask" && intent.text) router.navigate({ pathname: "/", params: { pergunta: intent.text, n } });
+    else router.navigate("/");
+    setIntent(null);
+  }, [intent, session, locked]);
 
   // Renova o registro do aparelho para push a cada abertura (tokens podem mudar).
   useEffect(() => {

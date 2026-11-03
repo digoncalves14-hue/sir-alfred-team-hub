@@ -2,6 +2,7 @@ import type {
   AppNotification,
   AuditEntry,
   GoogleService,
+  DeviceToken,
   Task,
   TaskUpdate,
   ChatMessage,
@@ -15,7 +16,7 @@ import type {
   ToolEvent,
 } from "@jarvis/shared";
 
-export interface PendingActionRecord extends PendingAction {
+export interface PendingActionRecord extends Omit<PendingAction, "device"> {
   conversationId: string | null;
   input: unknown;
 }
@@ -77,7 +78,13 @@ export interface UserStore {
   updateMemory(id: string, patch: { category?: MemoryCategory; space?: Space; content?: string }): Promise<Memory | null>;
   deleteMemory(id: string): Promise<boolean>;
 
-  createPendingAction(input: { conversationId: string | null; tool: string; input: unknown; summary: string }): Promise<PendingActionRecord>;
+  createPendingAction(input: {
+    conversationId: string | null;
+    tool: string;
+    input: unknown;
+    summary: string;
+    executor?: "server" | "device";
+  }): Promise<PendingActionRecord>;
   getPendingAction(id: string): Promise<PendingActionRecord | null>;
   resolvePendingAction(id: string, status: PendingAction["status"], result?: unknown): Promise<PendingActionRecord>;
   listPendingActions(): Promise<PendingActionRecord[]>;
@@ -100,6 +107,10 @@ export interface UserStore {
 
   /** Status da integração (sem segredos). */
   getIntegration(provider: "google"): Promise<IntegrationInfo | null>;
+
+  // ---- Fase 3 ----
+  listDeviceTokens(): Promise<DeviceToken[]>;
+  revokeDeviceToken(id: string): Promise<boolean>;
 }
 
 export interface TaskQuery {
@@ -179,4 +190,13 @@ export interface SystemStore {
   /** Insere notificação; retorna null se a dedupe_key já existia. */
   insertNotification(input: { userId: string; kind: AppNotification["kind"]; title: string; body: string; dedupeKey: string }): Promise<string | null>;
   markNotificationDelivered(id: string): Promise<void>;
+
+  // ---- Fase 3: Atalhos/Siri em segundo plano (token de aparelho) ----
+  createDeviceToken(userId: string, tokenHash: string, name: string): Promise<string>;
+  /** userId do token ativo (não revogado); atualiza last_used_at. */
+  resolveDeviceToken(tokenHash: string): Promise<string | null>;
+  getProfileFor(userId: string): Promise<Profile>;
+  createTaskFor(userId: string, input: TaskInput): Promise<Task>;
+  createMemoryFor(userId: string, input: { category: MemoryCategory; space: Space; content: string }): Promise<Memory>;
+  logActionFor(userId: string, entry: { tool: string; status: "executed" | "failed" | "blocked"; summary: string }): Promise<void>;
 }

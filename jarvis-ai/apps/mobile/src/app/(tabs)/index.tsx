@@ -1,11 +1,12 @@
-import type { ChatMessage, Health, ToolEvent } from "@jarvis/shared";
+import type { ChatMessage, DeviceAction, Health, ToolEvent } from "@jarvis/shared";
 import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
+import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
 import { MessageBubble, PendingActionCard } from "@/components/chat";
 import { HoloOrb } from "@/components/HoloOrb";
 import { ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
+import { executeDeviceAction, gatherDeviceContext, type Chooser } from "@/lib/device";
 import { greeting } from "@/logic/format";
 import type { VoicePhase } from "@/logic/voiceMachine";
 import { usePrefs } from "@/providers/PrefsProvider";
@@ -33,11 +34,22 @@ type Conn = { status: "checking" } | { status: "online"; health: Health } | { st
 interface Pending {
   id: string;
   summary: string;
+  /** Ação executada no próprio iPhone após a confirmação. */
+  device?: DeviceAction;
 }
+
+/** Pergunta ao usuário qual opção usar (ex.: qual número do contato). */
+const chooseWithAlert: Chooser = (title, options) =>
+  new Promise((resolve) => {
+    Alert.alert(title, undefined, [
+      ...options.slice(0, 5).map((label, i) => ({ text: label, onPress: () => resolve(i) })),
+      { text: "Cancelar", style: "cancel" as const, onPress: () => resolve(null) },
+    ]);
+  });
 
 export default function JarvisScreen() {
   const { prefs, setPrefs } = usePrefs();
-  const params = useLocalSearchParams<{ ouvir?: string; conversa?: string }>();
+  const params = useLocalSearchParams<{ ouvir?: string; pergunta?: string; n?: string }>();
   const [conn, setConn] = useState<Conn>({ status: "checking" });
   const [ownerName, setOwnerName] = useState("senhor");
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
@@ -50,6 +62,8 @@ export default function JarvisScreen() {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const conversationRef = useRef(conversationId);
   conversationRef.current = conversationId;
+  const prefsRef = useRef(prefs);
+  prefsRef.current = prefs;
 
   const checkConnection = useCallback(async () => {
     setConn({ status: "checking" });
@@ -68,7 +82,7 @@ export default function JarvisScreen() {
       void checkConnection();
       api
         .pendingActions()
-        .then((r) => setPending(r.actions.map((a) => ({ id: a.id, summary: a.summary }))))
+        .then((r) => setPending(r.actions.map((a) => ({ id: a.id, summary: a.summary, device: a.device }))))
         .catch(() => undefined);
     }, [checkConnection]),
   );
@@ -78,7 +92,7 @@ export default function JarvisScreen() {
     const now = new Date().toISOString();
     setMessages((prev) => [...prev, { id: `local-${now}`, role: "user", content: userText, toolEvents: [], createdAt: now }, reply]);
     const newPending = reply.toolEvents.filter((e): e is ToolEvent & { pendingActionId: string } => e.status === "pending" && !!e.pendingActionId);
-    if (newPending.length) setPending((prev) => [...newPending.map((e) => ({ id: e.pendingActionId, summary: e.summary })), ...prev]);
+    if (newPending.length) setPending((prev) => [...newPending.map((e) => ({ id: e.pendingActionId, summary: e.summary, device: e.device })), ...prev]);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   }, []);
 
@@ -86,7 +100,9 @@ export default function JarvisScreen() {
     async (text: string, inputMode: "voice" | "text"): Promise<string | null> => {
       setError(null);
       try {
-        const res = await api.chat({ message: text, conversationId: conversationRef.current, inputMode, timezone: deviceTimezone });
+        // Dados do iPhone (somente o que foi autorizado em Ajustes; no máximo ~2,5 s).
+        const deviceContext = await gatherDeviceContext({ calendar: prefsRef.current.deviceCalendar, location: prefsRef.current.deviceLocation });
+        const res = await api.chat({ message: text, conversationId: conversationRef.current, inputMode, timezone: deviceTimezone, deviceContext });
         absorbReply(text, res.reply, res.conversationId);
         return res.speech;
       } catch (e) {
@@ -107,14 +123,21 @@ export default function JarvisScreen() {
   });
   const { phase, transcript, level, error: voiceError } = voice.state;
 
-  // Atalhos/Siri/Botão de Ação: jarvis://?ouvir=1 inicia a escuta direto.
-  const autoListened = useRef(false);
+  // Siri / Atalhos / Botão de Ação: "?ouvir=1" inicia a escuta; "?pergunta=..." envia a pergunta.
+  // "n" é um identificador por pedido, para que pedidos repetidos também funcionem.
+  const handledIntent = useRef<string | null>(null);
   useEffect(() => {
-    if (params.ouvir && !autoListened.current) {
-      autoListened.current = true;
+    const key = `${params.n ?? ""}|${params.ouvir ?? ""}|${params.pergunta ?? ""}`;
+    if (key === "||" || handledIntent.current === key) return;
+    handledIntent.current = key;
+    if (params.pergunta) {
+      void send(params.pergunta, "text").then((speech) => {
+        if (speech) void voice.say(speech);
+      });
+    } else if (params.ouvir) {
       void voice.start(prefs.continuousConversation);
     }
-  }, [params.ouvir, prefs.continuousConversation, voice]);
+  }, [params.n, params.ouvir, params.pergunta, prefs.continuousConversation, voice, send]);
 
   const onOrbPress = () => {
     if (phase === "idle" || phase === "error") void voice.start(prefs.continuousConversation);
@@ -134,8 +157,16 @@ export default function JarvisScreen() {
 
   const resolveAction = async (id: string, confirm: boolean) => {
     setBusyAction(id);
+    const item = pending.find((p) => p.id === id);
     try {
-      const r = confirm ? await api.confirmAction(id) : await api.rejectAction(id);
+      let r;
+      if (confirm && item?.device) {
+        // Executa NO iPhone e reporta o resultado real ao servidor.
+        const result = await executeDeviceAction(item.device, chooseWithAlert);
+        r = await api.reportDeviceAction(id, result.success, result.summary);
+      } else {
+        r = confirm ? await api.confirmAction(id) : await api.rejectAction(id);
+      }
       const now = new Date().toISOString();
       setMessages((prev) => [
         ...prev,

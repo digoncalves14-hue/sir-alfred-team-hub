@@ -3,14 +3,14 @@
     "name": "JARVIS AI",
     "slug": "jarvis-ai",
     "scheme": "jarvis",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#03060F",
     "ios": {
       "bundleIdentifier": "com.digoncalves.jarvisai",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
@@ -63,7 +63,36 @@
         {
           "color": "#38DCFF"
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "O JARVIS AI lê seus compromissos do Calendário para responder sobre sua agenda e cria eventos quando você confirma.",
+          "remindersPermission": "O JARVIS AI lê e cria lembretes no app Lembretes quando você pede e confirma."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "O JARVIS AI procura um contato no seu iPhone apenas quando você pede para ligar ou enviar mensagem. Os contatos não saem do aparelho."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O JARVIS AI usa sua localização aproximada, com o app aberto, para respostas que dependem de onde você está.",
+          "locationAlwaysAndWhenInUsePermission": "O JARVIS AI não usa sua localização em segundo plano; ela só é lida com o app aberto."
+        }
+      ],
+      "./plugins/withJarvisAppIntents"
     ],
     "experiments": {
       "typedRoutes": true

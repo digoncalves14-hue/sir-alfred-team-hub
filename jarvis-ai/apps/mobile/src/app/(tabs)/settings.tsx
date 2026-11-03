@@ -1,4 +1,4 @@
-import type { GoogleService, Health, IntegrationStatus, Profile } from "@jarvis/shared";
+import type { DeviceToken, GoogleService, Health, IntegrationStatus, Profile } from "@jarvis/shared";
 import * as LocalAuthentication from "expo-local-authentication";
 import type { Voice } from "expo-speech";
 import { useFocusEffect } from "expo-router";
@@ -9,6 +9,9 @@ import { api } from "@/lib/api";
 import { config } from "@/lib/config";
 import { connectGoogle } from "@/lib/google";
 import { registerForPush } from "@/lib/push";
+import { requestCalendarAccess, requestLocationAccess } from "@/lib/device";
+import { jarvisNative } from "../../../modules/jarvis-native";
+import * as Device from "expo-device";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePrefs } from "@/providers/PrefsProvider";
 import { listPortugueseVoices, speak } from "@/voice/tts";
@@ -41,6 +44,18 @@ export default function Settings() {
   const [wanted, setWanted] = useState<GoogleService[]>(["calendar", "gmail"]);
   const [connecting, setConnecting] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [devices, setDevices] = useState<DeviceToken[]>([]);
+  const [siriReady, setSiriReady] = useState(jarvisNative.hasCredentials());
+  const [siriBusy, setSiriBusy] = useState(false);
+
+  const loadDevices = useCallback(async () => {
+    try {
+      setDevices((await api.deviceTokens()).tokens.filter((t) => !t.revokedAt));
+    } catch {
+      setDevices([]);
+    }
+    setSiriReady(jarvisNative.hasCredentials());
+  }, []);
 
   const loadIntegrations = useCallback(async () => {
     try {
@@ -65,7 +80,8 @@ export default function Settings() {
         .catch((e) => setError(e instanceof Error ? e.message : "Falha ao carregar o perfil."));
       api.health().then(setHealth).catch(() => setHealth(null));
       void loadIntegrations();
-    }, [loadIntegrations]),
+      void loadDevices();
+    }, [loadIntegrations, loadDevices]),
   );
 
   const updateProfile = async (patch: Partial<Profile>) => {
@@ -120,6 +136,51 @@ export default function Settings() {
     setPushBusy(false);
     if (r.ok) setPrefs({ pushEnabled: true });
     else setError(r.message);
+  };
+
+  const enableSiri = async () => {
+    if (!jarvisNative.available) return setError("Este build não tem os recursos nativos da Fase 3. Gere um novo build do app.");
+    if (!config.apiUrl.startsWith("https://")) {
+      return setError("Os Atalhos em segundo plano exigem o servidor com HTTPS (publique o backend). Abrir o app pela Siri já funciona.");
+    }
+    setSiriBusy(true);
+    try {
+      const created = await api.createDeviceToken(Device.deviceName ?? "iPhone");
+      await jarvisNative.setCredentials(config.apiUrl, created.token);
+      await loadDevices();
+      Alert.alert("Pronto", 'Diga: "E aí Siri, resumo do dia no Jarvis".');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao ativar os atalhos.");
+    } finally {
+      setSiriBusy(false);
+    }
+  };
+
+  const revokeDevice = (d: DeviceToken) =>
+    Alert.alert("Revogar acesso?", `Os atalhos da Siri em "${d.name}" deixarão de funcionar até serem ativados de novo.`, [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Revogar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.revokeDeviceToken(d.id);
+            jarvisNative.clearCredentials();
+            await loadDevices();
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "Falha ao revogar.");
+          }
+        },
+      },
+    ]);
+
+  const toggleDeviceCalendar = async (v: boolean) => {
+    if (v && !(await requestCalendarAccess())) return setError("Permita o acesso em Ajustes › Privacidade › Calendários / Lembretes.");
+    setPrefs({ deviceCalendar: v });
+  };
+  const toggleDeviceLocation = async (v: boolean) => {
+    if (v && !(await requestLocationAccess())) return setError("Permita a localização em Ajustes › Privacidade › Serviços de Localização.");
+    setPrefs({ deviceLocation: v });
   };
 
   const toggleService = (s: GoogleService) => setWanted((w) => (w.includes(s) ? w.filter((x) => x !== s) : [...w, s]));
@@ -254,6 +315,62 @@ export default function Settings() {
           </Text>
         </Card>
 
+        <SectionTitle>IPHONE</SectionTitle>
+        <Card>
+          <Row
+            title="Calendário e Lembretes do iPhone"
+            subtitle="O Jarvis lê seus próximos eventos e lembretes; cria itens só quando você confirma"
+            value={prefs.deviceCalendar}
+            onChange={toggleDeviceCalendar}
+          />
+          <Row
+            title="Localização aproximada"
+            subtitle="Cidade e região, somente com o app aberto"
+            value={prefs.deviceLocation}
+            onChange={toggleDeviceLocation}
+          />
+          <Text style={[font.small, { marginTop: space(2) }]}>
+            Contatos: o Jarvis só procura um contato quando você pede para ligar ou mandar mensagem, e a busca acontece no próprio iPhone.
+          </Text>
+        </Card>
+
+        <SectionTitle>SIRI, ATALHOS E BOTÃO DE AÇÃO</SectionTitle>
+        <Card style={{ gap: space(2) }}>
+          <Text style={font.small}>Já disponíveis no app Atalhos e na Siri (sem configurar nada):</Text>
+          {[
+            "“E aí Siri, conversar com Jarvis” — abre ouvindo",
+            "“Resumo do dia no Jarvis”",
+            "“Consultar agenda no Jarvis”",
+            "“Registrar tarefa no Jarvis”",
+            "“Abrir Jarvis”",
+          ].map((t) => (
+            <Text key={t} style={[font.small, { color: colors.text }]}>
+              • {t}
+            </Text>
+          ))}
+          <Text style={font.small}>
+            Botão de Ação: Ajustes do iPhone › Botão de Ação › Atalho › JARVIS AI › Conversar. “Perguntar ao Jarvis” e “Salvar na memória do Jarvis” ficam no app Atalhos (o último também pode aparecer na Folha de Compartilhamento).
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: space(2) }}>
+            <Text style={[font.body, { flex: 1 }]}>Respostas da Siri sem abrir o app</Text>
+            <Pill label={siriReady ? "ATIVO" : "INATIVO"} color={siriReady ? colors.green : colors.textDim} />
+          </View>
+          <Text style={font.small}>
+            Resumo, agenda, registrar tarefa e salvar memória funcionam em segundo plano com uma chave deste iPhone, guardada no Keychain e limitada a essas quatro ações.
+          </Text>
+          <Button title={siriReady ? "Renovar chave deste iPhone" : "Ativar respostas da Siri"} icon="key.fill" variant={siriReady ? "ghost" : "primary"} onPress={enableSiri} loading={siriBusy} />
+          {devices.map((d) => (
+            <View key={d.id} style={{ flexDirection: "row", alignItems: "center", gap: space(2) }}>
+              <Text style={[font.small, { flex: 1 }]}>
+                {d.name} · {d.lastUsedAt ? `usado ${new Date(d.lastUsedAt).toLocaleDateString("pt-BR")}` : "ainda não usado"}
+              </Text>
+              <Pressable onPress={() => revokeDevice(d)}>
+                <Text style={[font.small, { color: colors.red }]}>Revogar</Text>
+              </Pressable>
+            </View>
+          ))}
+        </Card>
+
         <SectionTitle>VOZ</SectionTitle>
         <Card>
           <Row title="Falar respostas" subtitle="Desative para usar só texto" value={prefs.speakReplies} onChange={(v) => setPrefs({ speakReplies: v })} />
@@ -309,14 +426,6 @@ export default function Settings() {
           />
         </Card>
 
-        <SectionTitle>ATALHO DE VOZ (SIRI / BOTÃO DE AÇÃO)</SectionTitle>
-        <Card style={{ gap: space(2) }}>
-          <Text style={font.small}>
-            No app Atalhos, crie um atalho com a ação “Abrir URL” e o endereço abaixo. Dê o nome “Conversar com Jarvis” para chamá-lo pela Siri, e escolha-o em Ajustes › Botão de Ação › Atalho.
-          </Text>
-          <Text selectable style={[font.mono, { color: colors.text }]}>jarvis://?ouvir=1</Text>
-          <Text style={font.small}>Atalhos nativos (App Intents) chegam na Fase 3.</Text>
-        </Card>
 
         <SectionTitle>CONEXÃO</SectionTitle>
         <Card style={{ gap: space(2) }}>

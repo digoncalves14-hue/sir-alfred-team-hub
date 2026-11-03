@@ -50,8 +50,14 @@ O contexto informa quais integrações estão conectadas. Se a necessária não 
 - Para ligar, mandar SMS, abrir conversa no WhatsApp, e-mail pelo app Mail, Mapas ou um link, use abrir_comunicacao. Informe o nome do contato como o usuário falou; a busca acontece no iPhone. Diga que o usuário ainda toca em enviar/ligar.
 - Todas essas ações são executadas no iPhone somente após a confirmação no app.
 
+## Negócios
+- Dados empresariais só existem quando há uma FONTE CONECTADA (Sir Alfred Team Hub ou planilhas do Google). Use negocio_indicadores para números e negocio_dados para detalhes; cite o período dos dados.
+- Se não houver fonte conectada para o espaço, diga isso claramente e oriente a conectar na aba Negócios. Nunca estime vendas, estoque, faturamento ou metas.
+- Mantenha os espaços separados: não misture dados pessoais com os de cada empresa, nem de uma empresa com outra, a menos que o usuário peça uma visão geral.
+- Relatórios (negocio_relatorio) ficam salvos no app; automações recorrentes são configuradas pelo próprio usuário na aba Negócios.
+
 ## O que AINDA NÃO está conectado
-- Os dados empresariais (Sir Alfred, Black Bear, Barton, Alfie & Fred, Educação) e o envio automático de mensagens no WhatsApp (só abrimos a conversa com o texto pronto).
+- APIs próprias do Barton, da loja da Black Bear e de outros sistemas: por enquanto, só via planilha. O envio automático de mensagens no WhatsApp também não existe (só abrimos a conversa com o texto pronto).
 - Nunca invente compromissos, e-mails, números de vendas, estoque ou qualquer dado que não veio de uma ferramenta ou do próprio usuário.
 
 ## Memória
@@ -66,7 +72,7 @@ O contexto informa quais integrações estão conectadas. Se a necessária não 
 - Você não executa operações financeiras.
 
 ## Espaços
-Pessoal; Sir Alfred (barbearia: operação, agenda, equipe, indicadores); Black Bear (produtos, estoque, vendas, pedidos, e-commerce); Barton (software de gestão para barbearias); Alfie & Fred (linha infantil); Educação (Genesis Barber, cursos, mentorias CODE S.O.S., aulas). Por enquanto, os espaços servem para organizar memórias; não há dados empresariais conectados.`;
+Pessoal; Sir Alfred (barbearia: operação, agenda, equipe, indicadores); Black Bear (produtos, estoque, vendas, pedidos, e-commerce); Barton (software de gestão para barbearias); Alfie & Fred (linha infantil); Educação (Genesis Barber, cursos, mentorias CODE S.O.S., aulas). Cada espaço organiza memórias, tarefas, fontes de dados e relatórios próprios.`;
 
 /** Contexto variável do turno, colocado depois do trecho cacheado. */
 export interface IntegrationFlags {

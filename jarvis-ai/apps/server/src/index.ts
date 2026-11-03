@@ -11,6 +11,9 @@ import { GoogleOAuth } from "./google/oauth";
 import { GoogleGateway } from "./google/gateway";
 import { ExpoPushSender } from "./push/expo";
 import { Scheduler } from "./scheduler/scheduler";
+import { ConnectorService } from "./business/connectors";
+import { HubOAuth } from "./business/hub";
+import { ReportGenerator } from "./business/reports";
 
 const config = loadConfig();
 
@@ -30,6 +33,14 @@ const box = config.TOKEN_ENCRYPTION_KEY ? new SecretBox(config.TOKEN_ENCRYPTION_
 const google =
   system && box && config.GOOGLE_IOS_CLIENT_ID ? new GoogleGateway({ oauth: new GoogleOAuth(config.GOOGLE_IOS_CLIENT_ID, box), system, box }) : null;
 
+// ---- Fase 4: conectores empresariais e relatórios ----
+const hub =
+  box && config.HUB_SUPABASE_URL && config.HUB_PUBLISHABLE_KEY && config.HUB_OAUTH_CLIENT_ID
+    ? new HubOAuth({ url: config.HUB_SUPABASE_URL, publishableKey: config.HUB_PUBLISHABLE_KEY, clientId: config.HUB_OAUTH_CLIENT_ID }, box)
+    : null;
+const connectors = system && box ? new ConnectorService({ system, box, google, hub }) : null;
+const reports = system ? new ReportGenerator({ system, connectors }) : null;
+
 let scheduler: Scheduler | null = null;
 
 const app = await buildApp({
@@ -45,7 +56,9 @@ const app = await buildApp({
     maxToolIterations: config.AI_MAX_TOOL_ITERATIONS,
     historyMessages: config.AI_HISTORY_MESSAGES,
     googleFor: google ? (userId) => google.forUser(userId) : undefined,
+    business: connectors && reports ? { connectors, reports } : null,
   }),
+  phase4: { system, box, connectors, reports },
   phase2: { system, google, box },
   get scheduler() {
     return scheduler;
@@ -57,6 +70,7 @@ if (system) {
   scheduler = new Scheduler({
     system,
     google,
+    reports,
     push: new ExpoPushSender(system, { accessToken: config.EXPO_ACCESS_TOKEN, log: app.log }),
     log: app.log,
   });
@@ -71,6 +85,7 @@ app.log.info(
     google: Boolean(google),
     push: Boolean(system),
     scheduler: Boolean(system && config.SCHEDULER_ENABLED),
+    hub: Boolean(hub),
   },
   provider.configured ? "JARVIS iniciado" : "ATENÇÃO: ANTHROPIC_API_KEY ausente — /v1/chat responderá 503",
 );

@@ -3,9 +3,27 @@
  * Não é usada em produção (lá o armazenamento é o Supabase/PostgreSQL).
  */
 import { randomUUID } from "node:crypto";
-import type { AppNotification, AuditEntry, ChatMessage, Conversation, DeviceToken, Memory, MemoryCategory, Profile, Space, Task, TaskUpdate } from "@jarvis/shared";
+import type {
+  AppNotification,
+  AuditEntry,
+  Automation,
+  AutomationKind,
+  ChatMessage,
+  Connector,
+  Conversation,
+  DeviceToken,
+  Memory,
+  MemoryCategory,
+  Profile,
+  Report,
+  Space,
+  Task,
+  TaskUpdate,
+} from "@jarvis/shared";
 import { rankByQuery } from "./search";
 import type {
+  ConnectorRecord,
+  DueAutomation,
   IntegrationSecret,
   PendingActionRecord,
   SystemStore,
@@ -29,6 +47,9 @@ interface Db {
   pushTokens: { token: string; userId: string; deviceName?: string }[];
   lastSummary: Map<string, string>;
   deviceTokens: (DeviceToken & { userId: string; tokenHash: string })[];
+  connectors: ConnectorRecord[];
+  reports: (Report & { userId: string; data: unknown })[];
+  automations: (Automation & { userId: string; lastRunKey: string | null })[];
 }
 
 export function createMemoryDb(): Db {
@@ -46,6 +67,9 @@ export function createMemoryDb(): Db {
     pushTokens: [],
     lastSummary: new Map(),
     deviceTokens: [],
+    connectors: [],
+    reports: [],
+    automations: [],
   };
 }
 
@@ -277,6 +301,55 @@ export class MemoryUserStore implements UserStore {
     return true;
   }
 
+  // ---- Fase 4 ----
+  async listConnectors(space?: Space): Promise<Connector[]> {
+    return this.db.connectors.filter((c) => c.userId === this.userId && (!space || c.space === space)).map(publicConnector);
+  }
+  async deleteConnector(id: string) {
+    const before = this.db.connectors.length;
+    this.db.connectors = this.db.connectors.filter((c) => !(c.id === id && c.userId === this.userId));
+    return this.db.connectors.length < before;
+  }
+  async listReports(limit: number, space?: Space) {
+    return this.db.reports
+      .filter((r) => r.userId === this.userId && (!space || r.space === space))
+      .slice(-limit)
+      .reverse()
+      .map(({ userId: _u, data: _d, ...r }) => r);
+  }
+  async getReport(id: string) {
+    const r = this.db.reports.find((x) => x.id === id && x.userId === this.userId);
+    if (!r) return null;
+    const { userId: _u, data: _d, ...rest } = r;
+    return rest;
+  }
+  async deleteReport(id: string) {
+    const before = this.db.reports.length;
+    this.db.reports = this.db.reports.filter((r) => !(r.id === id && r.userId === this.userId));
+    return this.db.reports.length < before;
+  }
+  async listAutomations() {
+    return this.db.automations.filter((a) => a.userId === this.userId).map(({ userId: _u, lastRunKey: _k, ...a }) => a);
+  }
+  async createAutomation(input: Parameters<UserStore["createAutomation"]>[0]) {
+    const a = { id: randomUUID(), ...input, lastRunAt: null, userId: this.userId, lastRunKey: null };
+    this.db.automations.push(a);
+    const { userId: _u, lastRunKey: _k, ...pub } = a;
+    return pub;
+  }
+  async updateAutomation(id: string, patch: Parameters<UserStore["updateAutomation"]>[1]) {
+    const a = this.db.automations.find((x) => x.id === id && x.userId === this.userId);
+    if (!a) return null;
+    Object.assign(a, stripUndefined(patch));
+    const { userId: _u, lastRunKey: _k, ...pub } = a;
+    return pub;
+  }
+  async deleteAutomation(id: string) {
+    const before = this.db.automations.length;
+    this.db.automations = this.db.automations.filter((a) => !(a.id === id && a.userId === this.userId));
+    return this.db.automations.length < before;
+  }
+
   async listDeviceTokens() {
     return this.db.deviceTokens.filter((t) => t.userId === this.userId).map(({ userId: _u, tokenHash: _h, ...t }) => t);
   }
@@ -293,6 +366,11 @@ export class MemoryUserStore implements UserStore {
     const { encryptedRefreshToken: _secret, userId: _u, provider: _p, ...info } = i;
     return info;
   }
+}
+
+function publicConnector(c: ConnectorRecord): Connector {
+  const { userId: _u, encryptedSecret: _s, ...rest } = c;
+  return { ...rest };
 }
 
 function stripUndefined<T extends object>(o: T): T {
@@ -426,6 +504,65 @@ export class MemorySystemStore implements SystemStore {
   }
   async logActionFor(userId: string, entry: { tool: string; status: "executed" | "failed" | "blocked"; summary: string }) {
     return new MemoryUserStore(userId, this.db).logAction(entry);
+  }
+
+  // ---- Fase 4 ----
+  async createConnector(input: Parameters<SystemStore["createConnector"]>[0]) {
+    if (input.type === "sir_alfred_hub") {
+      this.db.connectors = this.db.connectors.filter((c) => !(c.userId === input.userId && c.type === "sir_alfred_hub"));
+    }
+    const c: ConnectorRecord = {
+      id: randomUUID(),
+      userId: input.userId,
+      space: input.space,
+      type: input.type,
+      name: input.name,
+      config: input.config,
+      encryptedSecret: input.encryptedSecret,
+      accountLabel: input.accountLabel,
+      status: "active",
+      lastError: null,
+      lastSyncAt: null,
+      createdAt: now(),
+    };
+    this.db.connectors.push(c);
+    return { ...c };
+  }
+  async getConnector(userId: string, id: string) {
+    const c = this.db.connectors.find((x) => x.id === id && x.userId === userId);
+    return c ? { ...c } : null;
+  }
+  async listConnectorsFor(userId: string, space?: Space) {
+    return this.db.connectors.filter((c) => c.userId === userId && (!space || c.space === space)).map((c) => ({ ...c }));
+  }
+  async updateConnectorSecret(id: string, encryptedSecret: string) {
+    const c = this.db.connectors.find((x) => x.id === id);
+    if (c) c.encryptedSecret = encryptedSecret;
+  }
+  async setConnectorStatus(id: string, status: "active" | "error", lastError: string | null, synced: boolean) {
+    const c = this.db.connectors.find((x) => x.id === id);
+    if (c) Object.assign(c, { status, lastError, ...(synced ? { lastSyncAt: now() } : {}) });
+  }
+  async insertReport(input: Parameters<SystemStore["insertReport"]>[0]) {
+    const r = { id: randomUUID(), space: input.space, kind: input.kind, title: input.title, body: input.body, createdAt: now(), userId: input.userId, data: input.data };
+    this.db.reports.push(r);
+    const { userId: _u, data: _d, ...pub } = r;
+    return pub;
+  }
+  async listEnabledAutomations(): Promise<DueAutomation[]> {
+    return this.db.automations
+      .filter((a) => a.enabled)
+      .map((a) => {
+        const p = this.db.profiles.get(a.userId) ?? DEFAULT_PROFILE;
+        return { ...a, timezone: p.timezone, ownerName: p.ownerName };
+      });
+  }
+  async claimAutomationRun(id: string, runKey: string) {
+    const a = this.db.automations.find((x) => x.id === id);
+    if (!a || a.lastRunKey === runKey) return false;
+    a.lastRunKey = runKey;
+    a.lastRunAt = now();
+    return true;
   }
 }
 

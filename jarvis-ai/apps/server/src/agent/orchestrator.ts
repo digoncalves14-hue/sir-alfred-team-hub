@@ -16,6 +16,8 @@ import type { ToolRegistry, ToolContext } from "../tools/registry";
 import type { PendingActionRecord, UserStore } from "../store/types";
 import type { GoogleUser } from "../google/gateway";
 import { IntegrationError } from "../google/errors";
+import type { ConnectorService } from "../business/connectors";
+import type { ReportGenerator } from "../business/reports";
 import { buildContext, SYSTEM_PROMPT } from "./prompt";
 import { toSpeech } from "./speech";
 import { isValidTimezone, startOfDayInTimezone } from "./time";
@@ -28,6 +30,8 @@ export interface OrchestratorDeps {
   clock?: () => Date;
   /** Integração Google por usuário (null quando o servidor não tem OAuth configurado). */
   googleFor?: (userId: string) => GoogleUser | null;
+  /** Conectores/relatórios dos negócios (Fase 4). */
+  business?: { connectors: ConnectorService; reports: ReportGenerator } | null;
   log?: { info: (obj: object, msg?: string) => void; warn: (obj: object, msg?: string) => void };
 }
 
@@ -93,7 +97,7 @@ export class Orchestrator {
       gmail: google ? await google.connected("gmail") : false,
     };
     const context = buildContext(profile, now, relevant, integrations, input.deviceContext);
-    const toolCtx: ToolContext = { store, profile, conversationId: conversation.id, now, google };
+    const toolCtx: ToolContext = { store, profile, conversationId: conversation.id, now, google, business: this.deps.business ?? null };
 
     const turns: ModelTurn[] = historyToTurns(history);
     turns.push({ role: "user", parts: [{ type: "text", text: input.message }] });
@@ -267,6 +271,7 @@ export class Orchestrator {
         conversationId: pending.conversationId,
         now: this.now(),
         google: this.deps.googleFor?.(store.userId) ?? null,
+        business: this.deps.business ?? null,
       });
       const status = outcome.isError ? "failed" : "confirmed";
       const action = await store.resolvePendingAction(id, status, { summary: outcome.summary });

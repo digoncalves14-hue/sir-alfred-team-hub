@@ -23,10 +23,11 @@ import type { UserStore } from "./store/types";
 import { detectSensitive } from "./security/sensitive";
 import { registerPhase2Routes, type Phase2Deps } from "./routes/phase2";
 import { registerIntentRoutes, registerPhase3UserRoutes } from "./routes/phase3";
+import { registerPhase4Routes, type Phase4Deps } from "./routes/phase4";
 import type { Scheduler } from "./scheduler/scheduler";
 import { timingSafeEqual } from "node:crypto";
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.4.0";
 
 export interface AppDeps {
   authenticate: Authenticator;
@@ -38,6 +39,7 @@ export interface AppDeps {
   logLevel?: string;
   logger?: boolean;
   phase2?: Phase2Deps;
+  phase4?: Phase4Deps;
   scheduler?: Scheduler | null;
   cronSecret?: string;
 }
@@ -104,6 +106,7 @@ export async function buildApp(deps: AppDeps) {
     google: { configured: Boolean(deps.phase2?.google && deps.phase2.system && deps.phase2.box) },
     push: { configured: Boolean(deps.phase2?.system) },
     scheduler: { running: deps.scheduler?.active ?? false, cron: Boolean(deps.scheduler && deps.cronSecret) },
+    business: { connectors: Boolean(deps.phase4?.connectors), hub: Boolean(deps.phase4?.connectors?.hub), sheets: Boolean(deps.phase4?.connectors?.google) },
   }));
 
   // Cron externo (ex.: cron-job.org, GitHub Actions) para hospedagens que "dormem".
@@ -242,6 +245,7 @@ export async function buildApp(deps: AppDeps) {
 
     await registerPhase2Routes(v1, deps.phase2 ?? { system: null, google: null, box: null });
     await registerPhase3UserRoutes(v1, { system: deps.phase2?.system ?? null, google: deps.phase2?.google ?? null, orchestrator: deps.orchestrator });
+    await registerPhase4Routes(v1, deps.phase4 ?? { system: null, box: null, connectors: null, reports: null });
   }, { prefix: "/v1" });
 
   await registerIntentRoutes(app, { system: deps.phase2?.system ?? null, google: deps.phase2?.google ?? null });

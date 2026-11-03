@@ -17,6 +17,8 @@ import type { DeviceAction, Profile } from "@jarvis/shared";
 import type { UserStore } from "../store/types";
 import type { ToolSpec } from "../ai/types";
 import type { GoogleUser } from "../google/gateway";
+import type { ConnectorService } from "../business/connectors";
+import type { ReportGenerator } from "../business/reports";
 
 export type ToolRisk = "read" | "write" | "confirm";
 
@@ -27,6 +29,8 @@ export interface ToolContext {
   now: Date;
   /** Integração Google do usuário; null quando o backend não tem o OAuth configurado. */
   google: GoogleUser | null;
+  /** Conectores e relatórios dos negócios (Fase 4); null quando não configurados. */
+  business?: { connectors: ConnectorService; reports: ReportGenerator } | null;
 }
 
 export interface ToolOutcome {

@@ -249,6 +249,9 @@ export const HealthSchema = z.object({
   push: z.object({ configured: z.boolean() }).default({ configured: false }),
   /** running: laço interno ativo; cron: disponível via POST /internal/cron/tick. */
   scheduler: z.object({ running: z.boolean(), cron: z.boolean().default(false) }).default({ running: false, cron: false }),
+  business: z
+    .object({ connectors: z.boolean(), hub: z.boolean(), sheets: z.boolean() })
+    .default({ connectors: false, hub: false, sheets: false }),
 });
 export type Health = z.infer<typeof HealthSchema>;
 
@@ -261,7 +264,7 @@ export type ApiError = z.infer<typeof ApiErrorSchema>;
 // ---------------------------------------------------------------------------
 // Fase 2 — Integrações, tarefas, notificações
 // ---------------------------------------------------------------------------
-export const GOOGLE_SERVICES = ["calendar", "gmail"] as const;
+export const GOOGLE_SERVICES = ["calendar", "gmail", "sheets"] as const;
 export const GoogleServiceSchema = z.enum(GOOGLE_SERVICES);
 export type GoogleService = z.infer<typeof GoogleServiceSchema>;
 
@@ -392,3 +395,127 @@ export const DeviceTokenCreatedSchema = z.object({ id: z.string().uuid(), token:
 export const IntentSpeechSchema = z.object({ speech: z.string() });
 export const IntentTaskRequestSchema = z.object({ titulo: z.string().trim().min(1).max(300) });
 export const IntentMemoryRequestSchema = z.object({ texto: z.string().trim().min(2).max(2000) });
+
+// ---------------------------------------------------------------------------
+// Fase 4 — conectores empresariais, indicadores, relatórios e automações
+// ---------------------------------------------------------------------------
+export const CONNECTOR_TYPES = ["sir_alfred_hub", "google_sheets"] as const;
+export const ConnectorTypeSchema = z.enum(CONNECTOR_TYPES);
+export type ConnectorType = z.infer<typeof ConnectorTypeSchema>;
+
+export const SHEET_DATASETS = ["vendas", "estoque", "pedidos", "cronograma", "indicadores", "tabela"] as const;
+export const SheetDatasetSchema = z.enum(SHEET_DATASETS);
+export type SheetDataset = z.infer<typeof SheetDatasetSchema>;
+export const SHEET_DATASET_LABELS: Record<SheetDataset, string> = {
+  vendas: "Vendas",
+  estoque: "Estoque",
+  pedidos: "Pedidos",
+  cronograma: "Cronograma / aulas",
+  indicadores: "Indicadores e metas",
+  tabela: "Tabela livre",
+};
+
+export const ConnectorSchema = z.object({
+  id: z.string().uuid(),
+  space: SpaceSchema,
+  type: ConnectorTypeSchema,
+  name: z.string(),
+  config: z.record(z.string(), z.unknown()),
+  accountLabel: z.string().nullable(),
+  status: z.enum(["active", "error"]),
+  lastError: z.string().nullable(),
+  lastSyncAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type Connector = z.infer<typeof ConnectorSchema>;
+
+export const SheetConnectorCreateSchema = z.object({
+  space: SpaceSchema,
+  name: z.string().trim().min(1).max(100),
+  /** URL da planilha (docs.google.com/spreadsheets/d/...) ou o ID. */
+  spreadsheet: z.string().trim().min(10).max(500),
+  /** Ex.: "Vendas!A1:H500". Padrão: primeira aba. */
+  range: z.string().trim().max(100).optional(),
+  dataset: SheetDatasetSchema,
+});
+export type SheetConnectorCreate = z.infer<typeof SheetConnectorCreateSchema>;
+
+export const KpiSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  value: z.number().nullable(),
+  /** brl = reais; pct = %; count = quantidade; stars = 0–5 */
+  unit: z.enum(["brl", "pct", "count", "stars", "text"]),
+  text: z.string().optional(),
+  /** Variação % contra o período anterior, quando disponível. */
+  changePct: z.number().nullable().optional(),
+});
+export type Kpi = z.infer<typeof KpiSchema>;
+
+export const ConnectorMetricsSchema = z.object({
+  connectorId: z.string(),
+  connectorName: z.string(),
+  type: ConnectorTypeSchema,
+  period: z.string().nullable(),
+  kpis: z.array(KpiSchema),
+  highlights: z.array(z.string()),
+  /** Alertas que merecem atenção (estoque baixo, avaliação ruim...). */
+  alerts: z.array(z.string()),
+  error: z.string().nullable(),
+  fetchedAt: z.string(),
+});
+export type ConnectorMetrics = z.infer<typeof ConnectorMetricsSchema>;
+
+export const SpaceOverviewSchema = z.object({
+  space: SpaceSchema,
+  connectors: z.array(ConnectorSchema),
+  metrics: z.array(ConnectorMetricsSchema),
+  openTasks: z.number(),
+  memories: z.number(),
+});
+export type SpaceOverview = z.infer<typeof SpaceOverviewSchema>;
+
+export const AUTOMATION_KINDS = ["relatorio_negocios", "pendencias", "tarefas_atrasadas", "alerta_estoque"] as const;
+export const AutomationKindSchema = z.enum(AUTOMATION_KINDS);
+export type AutomationKind = z.infer<typeof AutomationKindSchema>;
+export const AUTOMATION_LABELS: Record<AutomationKind, string> = {
+  relatorio_negocios: "Relatório semanal dos negócios",
+  pendencias: "Relatório semanal de pendências",
+  tarefas_atrasadas: "Alerta diário de tarefas atrasadas",
+  alerta_estoque: "Alerta diário de estoque baixo",
+};
+
+export const AutomationSchema = z.object({
+  id: z.string().uuid(),
+  kind: AutomationKindSchema,
+  space: SpaceSchema.nullable(),
+  /** 0 = domingo … 6 = sábado; null = todos os dias. */
+  weekday: z.number().int().min(0).max(6).nullable(),
+  runTime: z.string(),
+  enabled: z.boolean(),
+  lastRunAt: z.string().nullable(),
+});
+export type Automation = z.infer<typeof AutomationSchema>;
+
+const HHMM4 = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM");
+export const AutomationCreateSchema = z.object({
+  kind: AutomationKindSchema,
+  space: SpaceSchema.nullable().default(null),
+  weekday: z.number().int().min(0).max(6).nullable().default(null),
+  runTime: HHMM4.default("08:00"),
+  enabled: z.boolean().default(true),
+});
+export type AutomationCreate = z.input<typeof AutomationCreateSchema>;
+export const AutomationUpdateSchema = z
+  .object({ weekday: z.number().int().min(0).max(6).nullable(), runTime: HHMM4, enabled: z.boolean(), space: SpaceSchema.nullable() })
+  .partial();
+
+export const ReportSchema = z.object({
+  id: z.string().uuid(),
+  space: SpaceSchema.nullable(),
+  kind: AutomationKindSchema,
+  title: z.string(),
+  body: z.string(),
+  createdAt: z.string(),
+});
+export type Report = z.infer<typeof ReportSchema>;

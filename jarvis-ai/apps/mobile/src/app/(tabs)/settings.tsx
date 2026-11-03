@@ -9,6 +9,8 @@ import { api } from "@/lib/api";
 import { config } from "@/lib/config";
 import { connectGoogle } from "@/lib/google";
 import { registerForPush } from "@/lib/push";
+
+const SERVICE_NAME: Record<GoogleService, string> = { calendar: "Agenda", gmail: "Gmail", sheets: "Planilhas" };
 import { requestCalendarAccess, requestLocationAccess } from "@/lib/device";
 import { jarvisNative } from "../../../modules/jarvis-native";
 import * as Device from "expo-device";
@@ -102,7 +104,7 @@ export default function Settings() {
     setError(null);
     try {
       const r = await connectGoogle(wanted);
-      if (r.ok) Alert.alert("Google conectado", `${r.email ?? "Conta"} — ${r.services.map((s) => (s === "calendar" ? "Agenda" : "Gmail")).join(" e ")}.`);
+      if (r.ok) Alert.alert("Google conectado", `${r.email ?? "Conta"} — ${r.services.map((s) => SERVICE_NAME[s as GoogleService] ?? s).join(", ")}.`);
       else if (!r.cancelled) setError(r.message);
       await loadIntegrations();
     } catch (e) {
@@ -255,17 +257,17 @@ export default function Settings() {
           {google?.available ? (
             <>
               <View style={styles.voices}>
-                {(["calendar", "gmail"] as const).map((s) => {
+                {(["calendar", "gmail", "sheets"] as const).map((s) => {
                   const active = wanted.includes(s);
                   return (
                     <Pressable key={s} onPress={() => toggleService(s)} style={[styles.voice, active && styles.voiceActive]}>
-                      <Text style={[font.small, { color: active ? colors.bg : colors.text }]}>{s === "calendar" ? "Agenda" : "Gmail"}</Text>
+                      <Text style={[font.small, { color: active ? colors.bg : colors.text }]}>{SERVICE_NAME[s]}</Text>
                     </Pressable>
                   );
                 })}
               </View>
               <Text style={font.small}>
-                Agenda: ver e criar compromissos. Gmail: ler, rascunhar e enviar e-mails (o envio sempre pede sua confirmação). O Jarvis nunca apaga e-mails.
+                Agenda: ver e criar compromissos. Gmail: ler, rascunhar e enviar e-mails (o envio sempre pede sua confirmação). Planilhas: somente leitura, para os indicadores dos negócios. O Jarvis nunca apaga e-mails nem altera planilhas.
               </Text>
               <Button
                 title={google.connected ? "Reconectar / alterar permissões" : "Conectar conta Google"}

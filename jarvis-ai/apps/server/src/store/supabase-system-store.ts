@@ -5,8 +5,8 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { GoogleService, MemoryCategory, Space } from "@jarvis/shared";
-import { check, TASK_COLUMNS, toMemoryRow, toProfileRow, toTask } from "./supabase-store";
-import type { IntegrationSecret, SystemStore, TaskInput } from "./types";
+import { AUTOMATION_COLUMNS, check, CONNECTOR_COLUMNS, REPORT_COLUMNS, TASK_COLUMNS, toAutomation, toConnector, toMemoryRow, toProfileRow, toReport, toTask } from "./supabase-store";
+import type { ConnectorRecord, DueAutomation, IntegrationSecret, SystemStore, TaskInput } from "./types";
 
 type Row = Record<string, unknown>;
 
@@ -254,5 +254,103 @@ export class SupabaseSystemStore implements SystemStore {
       await this.sb.from("jarvis_action_log").insert({ user_id: userId, tool_name: entry.tool, status: entry.status, summary: entry.summary.slice(0, 500) }),
       "registro de ações",
     );
+  }
+
+  // ---- Fase 4 ----
+  private toRecord(r: Row): ConnectorRecord {
+    return { ...toConnector(r), userId: String(r.user_id), encryptedSecret: (r.encrypted_secret as string | null) ?? null };
+  }
+
+  async createConnector(input: Parameters<SystemStore["createConnector"]>[0]) {
+    if (input.type === "sir_alfred_hub") {
+      // Um único Hub por usuário: reconectar substitui o anterior.
+      check(await this.sb.from("jarvis_connectors").delete().eq("user_id", input.userId).eq("type", "sir_alfred_hub"), "conector");
+    }
+    const r = check(
+      await this.sb
+        .from("jarvis_connectors")
+        .insert({
+          user_id: input.userId,
+          space: input.space,
+          type: input.type,
+          name: input.name,
+          config: input.config,
+          encrypted_secret: input.encryptedSecret,
+          account_label: input.accountLabel,
+        })
+        .select(`user_id, encrypted_secret, ${CONNECTOR_COLUMNS}`)
+        .single(),
+      "conector",
+    ) as Row;
+    return this.toRecord(r);
+  }
+
+  async getConnector(userId: string, id: string) {
+    const r = check(
+      await this.sb.from("jarvis_connectors").select(`user_id, encrypted_secret, ${CONNECTOR_COLUMNS}`).eq("user_id", userId).eq("id", id).maybeSingle(),
+      "conector",
+    ) as Row | null;
+    return r ? this.toRecord(r) : null;
+  }
+
+  async listConnectorsFor(userId: string, space?: Space) {
+    let q = this.sb.from("jarvis_connectors").select(`user_id, encrypted_secret, ${CONNECTOR_COLUMNS}`).eq("user_id", userId);
+    if (space) q = q.eq("space", space);
+    return ((check(await q.order("created_at", { ascending: true }), "conectores") ?? []) as Row[]).map((r) => this.toRecord(r));
+  }
+
+  async updateConnectorSecret(id: string, encryptedSecret: string) {
+    check(await this.sb.from("jarvis_connectors").update({ encrypted_secret: encryptedSecret }).eq("id", id), "conector");
+  }
+
+  async setConnectorStatus(id: string, status: "active" | "error", lastError: string | null, synced: boolean) {
+    check(
+      await this.sb
+        .from("jarvis_connectors")
+        .update({ status, last_error: lastError?.slice(0, 300) ?? null, ...(synced ? { last_sync_at: new Date().toISOString() } : {}) })
+        .eq("id", id),
+      "conector",
+    );
+  }
+
+  async insertReport(input: Parameters<SystemStore["insertReport"]>[0]) {
+    const r = check(
+      await this.sb
+        .from("jarvis_reports")
+        .insert({ user_id: input.userId, space: input.space, kind: input.kind, title: input.title, body: input.body, data: input.data ?? {} })
+        .select(REPORT_COLUMNS)
+        .single(),
+      "relatório",
+    ) as Row;
+    return toReport(r);
+  }
+
+  async listEnabledAutomations(): Promise<DueAutomation[]> {
+    const rows = (check(await this.sb.from("jarvis_automations").select(`user_id, last_run_key, ${AUTOMATION_COLUMNS}`).eq("enabled", true).limit(2000), "automações") ??
+      []) as Row[];
+    if (rows.length === 0) return [];
+    const ids = [...new Set(rows.map((r) => String(r.user_id)))];
+    const profiles = (check(await this.sb.from("jarvis_profiles").select("user_id, timezone, owner_name").in("user_id", ids), "perfis") ?? []) as Row[];
+    const byUser = new Map(profiles.map((p) => [String(p.user_id), p]));
+    return rows.map((r) => ({
+      ...toAutomation(r),
+      userId: String(r.user_id),
+      lastRunKey: (r.last_run_key as string | null) ?? null,
+      timezone: String(byUser.get(String(r.user_id))?.timezone ?? "America/Sao_Paulo"),
+      ownerName: String(byUser.get(String(r.user_id))?.owner_name ?? "senhor"),
+    }));
+  }
+
+  async claimAutomationRun(id: string, runKey: string) {
+    const rows = check(
+      await this.sb
+        .from("jarvis_automations")
+        .update({ last_run_key: runKey, last_run_at: new Date().toISOString() })
+        .eq("id", id)
+        .or(`last_run_key.is.null,last_run_key.neq.${runKey}`)
+        .select("id"),
+      "automação",
+    );
+    return (rows ?? []).length > 0;
   }
 }

@@ -2,14 +2,16 @@
 
 ## O que foi verificado e o que não foi
 
-**Verificado neste ambiente (Linux, sem iPhone) — Fases 1, 2 e 3:**
+**Verificado neste ambiente (Linux, sem iPhone) — Fases 1 a 4:**
 - Verificação de tipos de todo o projeto (shared, server, mobile).
-- 115 testes automatizados (inclui Fase 3: chaves de aparelho, endpoints da Siri, ações executadas no iPhone,
+- 141 testes automatizados (Fase 4: leitura de planilhas brasileiras, indicadores de vendas/estoque/pedidos/
+  cronograma/metas, indicadores do Hub, OAuth do Hub com rotação de refresh token, automações uma vez por período;
+  Fase 3: chaves de aparelho, endpoints da Siri, ações executadas no iPhone,
   contexto do aparelho, links de ligação/SMS/WhatsApp/e-mail): orquestrador (ferramentas, confirmação, expiração, limites, recusa), API HTTP
   (autenticação, isolamento entre usuários, memória, exportação, ações, integrações, tarefas, push, cron),
   segurança, voz e palavra de ativação; Fase 2 com simulação das APIs do Google e do Expo Push exercitando os
   clientes reais (OAuth/PKCE, criar/reagendar/cancelar evento, buscar/ler/rascunhar/enviar e-mail, agendador).
-- 14 testes de integração aplicando as migrações reais em PostgreSQL 16 e checando o RLS (inclusive que o
+- 16 testes de integração aplicando as migrações reais em PostgreSQL 16 e checando o RLS (inclusive que o
   usuário não lê o token cifrado nem o hash das chaves de aparelho, e que um lembrete só é reivindicado uma vez).
 - Fase 3: `expo prebuild` gera o projeto com os App Intents no alvo principal (fase Sources), nome alternativo
   "Jarvis", região pt-BR, iOS 17, permissões de Calendário/Lembretes/Contatos/Localização em português, e o
@@ -29,6 +31,14 @@
 - `expo-doctor`: 18 de 20 checagens passaram; as 2 restantes precisam de acesso à internet da Expo, bloqueado aqui.
 
 ## Limitações conhecidas
+
+### Fase 4
+- **Hub:** a conexão real depende de cadastrar o cliente OAuth do Jarvis no Supabase do Hub (script incluso). O
+  formato das tabelas do Hub foi lido deste repositório; se o Hub mudar o esquema, o conector precisa acompanhar.
+- **Período do Hub:** usa o último `period_label` lançado pela gestão; o Jarvis não recalcula períodos.
+- **Black Bear, Barton, Alfie & Fred, Educação:** dados via planilha até existir API oficial/autorizada de cada sistema.
+- **Planilhas:** até 1.000 linhas por intervalo (ajustável no intervalo); fórmulas são lidas pelo valor exibido.
+- **Relatórios** são textos determinísticos; análises mais elaboradas acontecem quando você conversa com o Jarvis.
 
 ### Fase 3
 - **Siri em segundo plano exige backend HTTPS** (decisão de segurança para a chave do aparelho).
@@ -76,9 +86,10 @@ Google Agenda, Gmail, tarefas e lembretes, resumo diário, notificações push e
 App Intents (Siri, Atalhos, Spotlight, Botão de Ação), respostas da Siri em segundo plano, Calendário/Lembretes,
 Contatos, localização, ligações/mensagens/WhatsApp por links oficiais. Detalhes em `docs/IOS.md`.
 
-### Fase 4 — Negócios
-- Conectores autenticados por espaço (ex.: e-commerce da Black Bear, API autorizada do Barton), relatórios e
-  automações agendadas, sempre com permissões revogáveis e separação de dados por espaço.
+### Fase 4 — Negócios ✅ (implementada)
+Conectores (Sir Alfred Team Hub e Google Planilhas), aba Negócios, indicadores, relatórios e automações
+controladas pelo usuário. Próximos conectores, quando houver API autorizada: loja da Black Bear (ex.: Shopify,
+Nuvemshop), Barton, AppBarber.
 - WhatsApp: primeiro, abrir conversas com mensagem pronta (`whatsapp://send`), sem automação não oficial;
   WhatsApp Business Platform apenas quando configurado oficialmente.
 

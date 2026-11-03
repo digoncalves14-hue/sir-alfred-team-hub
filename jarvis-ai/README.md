@@ -3,7 +3,7 @@
 Assistente pessoal em português, com voz, memória persistente e ações autorizadas.
 App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQL com RLS) + Claude (Anthropic).
 
-> **Status: Fases 1 (MVP), 2 (Produtividade) e 3 (Integração iOS) implementadas e verificadas no ambiente de desenvolvimento.**
+> **Status: Fases 1 (MVP), 2 (Produtividade), 3 (Integração iOS) e 4 (Negócios) implementadas e verificadas no ambiente de desenvolvimento.**
 > Ainda **não** foram instaladas em um iPhone físico nem testadas contra as APIs reais do Google: isso exige a
 > sua conta Apple Developer, Supabase, chave da IA e um projeto no Google Cloud
 > (veja [Passo a passo](#passo-a-passo-para-rodar-no-iphone) e [`docs/GOOGLE.md`](docs/GOOGLE.md)).
@@ -29,7 +29,12 @@ App iOS (Expo/React Native) + backend Node.js (TypeScript) + Supabase (PostgreSQ
 | Bloqueio de dados sensíveis na memória | ✅ Implementado | Senhas, cartões, CPF, chaves de API são recusados no servidor |
 | Registro de ações (auditoria) | ✅ Implementado | Imutável para o usuário (só inserir/ler) |
 | Controle de custos | ✅ Implementado | Estimativa por requisição, painel de consumo, limite diário configurável |
-| Painel pessoal + espaços empresariais | ✅ Organizacional | Sir Alfred, Black Bear, Barton, Alfie & Fred, Educação: organizam memórias. **Sem dados de negócio conectados** |
+| Painel pessoal + espaços empresariais | ✅ | Sir Alfred, Black Bear, Barton, Alfie & Fred, Educação: memórias, tarefas, fontes e relatórios separados |
+| **Conector Sir Alfred Team Hub** | ✅ Fase 4 | OAuth 2.1 + PKCE no app da equipe (somente leitura): faturamento, serviços, ticket, ranking, produtos, avaliações |
+| **Conector Google Planilhas** | ✅ Fase 4 | Somente leitura: vendas, estoque, pedidos, cronogramas, metas — para Black Bear, Alfie & Fred, Educação, Barton |
+| **Aba Negócios** (dashboards por empresa) | ✅ Fase 4 | Indicadores, alertas, fontes, relatórios. Ver [`docs/NEGOCIOS.md`](docs/NEGOCIOS.md) |
+| **Relatórios e automações** | ✅ Fase 4 | Relatório semanal, pendências, tarefas atrasadas, estoque baixo — você liga/desliga e escolhe dia/horário |
+| APIs próprias (loja Black Bear, Barton) | ⏳ | Via planilha até haver API autorizada; arquitetura de conectores pronta |
 | **Siri, Atalhos, Spotlight e Botão de Ação** (App Intents) | ✅ Fase 3 | "Conversar com Jarvis", resumo do dia, agenda, registrar tarefa — sem configuração manual. Ver [`docs/IOS.md`](docs/IOS.md) |
 | Siri responde sem abrir o app | ✅ Fase 3 | Chave do aparelho de escopo restrito, no Keychain, revogável; exige backend HTTPS |
 | Calendário e Lembretes do iPhone | ✅ Fase 3 | Leitura como contexto (com permissão); criar evento/lembrete **após confirmação** |
@@ -58,7 +63,7 @@ pela ferramenta, ele não diz que foi feita.
 jarvis-ai/
 ├── apps/
 │   ├── mobile/                 # App iOS (Expo SDK 58, Expo Router, TypeScript)
-│   │   ├── src/app/            # Telas: login, Jarvis, Hoje, Histórico, Memória, Ajustes
+│   │   ├── src/app/            # Telas: login, Jarvis, Hoje, Negócios, Memória, Ajustes, Histórico
 │   │   ├── src/voice/          # Voice Engine: reconhecimento + síntese
 │   │   ├── src/logic/          # Máquina de estados da voz, palavra de ativação (testadas)
 │   │   ├── src/components/     # Orbe holográfico, cartões, chat
@@ -76,7 +81,8 @@ jarvis-ai/
 │       ├── src/tts/            # Voz premium opcional (ElevenLabs)
 │       ├── src/google/         # OAuth (PKCE), Google Agenda, Gmail
 │       ├── src/push/           # Notificações push (Expo → APNs)
-│       ├── src/scheduler/      # Lembretes, resumo diário, avisos de reunião
+│       ├── src/scheduler/      # Lembretes, resumo diário, avisos de reunião, automações
+│       ├── src/business/       # Conectores (Hub, Planilhas), indicadores, relatórios
 │       └── test/               # Testes unitários, de API e de integração (RLS)
 ├── packages/shared/            # Contratos (zod) usados pelo app e pelo servidor
 ├── supabase/migrations/        # Migração SQL com Row Level Security
@@ -84,7 +90,7 @@ jarvis-ai/
 └── Dockerfile.server           # Imagem do backend
 ```
 
-Detalhes: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) · Google: [`docs/GOOGLE.md`](docs/GOOGLE.md) · iPhone/Siri: [`docs/IOS.md`](docs/IOS.md) · Custos: [`docs/CUSTOS.md`](docs/CUSTOS.md) ·
+Detalhes: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) · Google: [`docs/GOOGLE.md`](docs/GOOGLE.md) · iPhone/Siri: [`docs/IOS.md`](docs/IOS.md) · Negócios: [`docs/NEGOCIOS.md`](docs/NEGOCIOS.md) · Custos: [`docs/CUSTOS.md`](docs/CUSTOS.md) ·
 Limitações e próximas fases: [`docs/LIMITACOES-E-ROADMAP.md`](docs/LIMITACOES-E-ROADMAP.md)
 
 ---
@@ -105,12 +111,13 @@ ou nos painéis dos serviços.
 | 5 | (Opcional) ElevenLabs: API key + ID de uma voz masculina pt-BR | elevenlabs.io | Plano pago conforme uso |
 | 6 | Um lugar para hospedar o backend (ou seu computador na mesma rede Wi-Fi para testes) | Render, Railway, Fly.io… | Gratuito a ~US$ 7/mês |
 | 7 | (Fase 2) Supabase **service_role** + chave de criptografia + **cliente OAuth iOS do Google** | Ver [`docs/GOOGLE.md`](docs/GOOGLE.md) | Gratuito |
+| 8 | (Fase 4) Cliente OAuth do Jarvis no **Sir Alfred Team Hub** | `node scripts/register-hub-client.mjs` — ver [`docs/NEGOCIOS.md`](docs/NEGOCIOS.md) | Gratuito |
 
 ### 1. Banco de dados (Supabase)
 
 1. Crie um projeto (recomendo um projeto **separado** do Sir Alfred Team Hub).
 2. Abra **SQL Editor** e execute, nesta ordem, `supabase/migrations/20261103000000_jarvis_phase1.sql`,
-   `20261104000000_jarvis_phase2.sql` e `20261105000000_jarvis_phase3.sql`.
+   `20261104000000_jarvis_phase2.sql`, `20261105000000_jarvis_phase3.sql` e `20261106000000_jarvis_phase4.sql`.
    (Ou, com a Supabase CLI: `supabase link` e `supabase db push` dentro de `jarvis-ai/`.)
 3. Em **Authentication → Providers → Email**, mantenha e-mail/senha ativado. Para uso pessoal,
    você pode desativar “Confirm email” ou confirmar pelo link enviado.
@@ -207,9 +214,9 @@ Detalhes, frases e privacidade: [`docs/IOS.md`](docs/IOS.md). O link `jarvis://?
 ```bash
 cd jarvis-ai
 npm run typecheck          # shared + server + mobile
-npm test                   # 115 testes: orquestrador, ferramentas, Google (simulado), agendador, iPhone/Siri, API, segurança, voz
+npm test                   # 141 testes: orquestrador, Google e Hub (simulados), planilhas, indicadores, automações, iPhone/Siri, API, segurança, voz
 npm run db:test:up         # sobe um PostgreSQL local descartável
-npm run test:integration   # aplica as migrações reais e testa o RLS (14 testes)
+npm run test:integration   # aplica as migrações reais e testa o RLS (16 testes)
 npm run db:test:down
 npm run verify:mobile      # typecheck + bundle iOS (Metro/Hermes)
 ```

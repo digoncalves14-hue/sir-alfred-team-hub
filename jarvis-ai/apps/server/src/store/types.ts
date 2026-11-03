@@ -3,6 +3,11 @@ import type {
   AuditEntry,
   GoogleService,
   DeviceToken,
+  Automation,
+  AutomationKind,
+  Connector,
+  ConnectorType,
+  Report,
   Task,
   TaskUpdate,
   ChatMessage,
@@ -111,6 +116,29 @@ export interface UserStore {
   // ---- Fase 3 ----
   listDeviceTokens(): Promise<DeviceToken[]>;
   revokeDeviceToken(id: string): Promise<boolean>;
+
+  // ---- Fase 4 ----
+  listConnectors(space?: Space): Promise<Connector[]>;
+  deleteConnector(id: string): Promise<boolean>;
+  listReports(limit: number, space?: Space): Promise<Report[]>;
+  getReport(id: string): Promise<Report | null>;
+  deleteReport(id: string): Promise<boolean>;
+  listAutomations(): Promise<Automation[]>;
+  createAutomation(input: { kind: AutomationKind; space: Space | null; weekday: number | null; runTime: string; enabled: boolean }): Promise<Automation>;
+  updateAutomation(id: string, patch: Partial<{ weekday: number | null; runTime: string; enabled: boolean; space: Space | null }>): Promise<Automation | null>;
+  deleteAutomation(id: string): Promise<boolean>;
+}
+
+export interface ConnectorRecord extends Connector {
+  userId: string;
+  encryptedSecret: string | null;
+}
+
+export interface DueAutomation extends Automation {
+  userId: string;
+  timezone: string;
+  ownerName: string;
+  lastRunKey: string | null;
 }
 
 export interface TaskQuery {
@@ -199,4 +227,23 @@ export interface SystemStore {
   createTaskFor(userId: string, input: TaskInput): Promise<Task>;
   createMemoryFor(userId: string, input: { category: MemoryCategory; space: Space; content: string }): Promise<Memory>;
   logActionFor(userId: string, entry: { tool: string; status: "executed" | "failed" | "blocked"; summary: string }): Promise<void>;
+
+  // ---- Fase 4: conectores (segredos cifrados), relatórios e automações ----
+  createConnector(input: {
+    userId: string;
+    space: Space;
+    type: ConnectorType;
+    name: string;
+    config: Record<string, unknown>;
+    encryptedSecret: string | null;
+    accountLabel: string | null;
+  }): Promise<ConnectorRecord>;
+  getConnector(userId: string, id: string): Promise<ConnectorRecord | null>;
+  listConnectorsFor(userId: string, space?: Space): Promise<ConnectorRecord[]>;
+  updateConnectorSecret(id: string, encryptedSecret: string): Promise<void>;
+  setConnectorStatus(id: string, status: "active" | "error", lastError: string | null, synced: boolean): Promise<void>;
+  insertReport(input: { userId: string; space: Space | null; kind: AutomationKind; title: string; body: string; data: unknown }): Promise<Report>;
+  listEnabledAutomations(): Promise<DueAutomation[]>;
+  /** true se ESTA execução ganhou o período (evita relatórios duplicados). */
+  claimAutomationRun(id: string, runKey: string): Promise<boolean>;
 }

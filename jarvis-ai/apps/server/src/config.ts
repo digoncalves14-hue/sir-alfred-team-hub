@@ -46,6 +46,13 @@ const EnvSchema = z.object({
   SCHEDULER_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(3600).default(60),
   // Protege POST /internal/cron/tick (para cron externo quando o servidor "dorme").
   CRON_SECRET: z.string().min(16).optional(),
+
+  // ---- Fase 4: Sir Alfred Team Hub (Supabase do app da equipe como servidor OAuth 2.1) ----
+  HUB_SUPABASE_URL: z.string().url().optional(),
+  // Chave PÚBLICA (publishable/anon) do Hub — não é segredo.
+  HUB_PUBLISHABLE_KEY: z.string().min(20).optional(),
+  // client_id do app OAuth "JARVIS AI" cadastrado no Hub (cliente público, sem segredo).
+  HUB_OAUTH_CLIENT_ID: z.string().min(8).optional(),
 });
 
 export type Config = z.infer<typeof EnvSchema>;

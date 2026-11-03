@@ -251,4 +251,39 @@ describe.skipIf(!enabled)("RLS no PostgreSQL (migração real)", () => {
       as(A, (c) => c.query("insert into public.jarvis_pending_actions (tool_name, input, summary, executor) values ('x', '{}', 's', 'nuvem')")),
     ).rejects.toThrow(/check constraint/);
   });
+
+  // ------------------------------- Fase 4 -------------------------------
+  it("conectores: usuário vê config e status, nunca o segredo; não cria nem altera", async () => {
+    await asService((c) =>
+      c.query("insert into public.jarvis_connectors (user_id, space, type, name, encrypted_secret) values ($1, 'sir_alfred', 'sir_alfred_hub', 'Hub', 'v1.cifrado')", [A]),
+    );
+    expect((await as(A, (c) => c.query("select name, type, status from public.jarvis_connectors"))).rows).toEqual([{ name: "Hub", type: "sir_alfred_hub", status: "active" }]);
+    await expect(as(A, (c) => c.query("select encrypted_secret from public.jarvis_connectors"))).rejects.toThrow(/permission denied/);
+    await expect(as(A, (c) => c.query("update public.jarvis_connectors set name = 'x'"))).rejects.toThrow(/permission denied/);
+    await expect(
+      as(A, (c) => c.query("insert into public.jarvis_connectors (user_id, space, type, name) values ($1, 'pessoal', 'google_sheets', 'x')", [A])),
+    ).rejects.toThrow(/permission denied/);
+    expect((await as(B, (c) => c.query("select id from public.jarvis_connectors"))).rows).toHaveLength(0);
+    expect((await as(B, (c) => c.query("delete from public.jarvis_connectors"))).rowCount).toBe(0);
+    // Um único Hub por usuário
+    await expect(
+      asService((c) => c.query("insert into public.jarvis_connectors (user_id, space, type, name) values ($1, 'sir_alfred', 'sir_alfred_hub', 'Hub 2')", [A])),
+    ).rejects.toThrow(/duplicate key/);
+    expect((await as(A, (c) => c.query("delete from public.jarvis_connectors"))).rowCount).toBe(1);
+  });
+
+  it("automações são do usuário; relatórios só o backend cria", async () => {
+    const id = await as(A, async (c) =>
+      (await c.query("insert into public.jarvis_automations (kind, weekday, run_time) values ('pendencias', 1, '08:00') returning id")).rows[0].id,
+    );
+    expect((await as(B, (c) => c.query("update public.jarvis_automations set enabled = false where id = $1", [id]))).rowCount).toBe(0);
+    await expect(as(A, (c) => c.query("insert into public.jarvis_automations (kind, run_time) values ('pendencias', '24:00')"))).rejects.toThrow(/check constraint/);
+    await expect(as(A, (c) => c.query("insert into public.jarvis_automations (kind) values ('apagar_tudo')"))).rejects.toThrow(/check constraint/);
+    await expect(
+      as(A, (c) => c.query("insert into public.jarvis_reports (user_id, kind, title, body) values ($1, 'pendencias', 't', 'b')", [A])),
+    ).rejects.toThrow(/permission denied/);
+    await asService((c) => c.query("insert into public.jarvis_reports (user_id, kind, title, body) values ($1, 'pendencias', 't', 'b')", [A]));
+    expect((await as(B, (c) => c.query("select id from public.jarvis_reports"))).rows).toHaveLength(0);
+    expect((await as(A, (c) => c.query("select title from public.jarvis_reports"))).rows).toHaveLength(1);
+  });
 });

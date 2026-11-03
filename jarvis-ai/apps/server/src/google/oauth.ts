@@ -14,6 +14,8 @@ export const GOOGLE_SCOPES: Record<GoogleService, string[]> = {
   calendar: ["https://www.googleapis.com/auth/calendar.events"],
   // Ler e-mails + criar rascunhos/enviar. Nunca exclui e-mails.
   gmail: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.compose"],
+  // Somente LEITURA de planilhas (indicadores dos negócios). O Jarvis nunca altera planilhas.
+  sheets: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
 };
 const BASE_SCOPES = ["openid", "email"];
 const STATE_TTL_MS = 10 * 60_000;

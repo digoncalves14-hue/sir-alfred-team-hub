@@ -1,4 +1,4 @@
-export type IntegrationErrorCode = "nao_configurado" | "nao_conectado" | "servico_nao_autorizado" | "reconectar" | "erro_google";
+export type IntegrationErrorCode = "nao_configurado" | "nao_conectado" | "servico_nao_autorizado" | "reconectar" | "erro_google" | "erro_conector";
 
 /** Erro "honesto" de integração: vira mensagem clara para o usuário, nunca um sucesso falso. */
 export class IntegrationError extends Error {
@@ -12,4 +12,4 @@ export class IntegrationError extends Error {
   }
 }
 
-export const SERVICE_LABEL = { calendar: "Google Agenda", gmail: "Gmail" } as const;
+export const SERVICE_LABEL = { calendar: "Google Agenda", gmail: "Gmail", sheets: "Google Planilhas" } as const;

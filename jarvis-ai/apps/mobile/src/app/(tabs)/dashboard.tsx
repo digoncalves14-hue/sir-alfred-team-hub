@@ -254,19 +254,20 @@ export default function Dashboard() {
         <SectionTitle>ESPAÇOS</SectionTitle>
         <View style={styles.grid}>
           {SPACES.map((s) => (
-            <Card key={s} style={styles.spaceCard}>
+            <Pressable key={s} style={styles.spaceCard} onPress={() => (s === "pessoal" ? router.push("/memory") : router.push({ pathname: "/space/[id]", params: { id: s } }))}>
+            <Card style={{ gap: space(1.5), flex: 1 }}>
               <Icon name={SPACE_ICONS[s]} size={22} />
               <Text style={[font.body, { fontWeight: "700" }]}>{SPACE_LABELS[s]}</Text>
               <Text style={font.small} numberOfLines={2}>
                 {SPACE_SCOPE[s]}
               </Text>
               <Text style={font.small}>{countBySpace(s)} memória(s)</Text>
-              {s !== "pessoal" ? <Pill label="SEM INTEGRAÇÃO" color={colors.textDim} /> : null}
             </Card>
+            </Pressable>
           ))}
         </View>
         <Text style={[font.small, { marginTop: space(2) }]}>
-          Os espaços empresariais organizam memórias e decisões. Dados reais (vendas, estoque, agenda) só aparecerão quando os conectores autorizados forem configurados (Fase 4).
+          Toque num espaço para ver indicadores e conectar fontes de dados (aba Negócios). Sem fonte conectada, nenhum número é exibido.
         </Text>
 
         <SectionTitle>ÚLTIMAS AÇÕES</SectionTitle>
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
   barBg: { height: 8, backgroundColor: colors.cyanFaint, borderRadius: radius.pill, overflow: "hidden" },
   barFg: { height: 8, borderRadius: radius.pill },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space(2) },
-  spaceCard: { width: "48.5%", gap: space(1.5) },
+  spaceCard: { width: "48.5%" },
   addRow: { flexDirection: "row", alignItems: "center", gap: space(2), marginBottom: space(2) },
   addInput: {
     flex: 1,

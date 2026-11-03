@@ -9,6 +9,7 @@ import { IntegrationError, SERVICE_LABEL } from "./errors";
 import type { GoogleOAuth } from "./oauth";
 import { CalendarApi } from "./calendar";
 import { GmailApi } from "./gmail";
+import { SheetsApi } from "./sheets";
 
 export type GoogleFetch = (url: string, init?: RequestInit) => Promise<unknown>;
 
@@ -108,6 +109,11 @@ export class GoogleUser {
   async calendar(): Promise<CalendarApi> {
     await this.require("calendar");
     return new CalendarApi((url, init) => this.gw.request(this.userId, url, init));
+  }
+
+  async sheets(): Promise<SheetsApi> {
+    await this.require("sheets");
+    return new SheetsApi((url, init) => this.gw.request(this.userId, url, init));
   }
 
   async gmail(): Promise<GmailApi> {

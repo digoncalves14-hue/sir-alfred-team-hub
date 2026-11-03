@@ -6,16 +6,16 @@ tokens de cada requisição; a fatura oficial é a do provedor.
 
 ## Por conversa (IA)
 
-Na Fase 2, cada chamada envia ~4.500 tokens fixos (instruções + 19 ferramentas), mais histórico e contexto
+Com as Fases 1–4, cada chamada envia ~6.100 tokens fixos (instruções + 25 ferramentas), mais histórico e contexto
 (~2.000) e recebe ~300 de saída. A parte fixa entra no **cache de prompt**: na primeira fala de uma sequência ela
 é gravada no cache (um pouco mais cara) e, nas falas seguintes dentro de ~5 minutos, é lida do cache (≈ 5% do preço).
 Quando o Jarvis usa uma ferramenta, são 2 chamadas.
 
 | Modelo (`AI_MODEL`) | Preço (entrada / saída por 1M tokens) | Fala simples | Fala com ferramenta |
 |---|---|---|---|
-| `claude-opus-5-5` (padrão) | US$ 4 / US$ 20 | ~US$ 0,015 (com cache) a 0,036 | ~US$ 0,03 a 0,06 |
-| `claude-sonnet-5-5` | US$ 2 / US$ 10 | ~US$ 0,008 a 0,018 | ~US$ 0,015 a 0,03 |
-| `claude-haiku-5-5` | US$ 0,10 / US$ 0,50 | ~US$ 0,0004 a 0,001 | ~US$ 0,001 a 0,002 |
+| `claude-opus-5-5` (padrão) | US$ 4 / US$ 20 | ~US$ 0,015 (com cache) a 0,045 | ~US$ 0,03 a 0,065 |
+| `claude-sonnet-5-5` | US$ 2 / US$ 10 | ~US$ 0,008 a 0,022 | ~US$ 0,016 a 0,035 |
+| `claude-haiku-5-5` | US$ 0,10 / US$ 0,50 | ~US$ 0,0004 a 0,0012 | ~US$ 0,001 a 0,002 |
 
 **Exemplo de mês** com 30 falas por dia (metade com ferramenta, em conversas de várias falas): Opus 5.5 ≈ US$ 25–40;
 Sonnet 5.5 ≈ US$ 12–20; Haiku 5.5 ≈ US$ 1. O painel do app mostra o valor real estimado, já considerando o cache. O limite diário padrão é US$ 1,00 (ajustável em Ajustes) e bloqueia novas chamadas quando atingido.
@@ -43,6 +43,9 @@ das respostas no seu uso; diminua `AI_HISTORY_MESSAGES`.
 | EAS Build | Gratuito com limite mensal de builds | |
 | Google Calendar/Gmail API | US$ 0 nas cotas normais de uso pessoal | |
 | Cron externo (se o backend dormir) | cron-job.org e similares: US$ 0 | Alternativa a manter o servidor sempre ligado |
+
+**Fase 4:** indicadores, relatórios e automações são calculados sem IA (custo zero); as APIs do Hub e do Google
+Planilhas são gratuitas no uso pessoal. Só a conversa sobre os números usa IA.
 
 **Fase 2 e custo de IA:** o resumo diário e os lembretes são montados sem IA (custo zero). Perguntas como
 "o que temos hoje?" usam 1 a 2 chamadas extras de ferramenta (~US$ 0,02 a mais por pergunta no Opus 5.5).

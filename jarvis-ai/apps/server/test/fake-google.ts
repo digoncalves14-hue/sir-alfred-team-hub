@@ -38,6 +38,8 @@ export class FakeGoogle {
   refreshRevoked = false;
   omitRefreshToken = false;
   revoked: string[] = [];
+  /** Planilhas simuladas: id → título e abas. */
+  spreadsheets = new Map<string, { title: string; tabs: { name: string; values: string[][] }[] }>();
   private seq = 0;
 
   get mutations() {
@@ -172,6 +174,19 @@ export class FakeGoogle {
       }
     }
 
+    // ---- Google Sheets ----
+    if (url.host === "sheets.googleapis.com") {
+      const m = url.pathname.match(/^\/v4\/spreadsheets\/([^/]+)(?:\/values\/(.+))?$/);
+      const sheet = m ? this.spreadsheets.get(decodeURIComponent(m[1]!)) : undefined;
+      if (!m || !sheet) return json({ error: { message: "Requested entity was not found." } }, 404);
+      if (!m[2]) return json({ properties: { title: sheet.title }, sheets: sheet.tabs.map((t) => ({ properties: { title: t.name } })) });
+      const range = decodeURIComponent(m[2]);
+      const tabName = range.includes("!") ? range.split("!")[0]!.replace(/^'|'$/g, "").replace(/''/g, "'") : sheet.tabs[0]!.name;
+      const tab = sheet.tabs.find((t) => t.name === tabName);
+      if (!tab) return json({ error: { message: `Unable to parse range: ${range}` } }, 400);
+      return json({ range, majorDimension: "ROWS", values: tab.values });
+    }
+
     // ---- Expo Push ----
     if (url.href === "https://exp.host/--/api/v2/push/send") {
       const msgs = JSON.parse(body!) as unknown[];
@@ -190,4 +205,46 @@ export function decodeRaw(raw: string): string {
   const [head, b] = mime.split("\r\n\r\n");
   const headers = head!.replace(/=\?UTF-8\?B\?([^?]+)\?=/g, (_m, b64: string) => Buffer.from(b64, "base64").toString("utf8"));
   return `${headers}\n\n${Buffer.from(b!.replace(/\r\n/g, ""), "base64").toString("utf8")}`;
+}
+
+/** Simulação do Sir Alfred Team Hub: Supabase como servidor OAuth 2.1 (rotação de refresh token) + PostgREST. */
+export class FakeHub {
+  readonly base = "https://hub-teste.supabase.co";
+  tables: Record<string, unknown[]> = { performance_snapshots: [], product_sales_snapshots: [], client_reviews: [] };
+  validRefresh = new Set<string>();
+  validAccess = new Set<string>();
+  calls: { method: string; url: string; headers: Record<string, string> }[] = [];
+  private seq = 0;
+
+  fetch = (async (input: string | URL, init: RequestInit = {}) => {
+    const url = new URL(String(input));
+    const method = (init.method ?? "GET").toUpperCase();
+    const headers = (init.headers ?? {}) as Record<string, string>;
+    this.calls.push({ method, url: url.toString(), headers });
+    if (url.pathname === "/auth/v1/oauth/token") {
+      const p = new URLSearchParams(String(init.body));
+      if (p.get("client_id") !== "jarvis-client") return json({ error: "invalid_client" }, 401);
+      if (p.get("grant_type") === "authorization_code") {
+        if (p.get("code") !== "hub-code" || !p.get("code_verifier") || p.get("redirect_uri") !== "jarvis://hub-oauth") return json({ error: "invalid_grant" }, 400);
+      } else if (p.get("grant_type") === "refresh_token") {
+        const rt = p.get("refresh_token")!;
+        if (!this.validRefresh.has(rt)) return json({ error: "invalid_grant" }, 400);
+        this.validRefresh.delete(rt); // rotação: o token antigo deixa de valer
+      } else return json({ error: "unsupported_grant_type" }, 400);
+      const access = `hub-at-${++this.seq}`;
+      const refresh = `hub-rt-${this.seq}`;
+      this.validAccess.add(access);
+      this.validRefresh.add(refresh);
+      return json({ access_token: access, refresh_token: refresh, expires_in: 3600, token_type: "bearer" });
+    }
+    if (url.pathname === "/auth/v1/oauth/userinfo") return json({ sub: "u", email: "dono@siralfred.com" });
+    const rest = url.pathname.match(/^\/rest\/v1\/([a-z_]+)$/);
+    if (rest) {
+      const token = (headers.authorization ?? "").replace("Bearer ", "");
+      if (!headers.apikey) return json({ message: "No API key" }, 401);
+      if (!this.validAccess.has(token)) return json({ message: "JWT expired" }, 401);
+      return json(this.tables[rest[1]!] ?? []);
+    }
+    return json({ error: "rota não simulada" }, 599);
+  }) as typeof fetch;
 }

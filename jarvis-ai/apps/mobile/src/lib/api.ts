@@ -21,6 +21,13 @@ import {
   TodaySchema,
   DeviceTokenSchema,
   DeviceTokenCreatedSchema,
+  AutomationSchema,
+  ConnectorMetricsSchema,
+  ConnectorSchema,
+  ReportSchema,
+  SpaceOverviewSchema,
+  type AutomationCreate,
+  type SheetConnectorCreate,
   type GoogleService,
   type TaskCreate,
   type TaskUpdate,
@@ -149,6 +156,38 @@ export const api = {
   createDeviceToken: (name: string) => json(DeviceTokenCreatedSchema, "/v1/device-tokens", { method: "POST", body: body({ name }) }),
   deviceTokens: () => json(zod.object({ tokens: zod.array(DeviceTokenSchema) }), "/v1/device-tokens"),
   revokeDeviceToken: (id: string) => raw(`/v1/device-tokens/${id}`, { method: "DELETE" }).then(() => undefined),
+
+  // ---- Fase 4 ----
+  businessOverview: (space?: Space, refresh = false) =>
+    json(zod.object({ spaces: zod.array(SpaceOverviewSchema) }), `/v1/business/overview?${new URLSearchParams({ ...(space ? { space } : {}), refresh: refresh ? "1" : "0" })}`, {
+      timeoutMs: 60_000,
+    }),
+  connectors: () =>
+    json(zod.object({ connectors: zod.array(ConnectorSchema), available: zod.object({ hub: zod.boolean(), sheets: zod.boolean() }) }), "/v1/connectors"),
+  createSheetConnector: (input: SheetConnectorCreate) =>
+    json(zod.object({ connector: ConnectorSchema, headers: zod.array(zod.string()), rows: zod.number() }), "/v1/connectors/sheets", {
+      method: "POST",
+      body: body(input),
+      timeoutMs: 60_000,
+    }),
+  hubStart: () => json(OAuthStartResponseSchema, "/v1/connectors/hub/start", { method: "POST" }),
+  hubComplete: (code: string, state: string) =>
+    json(zod.object({ connected: zod.boolean(), accountLabel: zod.string().nullable() }), "/v1/connectors/hub/complete", { method: "POST", body: body({ code, state }) }),
+  refreshConnector: (id: string) => json(zod.object({ metrics: ConnectorMetricsSchema }), `/v1/connectors/${id}/refresh`, { method: "POST", timeoutMs: 60_000 }),
+  deleteConnector: (id: string) => raw(`/v1/connectors/${id}`, { method: "DELETE" }).then(() => undefined),
+
+  generateReport: (kind: AutomationCreate["kind"], space: Space | null) =>
+    json(zod.object({ report: ReportSchema }), "/v1/reports/generate", { method: "POST", body: body({ kind, space }), timeoutMs: 90_000 }),
+  reports: (space?: Space) => json(zod.object({ reports: zod.array(ReportSchema) }), `/v1/reports${space ? `?space=${space}` : ""}`),
+  report: (id: string) => json(zod.object({ report: ReportSchema }), `/v1/reports/${id}`),
+  deleteReport: (id: string) => raw(`/v1/reports/${id}`, { method: "DELETE" }).then(() => undefined),
+
+  automations: () => json(zod.object({ automations: zod.array(AutomationSchema) }), "/v1/automations"),
+  createAutomation: (a: AutomationCreate) => json(zod.object({ automation: AutomationSchema }), "/v1/automations", { method: "POST", body: body(a) }),
+  updateAutomation: (id: string, patch: { enabled?: boolean; runTime?: string; weekday?: number | null }) =>
+    json(zod.object({ automation: AutomationSchema }), `/v1/automations/${id}`, { method: "PATCH", body: body(patch) }),
+  deleteAutomation: (id: string) => raw(`/v1/automations/${id}`, { method: "DELETE" }).then(() => undefined),
+  runAutomation: (id: string) => json(zod.object({ report: ReportSchema }), `/v1/automations/${id}/run`, { method: "POST", timeoutMs: 90_000 }),
 
   /** Áudio MP3 da voz premium (ElevenLabs), quando configurada no backend. */
   tts: async (text: string): Promise<ArrayBuffer> => (await raw("/v1/tts", { method: "POST", body: body({ text }), headers: { accept: "audio/mpeg" } })).arrayBuffer(),

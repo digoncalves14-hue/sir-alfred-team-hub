@@ -12,11 +12,13 @@ import { humanDateTime, toLocalIso } from "../agent/time";
 import type { GoogleGateway } from "../google/gateway";
 import type { PushSender } from "../push/expo";
 import type { SystemStore } from "../store/types";
+import { isDue, runKey, type ReportGenerator } from "../business/reports";
 
 export interface TickReport {
   reminders: number;
   summaries: number;
   meetingReminders: number;
+  automations: number;
   errors: number;
 }
 
@@ -29,6 +31,7 @@ export class Scheduler {
       system: SystemStore;
       push: PushSender;
       google: GoogleGateway | null;
+      reports?: ReportGenerator | null;
       clock?: () => Date;
       log?: { info: (o: object, m?: string) => void; warn: (o: object, m?: string) => void };
     },
@@ -51,7 +54,7 @@ export class Scheduler {
   }
 
   async tick(): Promise<TickReport> {
-    const report: TickReport = { reminders: 0, summaries: 0, meetingReminders: 0, errors: 0 };
+    const report: TickReport = { reminders: 0, summaries: 0, meetingReminders: 0, automations: 0, errors: 0 };
     if (this.busy) return report; // evita execuções sobrepostas
     this.busy = true;
     const now = this.deps.clock?.() ?? new Date();
@@ -67,17 +70,39 @@ export class Scheduler {
         }
       }
       await this.meetingReminders(candidates, now, report);
+      await this.automations(now, report);
     } catch (e) {
       report.errors++;
       this.deps.log?.warn({ err: String(e) }, "falha no agendador");
     } finally {
       this.busy = false;
     }
-    if (report.reminders + report.summaries + report.meetingReminders + report.errors > 0) this.deps.log?.info({ ...report }, "agendador");
+    if (report.reminders + report.summaries + report.meetingReminders + report.automations + report.errors > 0) this.deps.log?.info({ ...report }, "agendador");
     return report;
   }
 
-  private async notify(userId: string, kind: "resumo_diario" | "lembrete_tarefa" | "lembrete_reuniao", title: string, body: string, dedupeKey: string, url: string) {
+  /** Automações do usuário: relatórios semanais e alertas diários (só notifica alertas quando há algo). */
+  private async automations(now: Date, report: TickReport) {
+    if (!this.deps.reports) return;
+    const list = await this.deps.system.listEnabledAutomations();
+    for (const a of list) {
+      if (!isDue(a, now)) continue;
+      const key = runKey(now, a.timezone, a.weekday !== null);
+      if (a.lastRunKey === key || !(await this.deps.system.claimAutomationRun(a.id, key))) continue;
+      try {
+        const generated = await this.deps.reports.generate(a.kind, a.userId, a.space, a.timezone);
+        if (!generated.worthNotifying && (a.kind === "tarefas_atrasadas" || a.kind === "alerta_estoque")) continue;
+        const saved = await this.deps.system.insertReport({ userId: a.userId, space: a.space, kind: a.kind, title: generated.title, body: generated.body, data: generated.data });
+        await this.notify(a.userId, "sistema", generated.title, generated.notification, `auto:${a.id}:${key}`, `jarvis://report/${saved.id}`);
+        report.automations++;
+      } catch (e) {
+        report.errors++;
+        this.deps.log?.warn({ err: String(e), automation: a.id }, "falha na automação");
+      }
+    }
+  }
+
+  private async notify(userId: string, kind: "resumo_diario" | "lembrete_tarefa" | "lembrete_reuniao" | "sistema", title: string, body: string, dedupeKey: string, url: string) {
     const id = await this.deps.system.insertNotification({ userId, kind, title, body, dedupeKey });
     if (!id) return false; // já enviado antes
     const r = await this.deps.push.send(userId, { title, body, url });

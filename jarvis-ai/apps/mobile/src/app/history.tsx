@@ -48,8 +48,7 @@ export default function History() {
     ]);
 
   return (
-    <Screen>
-      <Text style={[font.title, { marginBottom: space(4) }]}>HISTÓRICO</Text>
+    <Screen top={false}>
       {error ? <ErrorBanner message={error} onRetry={load} /> : null}
       <FlatList
         data={items}

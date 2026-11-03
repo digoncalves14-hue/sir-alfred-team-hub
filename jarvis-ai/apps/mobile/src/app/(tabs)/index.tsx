@@ -221,6 +221,9 @@ export default function JarvisScreen() {
               <Pressable onPress={() => setPrefs({ speakReplies: !prefs.speakReplies })} accessibilityLabel={prefs.speakReplies ? "Desativar áudio" : "Ativar áudio"}>
                 <Icon name={prefs.speakReplies ? "speaker.wave.2.fill" : "speaker.slash.fill"} color={prefs.speakReplies ? colors.cyan : colors.textDim} />
               </Pressable>
+              <Pressable onPress={() => router.push("/history")} accessibilityLabel="Histórico de conversas">
+                <Icon name="clock.arrow.circlepath" />
+              </Pressable>
               <Pressable onPress={newConversation} accessibilityLabel="Nova conversa">
                 <Icon name="square.and.pencil" />
               </Pressable>

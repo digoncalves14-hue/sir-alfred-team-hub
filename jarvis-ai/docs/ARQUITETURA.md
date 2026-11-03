@@ -21,10 +21,10 @@
 | Tool Registry | `apps/server/src/tools/registry.ts` | ✅ |
 | Memory Service | `apps/server/src/store/` + tabela `jarvis_memories` | ✅ |
 | Integrations Service | `apps/server/src/google/` (OAuth PKCE, Calendar, Gmail) | ✅ Fase 2 |
-| Automation Engine | `apps/server/src/scheduler/` (lembretes, resumo diário, reuniões) | ✅ Fase 2 (automações personalizadas: Fase 4) |
+| Automation Engine | `apps/server/src/scheduler/` + `src/business/reports.ts` | ✅ Fases 2 e 4 (automações controladas pelo usuário) |
 | Notifications Service | `apps/server/src/push/expo.ts` + `apps/mobile/src/lib/push.ts` | ✅ Fase 2 |
 | Authentication | Supabase Auth + `apps/server/src/auth.ts` + Face ID no app | ✅ |
-| Business Dashboard | `apps/mobile/src/app/(tabs)/dashboard.tsx` (organizacional) | ✅ parcial |
+| Business Dashboard | `apps/mobile/src/app/(tabs)/business.tsx`, `space/[id].tsx` + `apps/server/src/business/` | ✅ Fase 4 |
 | Settings | `apps/mobile/src/app/(tabs)/settings.tsx` + `PATCH /v1/settings` | ✅ |
 
 ## Fluxo de um comando de voz
@@ -86,6 +86,22 @@ export const createEventTool = defineTool({
 | POST | `/v1/actions/:id/report` | O iPhone informa o resultado real de uma ação executada nele |
 | GET | `/v1/intents/summary` · `/v1/intents/agenda?dia=` | Siri em segundo plano (auth `Device <chave>`) |
 | POST | `/v1/intents/tasks` · `/v1/intents/memory` | Registrar tarefa / salvar memória pela Siri |
+
+## Fase 4 — conectores de negócios
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/v1/business/overview?space=&refresh=` | Indicadores por espaço (cache de 5 min) |
+| GET · DELETE | `/v1/connectors` · `/v1/connectors/:id` | Fontes de dados (sem segredos) |
+| POST | `/v1/connectors/sheets` | Conecta uma planilha (valida acesso e mostra prévia) |
+| POST | `/v1/connectors/hub/start` · `/complete` | OAuth 2.1 + PKCE com o Sir Alfred Team Hub |
+| POST | `/v1/connectors/:id/refresh` | Recalcula indicadores agora |
+| GET · DELETE · POST | `/v1/reports` · `/v1/reports/:id` · `/v1/reports/generate` | Relatórios |
+| GET/POST · PATCH/DELETE · POST | `/v1/automations` · `/:id` · `/:id/run` | Automações do usuário |
+
+Para acrescentar um conector: novo `type` em `jarvis_connectors`, autenticação no `ConnectorService` e uma função
+de indicadores em `business/metrics.ts` que devolva `{ period, kpis, highlights, alerts }`. Ferramentas, telas,
+relatórios e automações passam a usar o novo conector automaticamente.
 
 ## Fase 3 — ações executadas no iPhone
 

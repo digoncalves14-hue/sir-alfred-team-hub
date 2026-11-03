@@ -3,7 +3,23 @@
  * então toda consulta passa pelas políticas de Row Level Security.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { AppNotification, AuditEntry, ChatMessage, Conversation, DeviceToken, GoogleService, Memory, Profile, Task, TaskUpdate, ToolEvent } from "@jarvis/shared";
+import type {
+  AppNotification,
+  AuditEntry,
+  Automation,
+  ChatMessage,
+  Connector,
+  Conversation,
+  DeviceToken,
+  GoogleService,
+  Memory,
+  Profile,
+  Report,
+  Space,
+  Task,
+  TaskUpdate,
+  ToolEvent,
+} from "@jarvis/shared";
 import { AppError } from "../errors";
 import { rankByQuery } from "./search";
 import type { IntegrationInfo, PendingActionRecord, TaskInput, TaskQuery, UsageRecord, UserStore } from "./types";
@@ -35,6 +51,39 @@ const toProfile = (r: Row): Profile => ({
 
 export const toProfileRow = (r: Row): Profile => toProfile(r);
 export const toMemoryRow = (r: Row): Memory => toMemory(r);
+
+export const CONNECTOR_COLUMNS = "id, space, type, name, config, account_label, status, last_error, last_sync_at, created_at";
+export const toConnector = (r: Row): Connector => ({
+  id: String(r.id),
+  space: r.space as Connector["space"],
+  type: r.type as Connector["type"],
+  name: String(r.name),
+  config: (r.config as Record<string, unknown>) ?? {},
+  accountLabel: (r.account_label as string | null) ?? null,
+  status: r.status as Connector["status"],
+  lastError: (r.last_error as string | null) ?? null,
+  lastSyncAt: (r.last_sync_at as string | null) ?? null,
+  createdAt: String(r.created_at),
+});
+export const REPORT_COLUMNS = "id, space, kind, title, body, created_at";
+export const toReport = (r: Row): Report => ({
+  id: String(r.id),
+  space: (r.space as Report["space"]) ?? null,
+  kind: r.kind as Report["kind"],
+  title: String(r.title),
+  body: String(r.body),
+  createdAt: String(r.created_at),
+});
+export const AUTOMATION_COLUMNS = "id, kind, space, weekday, run_time, enabled, last_run_at";
+export const toAutomation = (r: Row): Automation => ({
+  id: String(r.id),
+  kind: r.kind as Automation["kind"],
+  space: (r.space as Automation["space"]) ?? null,
+  weekday: r.weekday === null || r.weekday === undefined ? null : Number(r.weekday),
+  runTime: String(r.run_time),
+  enabled: Boolean(r.enabled),
+  lastRunAt: (r.last_run_at as string | null) ?? null,
+});
 
 export const TASK_COLUMNS = "id, title, notes, space, priority, due_date, remind_at, status, completed_at, created_at";
 export const toTask = (r: Row): Task => ({
@@ -421,6 +470,58 @@ export class SupabaseUserStore implements UserStore {
       await this.sb.from("jarvis_device_tokens").update({ revoked_at: new Date().toISOString() }).eq("id", id).is("revoked_at", null).select("id"),
       "aparelho",
     );
+    return (rows ?? []).length > 0;
+  }
+
+  // ---- Fase 4 ----
+  async listConnectors(space?: Space) {
+    let q = this.sb.from("jarvis_connectors").select(CONNECTOR_COLUMNS).order("created_at", { ascending: true });
+    if (space) q = q.eq("space", space);
+    return ((check(await q, "conectores") ?? []) as Row[]).map(toConnector);
+  }
+  async deleteConnector(id: string) {
+    const rows = check(await this.sb.from("jarvis_connectors").delete().eq("id", id).select("id"), "conector");
+    return (rows ?? []).length > 0;
+  }
+  async listReports(limit: number, space?: Space) {
+    let q = this.sb.from("jarvis_reports").select(REPORT_COLUMNS).order("created_at", { ascending: false }).limit(limit);
+    if (space) q = q.eq("space", space);
+    return ((check(await q, "relatórios") ?? []) as Row[]).map(toReport);
+  }
+  async getReport(id: string) {
+    const r = check(await this.sb.from("jarvis_reports").select(REPORT_COLUMNS).eq("id", id).maybeSingle(), "relatório");
+    return r ? toReport(r as Row) : null;
+  }
+  async deleteReport(id: string) {
+    const rows = check(await this.sb.from("jarvis_reports").delete().eq("id", id).select("id"), "relatório");
+    return (rows ?? []).length > 0;
+  }
+  async listAutomations() {
+    const rows = check(await this.sb.from("jarvis_automations").select(AUTOMATION_COLUMNS).order("created_at", { ascending: true }), "automações");
+    return ((rows ?? []) as Row[]).map(toAutomation);
+  }
+  async createAutomation(input: Parameters<UserStore["createAutomation"]>[0]) {
+    const r = check(
+      await this.sb
+        .from("jarvis_automations")
+        .insert({ user_id: this.userId, kind: input.kind, space: input.space, weekday: input.weekday, run_time: input.runTime, enabled: input.enabled })
+        .select(AUTOMATION_COLUMNS)
+        .single(),
+      "automação",
+    );
+    return toAutomation(r as Row);
+  }
+  async updateAutomation(id: string, patch: Parameters<UserStore["updateAutomation"]>[1]) {
+    const row: Row = {};
+    if (patch.weekday !== undefined) row.weekday = patch.weekday;
+    if (patch.runTime !== undefined) row.run_time = patch.runTime;
+    if (patch.enabled !== undefined) row.enabled = patch.enabled;
+    if (patch.space !== undefined) row.space = patch.space;
+    const r = check(await this.sb.from("jarvis_automations").update(row).eq("id", id).select(AUTOMATION_COLUMNS).maybeSingle(), "automação");
+    return r ? toAutomation(r as Row) : null;
+  }
+  async deleteAutomation(id: string) {
+    const rows = check(await this.sb.from("jarvis_automations").delete().eq("id", id).select("id"), "automação");
     return (rows ?? []).length > 0;
   }
 }

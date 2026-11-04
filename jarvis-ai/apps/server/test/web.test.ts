@@ -196,3 +196,13 @@ describe("contas autorizadas (ALLOWED_EMAILS)", () => {
     expect(isEmailAllowed(allowed, null)).toBe(false);
   });
 });
+
+describe("função da Vercel", () => {
+  it("restaura o caminho original da API e mantém a query", async () => {
+    const { restoreUrl } = await import("../src/vercel");
+    expect(restoreUrl("/api?__jarvis_path=/v1/memories&q=barba")).toBe("/v1/memories?q=barba");
+    expect(restoreUrl("/api?__jarvis_path=%2Fhealth")).toBe("/health");
+    expect(restoreUrl("/v1/me")).toBe("/v1/me");
+    expect(restoreUrl("/api?__jarvis_path=https://evil.com")).toBe("/api?__jarvis_path=https://evil.com");
+  });
+});

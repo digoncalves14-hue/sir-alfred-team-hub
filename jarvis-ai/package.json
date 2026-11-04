@@ -17,10 +17,13 @@
     "test:all": "npm run test && npm run test:integration",
     "db:test:up": "bash scripts/test-db.sh up",
     "db:test:down": "bash scripts/test-db.sh down",
-    "verify:mobile": "npm run verify -w @jarvis/mobile"
+    "verify:mobile": "npm run verify -w @jarvis/mobile",
+    "build:vercel": "tsx scripts/build-vercel.mts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vitest": "^3.2.4"
   },

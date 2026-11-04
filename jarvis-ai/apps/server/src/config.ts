@@ -12,8 +12,13 @@ const EnvSchema = z.object({
 
   // Supabase — somente URL e chave pública (publishable/anon). O backend age
   // sempre com o JWT do usuário, então o RLS do banco continua valendo.
-  SUPABASE_URL: z.string().url(),
-  SUPABASE_ANON_KEY: z.string().min(20),
+  // Aceita também o endereço copiado com caminho (ex.: .../rest/v1/) e usa só a origem.
+  SUPABASE_URL: z
+    .string()
+    .trim()
+    .url()
+    .transform((v) => new URL(v).origin),
+  SUPABASE_ANON_KEY: z.string().trim().min(20),
 
   // IA (Claude). A chave fica somente no backend.
   ANTHROPIC_API_KEY: z.string().optional(),

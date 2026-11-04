@@ -177,6 +177,11 @@ describe("configuração para hospedagem", () => {
     expect(cfg.TRUST_PROXY).toBe(true);
   });
 
+  it("usa só a origem do SUPABASE_URL, mesmo se copiado com caminho", () => {
+    const cfg = loadConfig({ SUPABASE_URL: " https://abc.supabase.co/rest/v1/ ", SUPABASE_ANON_KEY: "sb_publishable_xxxxxxxxxxxxxxxx" });
+    expect(cfg.SUPABASE_URL).toBe("https://abc.supabase.co");
+  });
+
   it("aceita chave de cifra gerada pelo provedor (texto longo) e recusa chave curta", () => {
     const generated = randomBytes(48).toString("hex");
     const box = new SecretBox(generated);

@@ -13,8 +13,10 @@ import { renderIndex } from "../apps/server/src/web/static";
 
 const root = resolve(import.meta.dirname, "..");
 const out = join(root, ".vercel", "output");
-const supabaseUrl = process.env.SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY ?? "";
+const rawUrl = (process.env.SUPABASE_URL ?? "").trim();
+// Aceita o endereço copiado com caminho (ex.: .../rest/v1/) e usa só a origem.
+const supabaseUrl = rawUrl ? new URL(rawUrl).origin : "";
+const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY ?? "").trim();
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error("Defina SUPABASE_URL e SUPABASE_ANON_KEY nas variáveis de ambiente do projeto na Vercel.");
   process.exit(1);

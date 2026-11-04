@@ -437,12 +437,12 @@ export default function Settings() {
             value={prefs.bargeIn}
             onChange={(v) => setPrefs({ bargeIn: v })}
           />}
-          <Row
+          {WEB ? null : <Row
             title="Conversa contínua"
             subtitle="Volta a ouvir após cada resposta; dois silêncios encerram"
             value={prefs.continuousConversation}
             onChange={(v) => setPrefs({ continuousConversation: v })}
-          />
+          />}
           <Row
             title="Voz premium (servidor)"
             subtitle={health?.tts.configured ? "ElevenLabs configurada no backend" : "Não configurada no backend — usando a voz do iPhone"}
@@ -450,7 +450,7 @@ export default function Settings() {
             onChange={(v) => setPrefs({ premiumVoice: v })}
             disabled={!health?.tts.configured}
           />
-          <Text style={[font.small, { marginTop: space(3) }]}>{WEB ? "Voz do navegador (pt-BR). " : ""}Voz do iPhone (pt-BR). Para vozes mais naturais, baixe em Ajustes › Acessibilidade › Conteúdo Falado › Vozes › Português (Brasil).</Text>
+          <Text style={[font.small, { marginTop: space(3) }]}>Voz do iPhone (pt-BR). Para vozes mais naturais, baixe em Ajustes › Acessibilidade › Conteúdo Falado › Vozes › Português (Brasil).</Text>
           <View style={styles.voices}>
             <Pressable onPress={() => setPrefs({ voiceIdentifier: null })} style={[styles.voice, !prefs.voiceIdentifier && styles.voiceActive]}>
               <Text style={[font.small, { color: !prefs.voiceIdentifier ? colors.bg : colors.text }]}>Padrão</Text>

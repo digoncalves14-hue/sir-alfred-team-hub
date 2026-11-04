@@ -195,6 +195,18 @@ async function speakPremium(text: string): Promise<void> {
 
 export async function speak(text: string, opts: SpeakOptions): Promise<void> {
   if (!text.trim()) return;
+  if (IS_WEB && !opts.premium) {
+    // Web: fala imediatamente, sem nenhuma espera antes (o Safari só libera a voz "dentro" do toque).
+    const prev = currentFinish;
+    try {
+      webSynth()?.cancel();
+    } catch {
+      /* ignore */
+    }
+    prev?.();
+    await speakNative(text, opts);
+    return;
+  }
   await ensureAudioMode();
   await stopSpeaking();
   if (opts.premium) {

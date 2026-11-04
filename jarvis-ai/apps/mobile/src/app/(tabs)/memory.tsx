@@ -7,9 +7,8 @@ import {
   type MemoryCategory,
   type Space,
 } from "@jarvis/shared";
-import { File, Paths } from "expo-file-system";
 import { useFocusEffect } from "expo-router";
-import * as Sharing from "expo-sharing";
+import { shareJson } from "@/lib/export-file";
 import { useCallback, useState } from "react";
 import { Alert, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Button, Card, Empty, ErrorBanner, Icon, Screen } from "@/components/ui";
@@ -120,9 +119,7 @@ export default function MemoryScreen() {
     setExporting(true);
     try {
       const json = await api.exportData();
-      const file = new File(Paths.cache, `jarvis-export-${new Date().toISOString().slice(0, 10)}.json`);
-      file.write(json);
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(file.uri, { mimeType: "application/json", UTI: "public.json" });
+      await shareJson(`jarvis-export-${new Date().toISOString().slice(0, 10)}.json`, json);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao exportar.");
     } finally {

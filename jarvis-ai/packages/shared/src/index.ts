@@ -172,6 +172,8 @@ export const ChatRequestSchema = z.object({
   deviceContext: z.lazy(() => DeviceContextSchema).optional(),
   /** Executa uma rotina específica (ex.: aberta por notificação agendada). */
   routineId: z.string().uuid().optional(),
+  /** Versão do app: iPhone (nativo) ou web (navegador). */
+  client: z.enum(["ios", "web"]).optional(),
 });
 export type ChatRequest = z.input<typeof ChatRequestSchema>;
 

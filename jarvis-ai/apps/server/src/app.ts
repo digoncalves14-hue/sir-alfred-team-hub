@@ -1,3 +1,4 @@
+import { registerWebApp, type WebAppOptions } from "./web/static";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { z, ZodError } from "zod";
@@ -48,6 +49,10 @@ export interface AppDeps {
   economyModel?: string | null;
   scheduler?: Scheduler | null;
   cronSecret?: string;
+  /** Atrás de um proxy confiável (Render, Fly): usa o IP real do X-Forwarded-For. */
+  trustProxy?: boolean;
+  /** Versão web do app (pasta exportada + configuração pública do Supabase). */
+  web?: WebAppOptions | null;
 }
 
 declare module "fastify" {
@@ -60,6 +65,7 @@ const IdParams = z.object({ id: z.string().uuid() });
 
 export async function buildApp(deps: AppDeps) {
   const app = Fastify({
+    trustProxy: deps.trustProxy ?? false,
     logger:
       deps.logger === false
         ? false
@@ -308,6 +314,8 @@ export async function buildApp(deps: AppDeps) {
   }, { prefix: "/v1" });
 
   await registerIntentRoutes(app, { system: deps.phase2?.system ?? null, google: deps.phase2?.google ?? null });
+
+  if (deps.web) await registerWebApp(app, deps.web);
 
   return app;
 }

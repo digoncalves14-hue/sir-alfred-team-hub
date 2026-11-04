@@ -7,6 +7,7 @@
 import * as Speech from "expo-speech";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { File, Paths } from "expo-file-system";
+import { Platform } from "react-native";
 import { api } from "@/lib/api";
 import { forSpeech, SentenceBuffer } from "@/logic/sentences";
 
@@ -54,8 +55,34 @@ function speakNative(text: string, opts: SpeakOptions): Promise<void> {
   });
 }
 
+/** Web: toca o MP3 da voz premium com o elemento <audio> do navegador. */
+async function speakPremiumWeb(audio: ArrayBuffer): Promise<void> {
+  const url = URL.createObjectURL(new Blob([audio], { type: "audio/mpeg" }));
+  const el = new window.Audio(url);
+  await new Promise<void>((resolve, reject) => {
+    const finish = () => {
+      if (currentFinish !== finish) return;
+      currentFinish = null;
+      el.pause();
+      URL.revokeObjectURL(url);
+      resolve();
+    };
+    currentFinish = finish;
+    el.onended = finish;
+    el.onerror = () => {
+      finish();
+    };
+    el.play().catch((e) => {
+      currentFinish = null;
+      URL.revokeObjectURL(url);
+      reject(e);
+    });
+  });
+}
+
 async function speakPremium(text: string): Promise<void> {
   const audio = await api.tts(text);
+  if (Platform.OS === "web") return speakPremiumWeb(audio);
   const file = new File(Paths.cache, `jarvis-tts-${Date.now()}.mp3`);
   file.write(new Uint8Array(audio));
   await new Promise<void>((resolve) => {

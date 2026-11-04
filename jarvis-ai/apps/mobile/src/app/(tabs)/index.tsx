@@ -1,7 +1,7 @@
 import type { ChatMessage, DeviceAction, Health, ToolEvent } from "@jarvis/shared";
 import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
 import { MessageBubble, PendingActionCard } from "@/components/chat";
 import { HoloOrb } from "@/components/HoloOrb";
 import { Button, Card, ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
@@ -113,7 +113,7 @@ export default function JarvisScreen() {
       try {
         // Dados do iPhone (somente o que foi autorizado em Ajustes; no máximo ~2,5 s).
         const deviceContext = await gatherDeviceContext({ calendar: prefsRef.current.deviceCalendar, location: prefsRef.current.deviceLocation });
-        const req = { message: text, conversationId: conversationRef.current, inputMode, timezone: deviceTimezone, deviceContext, routineId };
+        const req = { message: text, conversationId: conversationRef.current, inputMode, timezone: deviceTimezone, deviceContext, routineId, client: Platform.OS === "web" ? ("web" as const) : ("ios" as const) };
         if (streamingRef.current) {
           setLive({ text: "", tools: [] });
           const res = await chatStream(req, {

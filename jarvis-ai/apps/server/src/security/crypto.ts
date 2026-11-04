@@ -9,7 +9,9 @@ export class SecretBox {
   private readonly macKey: Buffer;
 
   constructor(base64Key: string) {
-    const key = Buffer.from(base64Key, "base64");
+    let key = Buffer.from(base64Key, "base64");
+    // Aceita também segredos longos gerados por provedores (ex.: "Generate" do Render): deriva 32 bytes por SHA-256.
+    if (key.length !== 32 && base64Key.length >= 40) key = createHash("sha256").update(base64Key, "utf8").digest();
     if (key.length !== 32) throw new Error("TOKEN_ENCRYPTION_KEY deve ter 32 bytes em base64 (gere com: openssl rand -base64 32).");
     this.key = key;
     this.macKey = createHash("sha256").update(Buffer.concat([key, Buffer.from("jarvis-hmac")])).digest();

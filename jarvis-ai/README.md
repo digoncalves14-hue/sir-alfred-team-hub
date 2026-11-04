@@ -103,6 +103,11 @@ Limitações e próximas fases: [`docs/LIMITACOES-E-ROADMAP.md`](docs/LIMITACOES
 
 ---
 
+## Testar grátis no navegador do iPhone
+
+Sem conta Apple Developer: a **versão web** roda no Safari e pode ser adicionada à Tela de Início. Supabase e Render
+gratuitos; você paga só o uso da IA. Passo a passo e o que funciona/não funciona: **[docs/WEB.md](docs/WEB.md)**.
+
 ## Passo a passo para rodar no iPhone
 
 ### O que você precisa providenciar

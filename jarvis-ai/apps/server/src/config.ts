@@ -32,6 +32,10 @@ const EnvSchema = z.object({
   ELEVENLABS_MODEL_ID: z.string().default("eleven_flash_v2_5"),
   TTS_COST_PER_1K_CHARS_USD: z.coerce.number().min(0).default(0.1),
 
+  // E-mails autorizados a usar este Jarvis (separados por vírgula). Recomendado em servidor público.
+  ALLOWED_EMAILS: z.string().optional(),
+  // true quando atrás de um proxy confiável (Render/Fly), para o limite por IP usar o IP real.
+  TRUST_PROXY: bool.default(false),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
 
   // ---- Fase 2 ----
@@ -42,6 +46,15 @@ const EnvSchema = z.object({
   TOKEN_ENCRYPTION_KEY: z.string().optional(),
   // ID do cliente OAuth do tipo iOS (Google Cloud Console). Sem client secret.
   GOOGLE_IOS_CLIENT_ID: z.string().regex(/\.apps\.googleusercontent\.com$/, "deve terminar em .apps.googleusercontent.com").optional(),
+  // Versão web: cliente OAuth do tipo "Aplicativo da Web" (o segredo fica SOMENTE aqui).
+  // Quando definido, substitui o cliente iOS. URI de redirecionamento: <PUBLIC_URL>/google-oauth
+  GOOGLE_WEB_CLIENT_ID: z.string().regex(/\.apps\.googleusercontent\.com$/, "deve terminar em .apps.googleusercontent.com").optional(),
+  GOOGLE_WEB_CLIENT_SECRET: z.string().min(8).optional(),
+  // Endereço público do servidor (ex.: https://jarvis-ai.onrender.com). No Render vem de RENDER_EXTERNAL_URL.
+  PUBLIC_URL: z.string().url().optional(),
+  RENDER_EXTERNAL_URL: z.string().url().optional(),
+  // Pasta com o app web exportado (expo export --platform web). Se existir, o servidor entrega o app.
+  WEB_DIR: z.string().optional(),
   // Opcional: token de acesso da Expo se você ativar "push security" no projeto.
   EXPO_ACCESS_TOKEN: z.string().optional(),
   SCHEDULER_ENABLED: bool.default(true),
@@ -65,7 +78,9 @@ const EnvSchema = z.object({
 export type Config = z.infer<typeof EnvSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const parsed = EnvSchema.safeParse(env);
+  // Variáveis vazias (ex.: opcionais deixadas em branco no painel da hospedagem) contam como ausentes.
+  const cleaned = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v.trim() !== ""));
+  const parsed = EnvSchema.safeParse(cleaned);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Configuração inválida do servidor. Verifique o arquivo .env:\n${issues}`);

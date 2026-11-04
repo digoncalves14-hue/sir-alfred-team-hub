@@ -11,6 +11,7 @@
 import * as Haptics from "expo-haptics";
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
 import { useCallback, useEffect, useReducer, useRef } from "react";
+import { Platform } from "react-native";
 import { initialVoiceState, voiceReducer } from "@/logic/voiceMachine";
 import { isStopCommand, stripWakeWord } from "@/logic/wakeWord";
 import { createSpeechStream, speak, stopSpeaking, type SpeakOptions, type SpeechStream } from "./tts";
@@ -20,9 +21,14 @@ const NO_SPEECH_MS = 8000;
 
 const CONTEXTUAL_STRINGS = ["Jarvis", "Sir Alfred", "Black Bear", "Barton", "Alfie & Fred", "Genesis Barber", "CODE S.O.S.", "barbearia"];
 
+const WEB = Platform.OS === "web";
 const ERROR_MESSAGES: Record<string, string> = {
-  "not-allowed": "Permita o uso do microfone e do reconhecimento de fala em Ajustes > JARVIS AI.",
-  "service-not-allowed": "O reconhecimento de fala está indisponível ou restrito neste aparelho.",
+  "not-allowed": WEB
+    ? "Permita o microfone para este site: no Safari, toque em \"aA\" › Ajustes do Site › Microfone › Permitir."
+    : "Permita o uso do microfone e do reconhecimento de fala em Ajustes > JARVIS AI.",
+  "service-not-allowed": WEB
+    ? "Este navegador não oferece reconhecimento de voz. Use o Safari no iPhone (com Siri e Ditado ativados) ou digite a mensagem."
+    : "O reconhecimento de fala está indisponível ou restrito neste aparelho.",
   "language-not-supported": "O reconhecimento em português não está disponível neste aparelho.",
   network: "Falha de rede no reconhecimento de fala.",
   "audio-capture": "Não foi possível capturar o áudio do microfone.",

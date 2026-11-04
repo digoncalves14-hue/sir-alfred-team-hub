@@ -1,0 +1,49 @@
+# Render Blueprint do JARVIS AI (versão web + backend num único serviço gratuito).
+# No Render: New › Blueprint › escolha este repositório. Os segredos marcados com
+# "sync: false" são pedidos na tela do Render (nunca ficam no Git).
+services:
+  - type: web
+    name: jarvis-ai
+    runtime: docker
+    plan: free
+    region: virginia
+    branch: claude/jarvis-ai-phase1
+    rootDir: jarvis-ai
+    dockerfilePath: ./Dockerfile.server
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8787"
+      - key: TRUST_PROXY
+        value: "true"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Seu e-mail de login no Jarvis (separe vários por vírgula). Impede que outras pessoas usem seu crédito de IA.
+      - key: ALLOWED_EMAILS
+        sync: false
+      # Padrão do teste: modelo mais barato. Troque para claude-opus-5-5 se quiser o mais capaz.
+      - key: AI_MODEL
+        value: claude-haiku-5-5
+      - key: AI_MODEL_ECONOMY
+        value: claude-haiku-5-5
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: CRON_SECRET
+        generateValue: true
+      # Opcionais (deixe em branco se não for usar agora)
+      - key: GOOGLE_WEB_CLIENT_ID
+        sync: false
+      - key: GOOGLE_WEB_CLIENT_SECRET
+        sync: false
+      - key: VOYAGE_API_KEY
+        sync: false

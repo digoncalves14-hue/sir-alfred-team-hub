@@ -1,9 +1,10 @@
+import { isWebAppAvailable } from "./web/static";
 import { loadConfig } from "./config";
 import { buildApp } from "./app";
 import { AnthropicProvider } from "./ai/anthropic";
 import { Orchestrator } from "./agent/orchestrator";
 import { createDefaultRegistry } from "./tools/builtin";
-import { createSupabaseAuthenticator } from "./auth";
+import { createSupabaseAuthenticator, parseAllowedEmails } from "./auth";
 import { ElevenLabsTts } from "./tts/elevenlabs";
 import { SecretBox } from "./security/crypto";
 import { createServiceClient, SupabaseSystemStore } from "./store/supabase-system-store";
@@ -32,8 +33,15 @@ const system = config.SUPABASE_SERVICE_ROLE_KEY
   ? new SupabaseSystemStore(createServiceClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY))
   : null;
 const box = config.TOKEN_ENCRYPTION_KEY ? new SecretBox(config.TOKEN_ENCRYPTION_KEY) : null;
-const google =
-  system && box && config.GOOGLE_IOS_CLIENT_ID ? new GoogleGateway({ oauth: new GoogleOAuth(config.GOOGLE_IOS_CLIENT_ID, box), system, box }) : null;
+const publicUrl = (config.PUBLIC_URL ?? config.RENDER_EXTERNAL_URL ?? "").replace(/\/+$/, "") || null;
+const googleOAuth = !box
+  ? null
+  : config.GOOGLE_WEB_CLIENT_ID && config.GOOGLE_WEB_CLIENT_SECRET && publicUrl
+    ? new GoogleOAuth(config.GOOGLE_WEB_CLIENT_ID, box, fetch, { clientSecret: config.GOOGLE_WEB_CLIENT_SECRET, redirectUri: `${publicUrl}/google-oauth` })
+    : config.GOOGLE_IOS_CLIENT_ID
+      ? new GoogleOAuth(config.GOOGLE_IOS_CLIENT_ID, box)
+      : null;
+const google = system && box && googleOAuth ? new GoogleGateway({ oauth: googleOAuth, system, box }) : null;
 
 // ---- Fase 4: conectores empresariais e relatórios ----
 const hub =
@@ -53,7 +61,7 @@ const memory = new MemoryIndex(
 let scheduler: Scheduler | null = null;
 
 const app = await buildApp({
-  authenticate: createSupabaseAuthenticator(config.SUPABASE_URL, config.SUPABASE_ANON_KEY),
+  authenticate: createSupabaseAuthenticator(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, parseAllowedEmails(config.ALLOWED_EMAILS)),
   provider,
   tts: new ElevenLabsTts({ apiKey: config.ELEVENLABS_API_KEY, voiceId: config.ELEVENLABS_VOICE_ID, modelId: config.ELEVENLABS_MODEL_ID }),
   ttsCostPer1kChars: config.TTS_COST_PER_1K_CHARS_USD,
@@ -77,6 +85,10 @@ const app = await buildApp({
     return scheduler;
   },
   cronSecret: config.CRON_SECRET,
+  trustProxy: config.TRUST_PROXY,
+  web: isWebAppAvailable(config.WEB_DIR)
+    ? { dir: config.WEB_DIR, supabaseUrl: config.SUPABASE_URL, supabaseAnonKey: config.SUPABASE_ANON_KEY }
+    : null,
 });
 
 if (system) {

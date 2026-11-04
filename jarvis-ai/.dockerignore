@@ -1,0 +1,10 @@
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+**/dist
+**/dist-verify
+apps/mobile/ios
+apps/mobile/android
+apps/mobile/.expo
+**/*.log

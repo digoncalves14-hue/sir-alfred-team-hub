@@ -72,7 +72,15 @@ export interface TurnInput {
   /** Lido no iPhone com permissão do usuário (calendário, lembretes, localização). */
   deviceContext?: DeviceContext;
   routineId?: string;
+  /** Onde o usuário está: app do iPhone (padrão) ou versão web (navegador). */
+  client?: "ios" | "web";
 }
+
+/** Ferramentas que dependem do app nativo (EventKit) e não existem na versão web. */
+export const WEB_EXCLUDED_TOOLS: ReadonlySet<string> = new Set(["iphone_criar_lembrete", "iphone_criar_evento"]);
+const WEB_CONTEXT =
+  "\nO usuário está usando a versão WEB do Jarvis (navegador do iPhone): não há acesso ao Calendário, Lembretes ou Contatos do iPhone. " +
+  "Para lembretes use as tarefas do Jarvis; para ligação/mensagem/WhatsApp peça o número (ou e-mail) quando não houver.";
 
 const REFUSAL_REPLY = "Desculpe, não posso ajudar com esse pedido.";
 
@@ -198,6 +206,8 @@ export class Orchestrator {
       gmail: google ? await google.connected("gmail") : false,
     };
     let context = buildContext(profile, now, relevant, integrations, input.deviceContext);
+    const excluded = input.client === "web" ? WEB_EXCLUDED_TOOLS : undefined;
+    if (excluded) context += WEB_CONTEXT;
     if (summary) context += `\nResumo das partes anteriores desta conversa:\n${wrapUntrusted("resumo_conversa", summary)}`;
     const toolCtx: ToolContext = {
       store,
@@ -230,7 +240,7 @@ export class Orchestrator {
 
       let streamed = false;
       const result = await provider.complete(
-        { system: SYSTEM_PROMPT, context, turns, tools: registry.specs(), model },
+        { system: SYSTEM_PROMPT, context, turns, tools: registry.specs(excluded), model },
         hooks.onText
           ? {
               onText: (d) => {
@@ -273,7 +283,7 @@ export class Orchestrator {
       // Todos os resultados de ferramentas voltam numa única mensagem do usuário.
       const results: ModelPart[] = [];
       for (const call of calls) {
-        const { part, event } = await this.runTool(call, toolCtx);
+        const { part, event } = await this.runTool(call, toolCtx, excluded);
         results.push(part);
         if (event) {
           toolEvents.push(event);
@@ -348,8 +358,9 @@ export class Orchestrator {
   private async runTool(
     call: Extract<ModelPart, { type: "tool_call" }>,
     ctx: ToolContext,
+    excluded?: ReadonlySet<string>,
   ): Promise<{ part: ModelPart; event?: ToolEvent }> {
-    const tool = this.deps.registry.get(call.name);
+    const tool = excluded?.has(call.name) ? undefined : this.deps.registry.get(call.name);
     if (!tool) {
       await ctx.store.logAction({ tool: call.name, status: "blocked", summary: "Ferramenta inexistente solicitada pelo modelo" });
       return { part: { type: "tool_result", callId: call.id, content: `Ferramenta "${call.name}" não existe.`, isError: true } };

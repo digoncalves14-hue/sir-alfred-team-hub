@@ -3,7 +3,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import type { Voice } from "expo-speech";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, Platform } from "react-native";
 import { Button, Card, ErrorBanner, Pill, Screen, SectionTitle } from "@/components/ui";
 import { api } from "@/lib/api";
 import { config } from "@/lib/config";
@@ -30,6 +30,8 @@ function Row({ title, subtitle, value, onChange, disabled }: { title: string; su
     </View>
   );
 }
+
+const WEB = Platform.OS === "web";
 
 export default function Settings() {
   const { prefs, setPrefs } = usePrefs();
@@ -326,13 +328,18 @@ export default function Settings() {
 
         <SectionTitle>NOTIFICAÇÕES</SectionTitle>
         <Card>
-          <Row
+          {WEB ? (
+            <Text style={[font.small, { marginBottom: space(2) }]}>
+              Na versão web não há notificações push: o resumo e os lembretes aparecem no Painel quando você abre o Jarvis.
+            </Text>
+          ) : null}
+          {WEB ? null : <Row
             title="Notificações neste iPhone"
             subtitle={health?.push.configured ? "Lembretes, resumo diário e reuniões" : "Push não configurado no servidor"}
             value={prefs.pushEnabled}
             onChange={togglePush}
             disabled={pushBusy || !health?.push.configured}
-          />
+          />}
           {profile ? (
             <>
               <Row title="Resumo diário" subtitle={`Enviado às ${profile.dailySummaryTime}`} value={profile.dailySummaryEnabled} onChange={(v) => updateProfile({ dailySummaryEnabled: v })} />
@@ -353,19 +360,21 @@ export default function Settings() {
               </View>
             </>
           ) : null}
-          <Text style={[font.small, { marginTop: space(3) }]}>
-            Os avisos são enviados pelo servidor, mesmo com o app fechado — desde que o servidor esteja ligado.
-          </Text>
+          {WEB ? null : (
+            <Text style={[font.small, { marginTop: space(3) }]}>
+              Os avisos são enviados pelo servidor, mesmo com o app fechado — desde que o servidor esteja ligado.
+            </Text>
+          )}
         </Card>
 
         <SectionTitle>IPHONE</SectionTitle>
         <Card>
-          <Row
+          {WEB ? null : <Row
             title="Calendário e Lembretes do iPhone"
             subtitle="O Jarvis lê seus próximos eventos e lembretes; cria itens só quando você confirma"
             value={prefs.deviceCalendar}
             onChange={toggleDeviceCalendar}
-          />
+          />}
           <Row
             title="Localização aproximada"
             subtitle="Cidade e região, somente com o app aberto"
@@ -373,10 +382,14 @@ export default function Settings() {
             onChange={toggleDeviceLocation}
           />
           <Text style={[font.small, { marginTop: space(2) }]}>
-            Contatos: o Jarvis só procura um contato quando você pede para ligar ou mandar mensagem, e a busca acontece no próprio iPhone.
+            {WEB ? "Versão web: Calendário, Lembretes e Contatos do iPhone ficam disponíveis só no app instalado. Para ligar ou mandar mensagem, diga o número." : null}
           </Text>
+          {WEB ? null : <Text style={[font.small, { marginTop: space(2) }]}>
+            Contatos: o Jarvis só procura um contato quando você pede para ligar ou mandar mensagem, e a busca acontece no próprio iPhone.
+          </Text>}
         </Card>
 
+        {WEB ? null : <>
         <SectionTitle>SIRI, ATALHOS E BOTÃO DE AÇÃO</SectionTitle>
         <Card style={{ gap: space(2) }}>
           <Text style={font.small}>Já disponíveis no app Atalhos e na Siri (sem configurar nada):</Text>
@@ -413,16 +426,17 @@ export default function Settings() {
             </View>
           ))}
         </Card>
+        </>}
 
         <SectionTitle>VOZ</SectionTitle>
         <Card>
           <Row title="Falar respostas" subtitle="Desative para usar só texto" value={prefs.speakReplies} onChange={(v) => setPrefs({ speakReplies: v })} />
-          <Row
+          {WEB ? null : <Row
             title="Interromper falando (experimental)"
             subtitle="Fale por cima e o Jarvis para. Usa cancelamento de eco do iPhone; funciona melhor com fones."
             value={prefs.bargeIn}
             onChange={(v) => setPrefs({ bargeIn: v })}
-          />
+          />}
           <Row
             title="Conversa contínua"
             subtitle="Volta a ouvir após cada resposta; dois silêncios encerram"
@@ -436,7 +450,7 @@ export default function Settings() {
             onChange={(v) => setPrefs({ premiumVoice: v })}
             disabled={!health?.tts.configured}
           />
-          <Text style={[font.small, { marginTop: space(3) }]}>Voz do iPhone (pt-BR). Para vozes mais naturais, baixe em Ajustes › Acessibilidade › Conteúdo Falado › Vozes › Português (Brasil).</Text>
+          <Text style={[font.small, { marginTop: space(3) }]}>{WEB ? "Voz do navegador (pt-BR). " : ""}Voz do iPhone (pt-BR). Para vozes mais naturais, baixe em Ajustes › Acessibilidade › Conteúdo Falado › Vozes › Português (Brasil).</Text>
           <View style={styles.voices}>
             <Pressable onPress={() => setPrefs({ voiceIdentifier: null })} style={[styles.voice, !prefs.voiceIdentifier && styles.voiceActive]}>
               <Text style={[font.small, { color: !prefs.voiceIdentifier ? colors.bg : colors.text }]}>Padrão</Text>
@@ -464,6 +478,7 @@ export default function Settings() {
           <Button title="Testar voz" variant="ghost" icon="play.fill" onPress={testVoice} style={{ marginTop: space(3) }} />
         </Card>
 
+        {WEB ? null : <>
         <SectionTitle>SEGURANÇA</SectionTitle>
         <Card>
           <Row
@@ -474,6 +489,7 @@ export default function Settings() {
             disabled={!biometricAvailable}
           />
         </Card>
+        </>}
 
 
         <SectionTitle>CONEXÃO</SectionTitle>

@@ -87,8 +87,9 @@ export class ToolRegistry {
   }
 
   /** Especificações para o modelo, em ordem determinística (estável para cache). */
-  specs(): ToolSpec[] {
+  specs(exclude?: ReadonlySet<string>): ToolSpec[] {
     return this.list()
+      .filter((t) => !exclude?.has(t.name))
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((t) => {
         const { $schema: _ignored, ...schema } = z.toJSONSchema(t.input, { io: "input" }) as Record<string, unknown>;

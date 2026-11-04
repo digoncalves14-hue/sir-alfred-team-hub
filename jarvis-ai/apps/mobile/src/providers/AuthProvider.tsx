@@ -6,7 +6,7 @@
 import type { Session } from "@supabase/supabase-js";
 import * as LocalAuthentication from "expo-local-authentication";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { usePrefs } from "./PrefsProvider";
 
@@ -84,7 +84,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+    // Versão web: o link de confirmação do e-mail volta para o próprio Jarvis.
+    const emailRedirectTo = Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : undefined;
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: emailRedirectTo ? { emailRedirectTo } : undefined });
     if (error) return translateAuthError(error.message);
     if (!data.session) return "Conta criada. Confirme o e-mail pelo link enviado e depois entre.";
     return null;

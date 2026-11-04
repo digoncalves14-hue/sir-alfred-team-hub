@@ -42,12 +42,25 @@ export function reversedClientId(clientId: string): string {
 export class GoogleOAuth {
   readonly redirectUri: string;
 
+  private readonly clientSecret: string | null;
+
+  /**
+   * App iOS: cliente "iOS" (sem segredo), retorno pelo esquema invertido do client ID.
+   * Versão web: cliente "Aplicativo da Web" com segredo (fica só no servidor) e retorno
+   * para uma página do próprio Jarvis web (`opts.redirectUri`).
+   */
   constructor(
     private readonly clientId: string,
     private readonly box: SecretBox,
     private readonly fetchImpl: typeof fetch = fetch,
+    opts: { clientSecret?: string; redirectUri?: string } = {},
   ) {
-    this.redirectUri = `${reversedClientId(clientId)}:/oauth2redirect`;
+    this.clientSecret = opts.clientSecret ?? null;
+    this.redirectUri = opts.redirectUri ?? `${reversedClientId(clientId)}:/oauth2redirect`;
+  }
+
+  private withSecret(params: Record<string, string>): URLSearchParams {
+    return new URLSearchParams(this.clientSecret ? { ...params, client_secret: this.clientSecret } : params);
   }
 
   start(userId: string, services: GoogleService[], now = Date.now()): { authUrl: string; redirectUri: string } {
@@ -83,7 +96,7 @@ export class GoogleOAuth {
     const res = await this.fetchImpl("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
+      body: this.withSecret({
         client_id: this.clientId,
         code,
         code_verifier: payload.v,
@@ -129,7 +142,7 @@ export class GoogleOAuth {
     const res = await this.fetchImpl("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ client_id: this.clientId, refresh_token: refreshToken, grant_type: "refresh_token" }),
+      body: this.withSecret({ client_id: this.clientId, refresh_token: refreshToken, grant_type: "refresh_token" }),
     });
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) {

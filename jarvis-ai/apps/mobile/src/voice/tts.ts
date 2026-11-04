@@ -25,6 +25,67 @@ export function speechWatchdogMs(text: string, rate = 1): number {
   return Math.round(4000 + (text.length * 85) / Math.max(rate, 0.5));
 }
 
+// ---------------------------------------------------------------------------
+// Web (Safari do iPhone): fala direto pelo speechSynthesis do navegador, escolhendo
+// explicitamente uma voz pt-BR e "acordando" o sintetizador (o iOS às vezes o deixa pausado).
+// ---------------------------------------------------------------------------
+const IS_WEB = Platform.OS === "web";
+
+function webSynth(): SpeechSynthesis | null {
+  return typeof window !== "undefined" && "speechSynthesis" in window ? window.speechSynthesis : null;
+}
+
+function webVoice(identifier: string | null): SpeechSynthesisVoice | null {
+  const synth = webSynth();
+  if (!synth) return null;
+  const voices = synth.getVoices();
+  if (identifier) {
+    const chosen = voices.find((v) => v.voiceURI === identifier);
+    if (chosen) return chosen;
+  }
+  const pt = voices.filter((v) => v.lang.replace("_", "-").toLowerCase().startsWith("pt-br"));
+  return pt.find((v) => v.localService) ?? pt[0] ?? null;
+}
+
+/** Fala um texto no navegador; chama onEnd ao terminar (ou em erro). */
+function webSpeak(text: string, opts: SpeakOptions, onEnd: () => void) {
+  const synth = webSynth();
+  if (!synth) {
+    onEnd();
+    return;
+  }
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "pt-BR";
+  const voice = webVoice(opts.voiceIdentifier);
+  if (voice) u.voice = voice;
+  u.rate = opts.rate;
+  u.pitch = 0.95;
+  u.volume = 1;
+  u.onend = onEnd;
+  u.onerror = onEnd;
+  try {
+    synth.resume();
+  } catch {
+    /* ignore */
+  }
+  synth.speak(u);
+}
+
+/** Chamado num toque do usuário: libera a fala no Safari do iPhone. */
+export function unlockWebSpeech() {
+  const synth = webSynth();
+  if (!synth) return;
+  try {
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    synth.speak(u);
+    synth.resume();
+  } catch {
+    /* sem voz */
+  }
+}
+
 let currentPlayer: AudioPlayer | null = null;
 let currentFinish: (() => void) | null = null;
 let audioModeReady = false;
@@ -38,6 +99,12 @@ async function ensureAudioMode() {
 
 /** Vozes pt-BR instaladas no aparelho (as "Aprimoradas/Premium" soam mais naturais). */
 export async function listPortugueseVoices(): Promise<Speech.Voice[]> {
+  if (IS_WEB) {
+    const synth = webSynth();
+    return (synth?.getVoices() ?? [])
+      .filter((v) => v.lang.replace("_", "-").toLowerCase().startsWith("pt-br"))
+      .map((v) => ({ identifier: v.voiceURI, name: v.name, language: v.lang, quality: (v.localService ? "Enhanced" : "Default") as Speech.Voice["quality"] }));
+  }
   const voices = await Speech.getAvailableVoicesAsync();
   return voices
     .filter((v) => v.language.toLowerCase().replace("_", "-").startsWith("pt-br"))
@@ -56,6 +123,10 @@ function speakNative(text: string, opts: SpeakOptions): Promise<void> {
     };
     const watchdog = setTimeout(done, speechWatchdogMs(text, opts.rate));
     currentFinish = done;
+    if (IS_WEB) {
+      webSpeak(text, opts, done);
+      return;
+    }
     Speech.speak(text, {
       language: "pt-BR",
       voice: opts.voiceIdentifier ?? undefined,
@@ -147,7 +218,15 @@ export async function stopSpeaking(): Promise<void> {
       /* já liberado */
     }
   }
-  await Speech.stop().catch(() => undefined);
+  if (IS_WEB) {
+    try {
+      webSynth()?.cancel();
+    } catch {
+      /* ignore */
+    }
+  } else {
+    await Speech.stop().catch(() => undefined);
+  }
   finish?.();
 }
 
@@ -207,7 +286,8 @@ export function createSpeechStream(opts: SpeakOptions, onFirstSentence: () => vo
       ended = true;
       checkDone();
     };
-    Speech.speak(clean, { language: "pt-BR", voice: opts.voiceIdentifier ?? undefined, rate: opts.rate, pitch: 0.95, onDone: finish, onStopped: finish, onError: finish });
+    if (IS_WEB) webSpeak(clean, opts, finish);
+    else Speech.speak(clean, { language: "pt-BR", voice: opts.voiceIdentifier ?? undefined, rate: opts.rate, pitch: 0.95, onDone: finish, onStopped: finish, onError: finish });
   };
 
   void ensureAudioMode();

@@ -14,7 +14,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import { Platform } from "react-native";
 import { initialVoiceState, voiceReducer } from "@/logic/voiceMachine";
 import { isStopCommand, stripWakeWord } from "@/logic/wakeWord";
-import { createSpeechStream, speak, stopSpeaking, type SpeakOptions, type SpeechStream } from "./tts";
+import { createSpeechStream, speak, stopSpeaking, unlockWebSpeech, type SpeakOptions, type SpeechStream } from "./tts";
 
 const END_OF_SPEECH_MS = 1600;
 /** Depois de pedir o fim da escuta, quanto esperar pelo aviso do reconhecedor (o Safari às vezes não avisa). */
@@ -104,11 +104,8 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
       dispatch({ type: "ERROR", message: ERROR_MESSAGES["service-not-allowed"]! });
       return false;
     }
-    try {
-      w.speechSynthesis?.cancel();
-    } catch {
-      /* sem voz */
-    }
+    // Este toque também libera a voz do Jarvis no Safari (a resposta chega depois, sem toque).
+    unlockWebSpeech();
     gotFinal.current = false;
     lastTranscript.current = "";
     clearTimers();

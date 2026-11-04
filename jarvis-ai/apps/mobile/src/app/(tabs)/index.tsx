@@ -8,7 +8,7 @@ import { Button, Card, ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { executeDeviceAction, gatherDeviceContext, type Chooser } from "@/lib/device";
 import { chatStream } from "@/lib/stream";
-import { createSpeechStream, type SpeechStream } from "@/voice/tts";
+import { createSpeechStream, type SpeechStream, unlockWebSpeech } from "@/voice/tts";
 import { greeting } from "@/logic/format";
 import type { VoicePhase } from "@/logic/voiceMachine";
 import { usePrefs } from "@/providers/PrefsProvider";
@@ -194,6 +194,7 @@ export default function JarvisScreen() {
     const text = typed.trim();
     if (!text || sending) return;
     setTyped("");
+    if (Platform.OS === "web") unlockWebSpeech(); // toque no enviar libera a voz no Safari
     await speakTyped(text);
   };
 

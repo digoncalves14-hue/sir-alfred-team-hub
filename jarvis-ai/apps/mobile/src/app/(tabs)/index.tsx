@@ -8,7 +8,7 @@ import { Button, Card, ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { executeDeviceAction, gatherDeviceContext, type Chooser } from "@/lib/device";
 import { chatStream } from "@/lib/stream";
-import { createSpeechStream, type SpeechStream, unlockWebSpeech } from "@/voice/tts";
+import { createSpeechStream, setWebServerVoice, type SpeechStream, unlockWebSpeech } from "@/voice/tts";
 import { greeting } from "@/logic/format";
 import type { VoicePhase } from "@/logic/voiceMachine";
 import { usePrefs } from "@/providers/PrefsProvider";
@@ -76,6 +76,7 @@ export default function JarvisScreen() {
     try {
       const health = await api.health();
       streamingRef.current = health.streaming;
+      setWebServerVoice(health.tts.configured);
       setConn({ status: "online", health });
       const me = await api.me();
       setOwnerName(me.profile.ownerName);

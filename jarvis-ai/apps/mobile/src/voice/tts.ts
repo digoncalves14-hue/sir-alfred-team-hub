@@ -71,8 +71,40 @@ function webSpeak(text: string, opts: SpeakOptions, onEnd: () => void) {
   synth.speak(u);
 }
 
-/** Chamado num toque do usuário: libera a fala no Safari do iPhone. */
+/**
+ * Web: um único elemento <audio>, "destravado" num toque do usuário e reaproveitado
+ * para tocar a voz do servidor depois (o Safari só deixa tocar áudio que começou num toque).
+ */
+let sharedAudio: HTMLAudioElement | null = null;
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
+function audioEl(): HTMLAudioElement | null {
+  if (typeof window === "undefined" || typeof window.Audio === "undefined") return null;
+  sharedAudio ??= new window.Audio();
+  return sharedAudio;
+}
+
+/**
+ * Web: quando o servidor tem voz própria (ElevenLabs), ela é usada no lugar da voz do
+ * navegador — no iPhone, a voz sintetizada do Safari pode ficar muda, mas áudio toca.
+ */
+let webServerVoice = false;
+export function setWebServerVoice(available: boolean) {
+  webServerVoice = IS_WEB && available;
+}
+const usePremium = (opts: SpeakOptions) => opts.premium || webServerVoice;
+
+/** Chamado num toque do usuário: libera a fala e o áudio no Safari do iPhone. */
 export function unlockWebSpeech() {
+  const el = audioEl();
+  if (el) {
+    try {
+      el.src = SILENT_WAV;
+      void el.play().catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
+  }
   const synth = webSynth();
   if (!synth) return;
   try {
@@ -91,7 +123,7 @@ let currentFinish: (() => void) | null = null;
 let audioModeReady = false;
 
 async function ensureAudioMode() {
-  if (audioModeReady) return;
+  if (audioModeReady || IS_WEB) return;
   audioModeReady = true;
   // Toca mesmo com a chave de silêncio ligada; não mistura com outros apps.
   await setAudioModeAsync({ playsInSilentMode: true }).catch(() => undefined);
@@ -142,7 +174,10 @@ function speakNative(text: string, opts: SpeakOptions): Promise<void> {
 /** Web: toca o MP3 da voz premium com o elemento <audio> do navegador. */
 async function speakPremiumWeb(audio: ArrayBuffer): Promise<void> {
   const url = URL.createObjectURL(new Blob([audio], { type: "audio/mpeg" }));
-  const el = new window.Audio(url);
+  const el = audioEl() ?? new window.Audio();
+  el.onended = null;
+  el.onerror = null;
+  el.src = url;
   await new Promise<void>((resolve, reject) => {
     const finish = () => {
       if (currentFinish !== finish) return;
@@ -195,7 +230,7 @@ async function speakPremium(text: string): Promise<void> {
 
 export async function speak(text: string, opts: SpeakOptions): Promise<void> {
   if (!text.trim()) return;
-  if (IS_WEB && !opts.premium) {
+  if (IS_WEB && !usePremium(opts)) {
     // Web: fala imediatamente, sem nenhuma espera antes (o Safari só libera a voz "dentro" do toque).
     const prev = currentFinish;
     try {
@@ -209,7 +244,7 @@ export async function speak(text: string, opts: SpeakOptions): Promise<void> {
   }
   await ensureAudioMode();
   await stopSpeaking();
-  if (opts.premium) {
+  if (usePremium(opts)) {
     try {
       await speakPremium(text);
       return;
@@ -309,11 +344,11 @@ export function createSpeechStream(opts: SpeakOptions, onFirstSentence: () => vo
     },
     push(text: string) {
       full += text;
-      if (opts.premium || cancelled) return;
+      if (usePremium(opts) || cancelled) return;
       for (const s of buffer.push(text)) say(s);
     },
     async end() {
-      if (opts.premium) {
+      if (usePremium(opts)) {
         if (full.trim() && !cancelled) {
           started = true;
           onFirstSentence();

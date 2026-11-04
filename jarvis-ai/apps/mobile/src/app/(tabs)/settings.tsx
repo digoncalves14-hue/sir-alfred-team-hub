@@ -16,7 +16,7 @@ import { jarvisNative } from "../../../modules/jarvis-native";
 import * as Device from "expo-device";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePrefs } from "@/providers/PrefsProvider";
-import { listPortugueseVoices, speak } from "@/voice/tts";
+import { listPortugueseVoices, setWebServerVoice, speak, unlockWebSpeech } from "@/voice/tts";
 import { colors, font, radius, space } from "@/theme";
 
 function Row({ title, subtitle, value, onChange, disabled }: { title: string; subtitle?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -85,7 +85,13 @@ export default function Settings() {
           setMonthly(String(p.monthlyCostLimitUsd));
         })
         .catch((e) => setError(e instanceof Error ? e.message : "Falha ao carregar o perfil."));
-      api.health().then(setHealth).catch(() => setHealth(null));
+      api
+        .health()
+        .then((h) => {
+          setHealth(h);
+          setWebServerVoice(h.tts.configured);
+        })
+        .catch(() => setHealth(null));
       void loadIntegrations();
       void loadDevices();
     }, [loadIntegrations, loadDevices]),
@@ -227,8 +233,10 @@ export default function Settings() {
     setPrefs({ biometricLock: v });
   };
 
-  const testVoice = () =>
-    speak(`Olá, ${ownerName || "senhor"}. Esta é a minha voz.`, { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice });
+  const testVoice = () => {
+    if (Platform.OS === "web") unlockWebSpeech();
+    return speak(`Olá, ${ownerName || "senhor"}. Esta é a minha voz.`, { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice });
+  };
 
   return (
     <Screen>

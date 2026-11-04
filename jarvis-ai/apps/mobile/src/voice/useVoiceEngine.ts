@@ -17,6 +17,10 @@ import { isStopCommand, stripWakeWord } from "@/logic/wakeWord";
 import { createSpeechStream, speak, stopSpeaking, type SpeakOptions, type SpeechStream } from "./tts";
 
 const END_OF_SPEECH_MS = 1600;
+/** Depois de pedir o fim da escuta, quanto esperar pelo aviso do reconhecedor (o Safari às vezes não avisa). */
+const STOP_GRACE_MS = 2500;
+/** Tempo máximo esperando a resposta do Jarvis antes de liberar o orbe. */
+const RESPONSE_TIMEOUT_MS = 60_000;
 const NO_SPEECH_MS = 8000;
 
 const CONTEXTUAL_STRINGS = ["Jarvis", "Sir Alfred", "Black Bear", "Barton", "Alfie & Fred", "Genesis Barber", "CODE S.O.S.", "barbearia"];
@@ -62,6 +66,20 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Escuta durante a fala do Jarvis (interrupção por voz). */
   const bargeRef = useRef(false);
+
+  /** Encerra a escuta com o texto parcial quando o reconhecedor não avisa o fim. */
+  const forceFinal = () => {
+    if (stateRef.current.phase !== "listening" || gotFinal.current) return;
+    gotFinal.current = true;
+    recognizing.current = false;
+    try {
+      ExpoSpeechRecognitionModule.abort();
+    } catch {
+      /* já parado */
+    }
+    const partial = lastTranscript.current.trim();
+    dispatch(partial ? { type: "FINAL", text: partial } : { type: "NO_SPEECH" });
+  };
 
   const clearTimers = () => {
     if (endTimer.current) clearTimeout(endTimer.current);
@@ -124,7 +142,11 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
       if (silenceTimer.current) clearTimeout(silenceTimer.current);
       if (endTimer.current) clearTimeout(endTimer.current);
       // Pausa na fala → encerra a captura e pede o resultado final.
-      endTimer.current = setTimeout(() => ExpoSpeechRecognitionModule.stop(), END_OF_SPEECH_MS);
+      endTimer.current = setTimeout(() => {
+        ExpoSpeechRecognitionModule.stop();
+        // Se o reconhecedor não encerrar sozinho (Safari), envia o que já foi entendido.
+        endTimer.current = setTimeout(forceFinal, STOP_GRACE_MS);
+      }, END_OF_SPEECH_MS);
     }
   });
 
@@ -186,7 +208,14 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
       let reply: string | null;
       try {
         // Só a palavra de ativação ("Jarvis") → responde localmente, sem custo de IA.
-        reply = text ? await optsRef.current.onUtterance(text, sink) : "Pois não?";
+        reply = text
+          ? await Promise.race([
+              optsRef.current.onUtterance(text, sink),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("O Jarvis demorou demais para responder. Toque no orbe e tente de novo.")), RESPONSE_TIMEOUT_MS),
+              ),
+            ])
+          : "Pois não?";
       } catch (e) {
         dispatch({ type: "ERROR", message: e instanceof Error ? e.message : "Falha ao falar com o Jarvis." });
         return;
@@ -226,6 +255,9 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   /** Termina a escuta atual e envia o que já foi dito. */
   const finish = useCallback(() => {
     if (recognizing.current) ExpoSpeechRecognitionModule.stop();
+    if (endTimer.current) clearTimeout(endTimer.current);
+    endTimer.current = setTimeout(forceFinal, STOP_GRACE_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** Interrupção: corta a fala e volta a ouvir. */

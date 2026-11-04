@@ -17,6 +17,14 @@ export interface SpeakOptions {
   premium: boolean;
 }
 
+/**
+ * Tempo máximo esperado para falar um texto. O Safari do iPhone às vezes não avisa o fim
+ * da fala (ou nem começa); passado esse tempo, seguimos como se tivesse terminado.
+ */
+export function speechWatchdogMs(text: string, rate = 1): number {
+  return Math.round(4000 + (text.length * 85) / Math.max(rate, 0.5));
+}
+
 let currentPlayer: AudioPlayer | null = null;
 let currentFinish: (() => void) | null = null;
 let audioModeReady = false;
@@ -38,10 +46,15 @@ export async function listPortugueseVoices(): Promise<Speech.Voice[]> {
 
 function speakNative(text: string, opts: SpeakOptions): Promise<void> {
   return new Promise((resolve) => {
+    let settled = false;
     const done = () => {
-      currentFinish = null;
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
+      if (currentFinish === done) currentFinish = null;
       resolve();
     };
+    const watchdog = setTimeout(done, speechWatchdogMs(text, opts.rate));
     currentFinish = done;
     Speech.speak(text, {
       language: "pt-BR",
@@ -161,6 +174,7 @@ export function createSpeechStream(opts: SpeakOptions, onFirstSentence: () => vo
   let ended = false;
   let full = "";
   let cancelled = false;
+  let queuedChars = 0;
   let resolveDone: (() => void) | null = null;
   const done = new Promise<void>((r) => (resolveDone = r));
   const checkDone = () => {
@@ -175,10 +189,17 @@ export function createSpeechStream(opts: SpeakOptions, onFirstSentence: () => vo
       onFirstSentence();
     }
     pending++;
+    let settled = false;
     const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(watchdog);
       pending = Math.max(0, pending - 1);
       checkDone();
     };
+    // As frases ficam em fila: o prazo desta conta também a fila à frente dela.
+    queuedChars += clean.length;
+    const watchdog = setTimeout(finish, speechWatchdogMs("x".repeat(queuedChars), opts.rate));
     // Interrupção (toque ou voz): para tudo e ignora o texto que ainda chegar.
     currentFinish = () => {
       cancelled = true;

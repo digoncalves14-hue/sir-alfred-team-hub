@@ -7,65 +7,76 @@
 <style>
   body { margin: 0; padding: 20px 16px 40px; background: #03060F; color: #E6F1FF; font: 17px -apple-system, system-ui, sans-serif; }
   h1 { font-size: 22px; margin: 0 0 6px; }
-  p { color: #8FA6C3; margin: 0 0 16px; }
-  button { display: block; width: 100%; margin: 12px 0; padding: 18px; font-size: 18px; font-weight: 700; border: 0; border-radius: 14px; background: #38D9F5; color: #03060F; }
+  p { color: #8FA6C3; margin: 0 0 12px; }
+  button { display: block; width: 100%; margin: 10px 0; padding: 16px; font-size: 17px; font-weight: 700; border: 0; border-radius: 14px; background: #38D9F5; color: #03060F; }
   button.alt { background: #1B2A44; color: #E6F1FF; }
-  #log { margin-top: 16px; padding: 12px; background: #0B1424; border-radius: 12px; font: 14px ui-monospace, Menlo, monospace; white-space: pre-wrap; min-height: 120px; }
+  #log { margin-top: 14px; padding: 12px; background: #0B1424; border-radius: 12px; font: 13px ui-monospace, Menlo, monospace; white-space: pre-wrap; }
 </style>
 </head>
 <body>
-<h1>Teste de voz</h1>
-<p>Toque nos botões na ordem e tire um print desta tela no final.</p>
-<button id="b1">1. Falar com a voz do iPhone</button>
-<button id="b2" class="alt">2. Tocar um bipe</button>
+<h1>Teste de voz (2)</h1>
+<p>Toque em cada botão, um de cada vez, e anote em qual você <b>ouviu</b> algo.</p>
+<button id="snd">A. Tocar um som (arquivo de áudio)</button>
+<button id="def" class="alt">B. Voz padrão (sem escolher voz)</button>
+<div id="voices"></div>
 <div id="log"></div>
 <script>
   var log = document.getElementById("log");
   function add(t) { log.textContent += new Date().toLocaleTimeString("pt-BR") + "  " + t + "\n"; }
-  add("Página carregada.");
-  add("speechSynthesis existe: " + ("speechSynthesis" in window));
-  add("Modo app (Tela de Início): " + (navigator.standalone === true));
-  function voicesInfo() {
-    try {
-      var v = speechSynthesis.getVoices();
-      var pt = v.filter(function (x) { return x.lang.replace("_", "-").toLowerCase().indexOf("pt-br") === 0; });
-      add("Vozes: " + v.length + " no total, " + pt.length + " pt-BR" + (pt[0] ? " (ex.: " + pt[0].name + ")" : ""));
-      return pt;
-    } catch (e) { add("Erro ao listar vozes: " + e.message); return []; }
+
+  // A) som num <audio> (WAV gerado na hora: 0,7 s de tom)
+  function wavUrl() {
+    var rate = 22050, secs = 0.7, n = Math.floor(rate * secs);
+    var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    function s(o, str) { for (var i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); }
+    s(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); s(8, "WAVE"); s(12, "fmt ");
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    s(36, "data"); v.setUint32(40, n * 2, true);
+    for (var i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.sin(2 * Math.PI * 660 * i / rate) * 12000, true);
+    return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   }
-  if ("speechSynthesis" in window) { voicesInfo(); speechSynthesis.onvoiceschanged = function () { add("(lista de vozes atualizada)"); }; }
-
-  document.getElementById("b1").onclick = function () {
-    add("Toque no botão 1.");
-    if (!("speechSynthesis" in window)) { add("SEM speechSynthesis neste navegador."); return; }
-    try {
-      var pt = voicesInfo();
-      var u = new SpeechSynthesisUtterance("Olá. Esta é a voz do Jarvis.");
-      u.lang = "pt-BR";
-      if (pt[0]) u.voice = pt[0];
-      u.volume = 1; u.rate = 1;
-      u.onstart = function () { add("COMEÇOU a falar."); };
-      u.onend = function () { add("TERMINOU de falar."); };
-      u.onerror = function (e) { add("ERRO na fala: " + (e.error || "desconhecido")); };
-      speechSynthesis.cancel();
-      speechSynthesis.speak(u);
-      add("Pedido de fala enviado. speaking=" + speechSynthesis.speaking + " pending=" + speechSynthesis.pending + " paused=" + speechSynthesis.paused);
-      setTimeout(function () { add("Após 3 s: speaking=" + speechSynthesis.speaking + " pending=" + speechSynthesis.pending); }, 3000);
-    } catch (e) { add("Exceção: " + e.message); }
+  document.getElementById("snd").onclick = function () {
+    add("A: tocando som...");
+    var a = new Audio(wavUrl());
+    a.onplaying = function () { add("A: som TOCANDO."); };
+    a.onended = function () { add("A: som terminou."); };
+    a.play().catch(function (e) { add("A: ERRO ao tocar: " + e.message); });
   };
 
-  document.getElementById("b2").onclick = function () {
-    add("Toque no botão 2.");
-    try {
-      var Ctx = window.AudioContext || window.webkitAudioContext;
-      var ctx = new Ctx();
-      var o = ctx.createOscillator(); var g = ctx.createGain();
-      o.frequency.value = 660; g.gain.value = 0.3;
-      o.connect(g); g.connect(ctx.destination);
-      o.start(); o.stop(ctx.currentTime + 0.6);
-      add("Bipe tocado (estado do áudio: " + ctx.state + ").");
-    } catch (e) { add("Erro no bipe: " + e.message); }
-  };
+  function speakWith(voice, label) {
+    add(label + ": pedindo fala...");
+    var u = new SpeechSynthesisUtterance("Olá. Esta é a voz do Jarvis.");
+    u.lang = "pt-BR"; u.volume = 1; u.rate = 1;
+    if (voice) u.voice = voice;
+    u.onstart = function () { add(label + ": COMEÇOU."); };
+    u.onend = function () { add(label + ": terminou."); };
+    u.onerror = function (e) { add(label + ": ERRO " + (e.error || "")); };
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  }
+  document.getElementById("def").onclick = function () { speakWith(null, "B (padrão)"); };
+
+  function renderVoices() {
+    var box = document.getElementById("voices");
+    var pt = speechSynthesis.getVoices().filter(function (x) { return x.lang.replace("_", "-").toLowerCase().indexOf("pt") === 0; });
+    if (!pt.length) return;
+    box.innerHTML = "";
+    pt.forEach(function (voice, i) {
+      var b = document.createElement("button");
+      b.className = "alt";
+      var label = "C" + (i + 1) + ". " + voice.name + " (" + voice.lang + (voice.localService ? ", no aparelho" : ", rede") + ")";
+      b.textContent = label;
+      b.onclick = function () { speakWith(voice, "C" + (i + 1)); };
+      box.appendChild(b);
+    });
+  }
+  if ("speechSynthesis" in window) {
+    renderVoices();
+    speechSynthesis.onvoiceschanged = renderVoices;
+    setTimeout(renderVoices, 800);
+  } else add("Sem speechSynthesis.");
+  add("Página carregada.");
 </script>
 </body>
 </html>

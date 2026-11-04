@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste de voz — Jarvis</title>
+<style>
+  body { margin: 0; padding: 20px 16px 40px; background: #03060F; color: #E6F1FF; font: 17px -apple-system, system-ui, sans-serif; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p { color: #8FA6C3; margin: 0 0 16px; }
+  button { display: block; width: 100%; margin: 12px 0; padding: 18px; font-size: 18px; font-weight: 700; border: 0; border-radius: 14px; background: #38D9F5; color: #03060F; }
+  button.alt { background: #1B2A44; color: #E6F1FF; }
+  #log { margin-top: 16px; padding: 12px; background: #0B1424; border-radius: 12px; font: 14px ui-monospace, Menlo, monospace; white-space: pre-wrap; min-height: 120px; }
+</style>
+</head>
+<body>
+<h1>Teste de voz</h1>
+<p>Toque nos botões na ordem e tire um print desta tela no final.</p>
+<button id="b1">1. Falar com a voz do iPhone</button>
+<button id="b2" class="alt">2. Tocar um bipe</button>
+<div id="log"></div>
+<script>
+  var log = document.getElementById("log");
+  function add(t) { log.textContent += new Date().toLocaleTimeString("pt-BR") + "  " + t + "\n"; }
+  add("Página carregada.");
+  add("speechSynthesis existe: " + ("speechSynthesis" in window));
+  add("Modo app (Tela de Início): " + (navigator.standalone === true));
+  function voicesInfo() {
+    try {
+      var v = speechSynthesis.getVoices();
+      var pt = v.filter(function (x) { return x.lang.replace("_", "-").toLowerCase().indexOf("pt-br") === 0; });
+      add("Vozes: " + v.length + " no total, " + pt.length + " pt-BR" + (pt[0] ? " (ex.: " + pt[0].name + ")" : ""));
+      return pt;
+    } catch (e) { add("Erro ao listar vozes: " + e.message); return []; }
+  }
+  if ("speechSynthesis" in window) { voicesInfo(); speechSynthesis.onvoiceschanged = function () { add("(lista de vozes atualizada)"); }; }
+
+  document.getElementById("b1").onclick = function () {
+    add("Toque no botão 1.");
+    if (!("speechSynthesis" in window)) { add("SEM speechSynthesis neste navegador."); return; }
+    try {
+      var pt = voicesInfo();
+      var u = new SpeechSynthesisUtterance("Olá. Esta é a voz do Jarvis.");
+      u.lang = "pt-BR";
+      if (pt[0]) u.voice = pt[0];
+      u.volume = 1; u.rate = 1;
+      u.onstart = function () { add("COMEÇOU a falar."); };
+      u.onend = function () { add("TERMINOU de falar."); };
+      u.onerror = function (e) { add("ERRO na fala: " + (e.error || "desconhecido")); };
+      speechSynthesis.cancel();
+      speechSynthesis.speak(u);
+      add("Pedido de fala enviado. speaking=" + speechSynthesis.speaking + " pending=" + speechSynthesis.pending + " paused=" + speechSynthesis.paused);
+      setTimeout(function () { add("Após 3 s: speaking=" + speechSynthesis.speaking + " pending=" + speechSynthesis.pending); }, 3000);
+    } catch (e) { add("Exceção: " + e.message); }
+  };
+
+  document.getElementById("b2").onclick = function () {
+    add("Toque no botão 2.");
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      var ctx = new Ctx();
+      var o = ctx.createOscillator(); var g = ctx.createGain();
+      o.frequency.value = 660; g.gain.value = 0.3;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.6);
+      add("Bipe tocado (estado do áudio: " + ctx.state + ").");
+    } catch (e) { add("Erro no bipe: " + e.message); }
+  };
+</script>
+</body>
+</html>

@@ -11,6 +11,7 @@ import { Platform } from "react-native";
 import { api } from "@/lib/api";
 import { forSpeech, SentenceBuffer } from "@/logic/sentences";
 import { clampServerSpeed } from "@/logic/voices";
+import { diag } from "@/lib/diag";
 
 export interface SpeakOptions {
   voiceIdentifier: string | null;
@@ -180,25 +181,56 @@ async function speakPremiumWeb(audio: ArrayBuffer): Promise<void> {
   const el = audioEl() ?? new window.Audio();
   el.onended = null;
   el.onerror = null;
+  el.onpause = null;
+  el.onloadedmetadata = null;
   el.src = url;
+  diag(`audio: carregando ${audio.byteLength} bytes`);
   await new Promise<void>((resolve, reject) => {
+    let watchdog: ReturnType<typeof setTimeout> | null = null;
     const finish = () => {
       if (currentFinish !== finish) return;
       currentFinish = null;
-      el.pause();
+      if (watchdog) clearTimeout(watchdog);
+      el.onended = el.onerror = el.onpause = el.onloadedmetadata = null;
+      try {
+        el.pause();
+      } catch {
+        /* ignore */
+      }
       URL.revokeObjectURL(url);
       resolve();
     };
     currentFinish = finish;
-    el.onended = finish;
-    el.onerror = () => {
+    // Prazo de segurança: duração do áudio + folga (o Safari às vezes não avisa o fim).
+    const arm = (ms: number) => {
+      if (watchdog) clearTimeout(watchdog);
+      watchdog = setTimeout(() => {
+        diag("audio: prazo esgotado, seguindo");
+        finish();
+      }, ms);
+    };
+    arm(45_000);
+    el.onloadedmetadata = () => {
+      if (Number.isFinite(el.duration) && el.duration > 0) arm(el.duration * 1000 + 2500);
+    };
+    el.onended = () => {
+      diag("audio: terminou");
       finish();
     };
-    el.play().catch((e) => {
-      currentFinish = null;
-      URL.revokeObjectURL(url);
-      reject(e);
-    });
+    el.onerror = () => {
+      diag("audio: erro ao tocar");
+      finish();
+    };
+    el.play().then(
+      () => diag("audio: tocando"),
+      (e) => {
+        diag(`audio: play recusado (${e instanceof Error ? e.name : "?"})`);
+        if (currentFinish === finish) currentFinish = null;
+        if (watchdog) clearTimeout(watchdog);
+        URL.revokeObjectURL(url);
+        reject(e);
+      },
+    );
   });
 }
 

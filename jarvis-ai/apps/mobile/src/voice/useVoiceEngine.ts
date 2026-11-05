@@ -14,6 +14,7 @@ import { useCallback, useEffect, useReducer, useRef } from "react";
 import { Platform } from "react-native";
 import { initialVoiceState, voiceReducer } from "@/logic/voiceMachine";
 import { isStopCommand, stripWakeWord } from "@/logic/wakeWord";
+import { diag } from "@/lib/diag";
 import { createSpeechStream, speak, stopSpeaking, unlockWebSpeech, type SpeakOptions, type SpeechStream } from "./tts";
 
 const END_OF_SPEECH_MS = 1600;
@@ -58,6 +59,11 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   optsRef.current = opts;
   const stateRef = useRef(state);
   stateRef.current = state;
+  const lastPhase = useRef(state.phase);
+  if (lastPhase.current !== state.phase) {
+    diag(`fase: ${lastPhase.current} → ${state.phase}${state.error ? ` (${state.error.slice(0, 60)})` : ""}`);
+    lastPhase.current = state.phase;
+  }
 
   const recognizing = useRef(false);
   const gotFinal = useRef(false);
@@ -137,8 +143,10 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
     clearTimers();
     try {
       endWebSession();
+      diag("microfone: start");
       ExpoSpeechRecognitionModule.start({ lang: "pt-BR", interimResults: true, continuous, maxAlternatives: 1 });
     } catch (e) {
+      diag(`microfone: start falhou (${e instanceof Error ? e.message.slice(0, 60) : "?"})`);
       dispatch({ type: "ERROR", message: e instanceof Error ? e.message : "Falha ao iniciar o microfone." });
       return false;
     }
@@ -203,10 +211,12 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   }, [state.listenId, state.phase]);
 
   // ---- Eventos do reconhecedor ----
+  useSpeechRecognitionEvent("start", () => diag("microfone: começou a ouvir"));
   useSpeechRecognitionEvent("volumechange", (e) => dispatch({ type: "LEVEL", value: e.value }));
 
   useSpeechRecognitionEvent("result", (e) => {
     const text = e.results[0]?.transcript ?? "";
+    diag(`microfone: resultado ${e.isFinal ? "final" : "parcial"} (${text.length} letras, fase ${stateRef.current.phase})`);
     if (bargeRef.current) {
       // O usuário começou a falar enquanto o Jarvis fala → interrompe e volta a ouvir.
       if (stateRef.current.phase === "speaking" && text.trim().length >= 4) {
@@ -246,6 +256,7 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   });
 
   useSpeechRecognitionEvent("error", (e) => {
+    diag(`microfone: erro ${e.error}`);
     clearTimers();
     if (bargeRef.current || stateRef.current.phase === "speaking") return; // escuta de interrupção: erros são silenciosos
     if (e.error === "aborted" || e.error === "no-speech" || e.error === "speech-timeout") return; // tratado em "end"
@@ -253,6 +264,7 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   });
 
   useSpeechRecognitionEvent("end", () => {
+    diag(`microfone: end (fase ${stateRef.current.phase})`);
     recognizing.current = false;
     // O Safari encerrou o microfone (tempo máximo, interrupção): a sessão acaba; novo toque religa.
     webSession.current = false;
@@ -296,6 +308,7 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
       return;
     }
     const text = stripWakeWord(raw);
+    diag(`enviando pergunta (${text.length} letras)`);
     dispatch({ type: "SUBMITTED" });
     (async () => {
       // Fala em streaming: a 1ª frase completa já passa o estado para "falando".
@@ -314,6 +327,7 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
             ])
           : "Pois não?";
       } catch (e) {
+        diag(`erro na resposta: ${e instanceof Error ? e.message.slice(0, 80) : "?"}`);
         dispatch({ type: "ERROR", message: e instanceof Error ? e.message : "Falha ao falar com o Jarvis." });
         return;
       }
@@ -321,8 +335,10 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
         dispatch({ type: "RESPONSE", willSpeak: false });
         return;
       }
+      diag("resposta recebida; falando");
       if (reply) sink.push(reply);
       await sink.end();
+      diag(`fala concluída (começou: ${sink.started})`);
       dispatch(sink.started ? { type: "SPEECH_DONE" } : { type: "RESPONSE", willSpeak: false });
     })();
   }, [state.phase, state.finalized, state.transcript]);

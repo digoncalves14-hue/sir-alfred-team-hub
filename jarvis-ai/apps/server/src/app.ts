@@ -292,6 +292,15 @@ export async function buildApp(deps: AppDeps) {
     });
 
     // ---- Voz premium (opcional) ----
+    // Diagnóstico da versão web: só nomes de eventos e tempos (sem áudio nem texto falado).
+    v1.post("/diag", async (req, reply: FastifyReply) => {
+      const parsed = z
+        .object({ events: z.array(z.string().max(200)).max(50), ua: z.string().max(200).optional() })
+        .safeParse(req.body);
+      if (parsed.success) req.log.info({ diag: parsed.data.events, ua: parsed.data.ua }, "diag web");
+      return reply.status(204).send();
+    });
+
     v1.post("/tts", async (req, reply: FastifyReply) => {
       if (!deps.tts.configured) throw new AppError("tts_nao_configurado", 503, "Voz premium não configurada; usando a voz do iPhone.");
       const { text, voiceId, speed } = TtsRequestSchema.parse(req.body);

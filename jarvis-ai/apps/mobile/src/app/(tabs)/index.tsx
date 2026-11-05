@@ -8,6 +8,7 @@ import { Button, Card, ErrorBanner, Icon, Pill, Screen } from "@/components/ui";
 import { api, ApiError } from "@/lib/api";
 import { executeDeviceAction, gatherDeviceContext, type Chooser } from "@/lib/device";
 import { chatStream } from "@/lib/stream";
+import { diag } from "@/lib/diag";
 import { createSpeechStream, setWebServerVoice, type SpeechStream, unlockWebSpeech } from "@/voice/tts";
 import { greeting } from "@/logic/format";
 import type { VoicePhase } from "@/logic/voiceMachine";
@@ -172,9 +173,12 @@ export default function JarvisScreen() {
   }, [params.n, params.ouvir, params.pergunta, params.rotina, prefs.continuousConversation]);
 
   const onOrbPress = () => {
+    diag(`toque no orbe (fase ${phase})`);
     if (phase === "idle" || phase === "error") void voice.start(prefs.continuousConversation);
     else if (phase === "listening") voice.finish();
     else if (phase === "speaking") void voice.interrupt();
+    // Pensando há muito tempo: o toque cancela e libera o orbe.
+    else if (phase === "processing") void voice.stop();
   };
 
   /** Texto digitado (ou vindo de Siri/rotina): também fala frase a frase quando há streaming. */

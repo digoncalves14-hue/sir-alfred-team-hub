@@ -68,16 +68,37 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   const silenceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Escuta durante a fala do Jarvis (interrupção por voz). */
   const bargeRef = useRef(false);
+  /**
+   * Web, conversa contínua: um único reconhecimento contínuo, iniciado no toque, fica
+   * ligado durante a conversa (o Safari não deixa religar o microfone sem novo toque).
+   * Enquanto o Jarvis pensa/fala, o que o microfone ouve é ignorado (eco da própria voz).
+   */
+  const webSession = useRef(false);
+  /** Ignora o que for ouvido até este instante (eco logo depois da fala). */
+  const ignoreUntil = useRef(0);
+  const ECHO_GRACE_MS = 900;
+
+  const endWebSession = () => {
+    if (!webSession.current) return;
+    webSession.current = false;
+    try {
+      ExpoSpeechRecognitionModule.abort();
+    } catch {
+      /* já parado */
+    }
+  };
 
   /** Encerra a escuta com o texto parcial quando o reconhecedor não avisa o fim. */
   const forceFinal = () => {
     if (stateRef.current.phase !== "listening" || gotFinal.current) return;
     gotFinal.current = true;
-    recognizing.current = false;
-    try {
-      ExpoSpeechRecognitionModule.abort();
-    } catch {
-      /* já parado */
+    if (!webSession.current) {
+      recognizing.current = false;
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch {
+        /* já parado */
+      }
     }
     const partial = lastTranscript.current.trim();
     dispatch(partial ? { type: "FINAL", text: partial } : { type: "NO_SPEECH" });
@@ -86,6 +107,11 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   /** Ninguém falou: encerra a escuta (e não depende do aviso do reconhecedor). */
   const giveUpIfSilent = () => {
     if (lastTranscript.current) return;
+    if (webSession.current) {
+      // Sessão contínua: conta um silêncio sem desligar o microfone.
+      forceFinal();
+      return;
+    }
     try {
       ExpoSpeechRecognitionModule.abort();
     } catch {
@@ -98,7 +124,7 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
    * Web (Safari do iPhone): o reconhecimento precisa começar DENTRO do toque do usuário,
    * sem nenhuma espera antes. Retorna false se não foi possível.
    */
-  const beginWebListening = (): boolean => {
+  const beginWebListening = (continuous = false): boolean => {
     const w = globalThis as unknown as { webkitSpeechRecognition?: unknown; SpeechRecognition?: unknown; speechSynthesis?: { cancel(): void } };
     if (!w.webkitSpeechRecognition && !w.SpeechRecognition) {
       dispatch({ type: "ERROR", message: ERROR_MESSAGES["service-not-allowed"]! });
@@ -110,13 +136,16 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
     lastTranscript.current = "";
     clearTimers();
     try {
-      ExpoSpeechRecognitionModule.start({ lang: "pt-BR", interimResults: true, continuous: false, maxAlternatives: 1 });
+      endWebSession();
+      ExpoSpeechRecognitionModule.start({ lang: "pt-BR", interimResults: true, continuous, maxAlternatives: 1 });
     } catch (e) {
       dispatch({ type: "ERROR", message: e instanceof Error ? e.message : "Falha ao iniciar o microfone." });
       return false;
     }
     recognizing.current = true;
     startedInGesture.current = true;
+    webSession.current = continuous;
+    ignoreUntil.current = 0;
     return true;
   };
 
@@ -136,7 +165,16 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
       return clearTimers;
     }
     if (WEB) {
+      if (webSession.current && recognizing.current) {
+        // Conversa contínua: o microfone continua ligado; nova vez de falar.
+        gotFinal.current = false;
+        lastTranscript.current = "";
+        ignoreUntil.current = Date.now() + ECHO_GRACE_MS;
+        silenceTimer.current = setTimeout(giveUpIfSilent, NO_SPEECH_MS);
+        return clearTimers;
+      }
       // Sem um toque, o Safari não libera o microfone: volta ao estado inicial ("toque para falar").
+      webSession.current = false;
       dispatch({ type: "STOP" });
       return;
     }
@@ -178,6 +216,10 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
       }
       return;
     }
+    if (webSession.current) {
+      // Fora da vez do usuário (Jarvis pensando/falando) ou eco logo depois: ignora.
+      if (stateRef.current.phase !== "listening" || stateRef.current.finalized || gotFinal.current || Date.now() < ignoreUntil.current) return;
+    }
     if (e.isFinal) {
       gotFinal.current = true;
       clearTimers();
@@ -191,6 +233,11 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
       if (endTimer.current) clearTimeout(endTimer.current);
       // Pausa na fala → encerra a captura e pede o resultado final.
       endTimer.current = setTimeout(() => {
+        if (webSession.current) {
+          // Conversa contínua: a pausa encerra a fala sem desligar o microfone.
+          forceFinal();
+          return;
+        }
         ExpoSpeechRecognitionModule.stop();
         // Se o reconhecedor não encerrar sozinho (Safari), envia o que já foi entendido.
         endTimer.current = setTimeout(forceFinal, STOP_GRACE_MS);
@@ -207,6 +254,8 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
 
   useSpeechRecognitionEvent("end", () => {
     recognizing.current = false;
+    // O Safari encerrou o microfone (tempo máximo, interrupção): a sessão acaba; novo toque religa.
+    webSession.current = false;
     clearTimers();
     if (stateRef.current.phase !== "listening" || gotFinal.current) return;
     const partial = lastTranscript.current.trim();
@@ -282,10 +331,9 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   const start = useCallback(async (continuous: boolean) => {
     if (WEB) {
       // Nada de await antes do start(): o Safari exige o toque "ao vivo".
-      if (!beginWebListening()) return;
+      if (!beginWebListening(continuous)) return;
       void stopSpeaking();
-      // Conversa contínua não funciona na web (o Safari exige um toque a cada escuta).
-      dispatch({ type: "START", continuous: false });
+      dispatch({ type: "START", continuous });
       return;
     }
     const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
@@ -301,8 +349,15 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
     dispatch({ type: "START", continuous });
   }, []);
 
+  // Web: a conversa terminou (silêncio, "pode parar", erro) → desliga o microfone.
+  useEffect(() => {
+    if ((state.phase === "idle" || state.phase === "error") && webSession.current) endWebSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase]);
+
   const stop = useCallback(async () => {
     clearTimers();
+    webSession.current = false;
     if (recognizing.current) ExpoSpeechRecognitionModule.abort();
     await stopSpeaking();
     dispatch({ type: "STOP" });
@@ -310,6 +365,12 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
 
   /** Termina a escuta atual e envia o que já foi dito. */
   const finish = useCallback(() => {
+    if (webSession.current) {
+      // Sessão contínua: envia o que já foi dito sem desligar o microfone.
+      clearTimers();
+      forceFinal();
+      return;
+    }
     if (recognizing.current) ExpoSpeechRecognitionModule.stop();
     if (endTimer.current) clearTimeout(endTimer.current);
     endTimer.current = setTimeout(forceFinal, STOP_GRACE_MS);
@@ -319,7 +380,13 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   /** Interrupção: corta a fala e volta a ouvir. */
   const interrupt = useCallback(async () => {
     if (WEB) {
-      if (!beginWebListening()) return;
+      if (webSession.current && recognizing.current) {
+        // Microfone já ligado (conversa contínua): só corta a fala e volta a ouvir.
+        void stopSpeaking();
+        dispatch({ type: "INTERRUPT" });
+        return;
+      }
+      if (!beginWebListening(stateRef.current.sessionActive)) return;
       void stopSpeaking();
       dispatch({ type: "INTERRUPT" });
       return;

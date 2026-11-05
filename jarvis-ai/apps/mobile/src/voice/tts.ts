@@ -98,13 +98,52 @@ export function setWebServerVoice(available: boolean) {
 }
 const usePremium = (opts: SpeakOptions) => opts.premium || webServerVoice;
 
+/**
+ * Safari (iOS 17+): avisa que o app toca E grava. Sem isso, depois de tocar a resposta o
+ * iPhone fica no modo "só reproduzir" e o microfone do site passa a captar silêncio.
+ */
+export function setWebAudioSession(type: "play-and-record" | "playback" | "auto") {
+  const nav = (typeof navigator !== "undefined" ? navigator : null) as (Navigator & { audioSession?: { type: string } }) | null;
+  try {
+    if (nav?.audioSession) nav.audioSession.type = type;
+  } catch {
+    /* navegador sem Audio Session API */
+  }
+}
+
+/** Solta o elemento de áudio por completo (libera o "tocando agora" do iPhone). */
+function releaseAudio(el: HTMLAudioElement) {
+  try {
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+  } catch {
+    /* ignore */
+  }
+  try {
+    const ms = (navigator as Navigator & { mediaSession?: { playbackState: string; metadata: unknown } }).mediaSession;
+    if (ms) {
+      ms.playbackState = "none";
+      ms.metadata = null;
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+let audioUnlocked = false;
+
 /** Chamado num toque do usuário: libera a fala e o áudio no Safari do iPhone. */
 export function unlockWebSpeech() {
+  setWebAudioSession("play-and-record");
   const el = audioEl();
-  if (el) {
+  // Só no primeiro toque: tocar o áudio "silencioso" logo antes de ligar o microfone
+  // deixaria o iPhone no modo de reprodução.
+  if (el && !audioUnlocked) {
+    audioUnlocked = true;
     try {
       el.src = SILENT_WAV;
-      void el.play().catch(() => undefined);
+      void el.play().then(() => releaseAudio(el), () => undefined);
     } catch {
       /* ignore */
     }
@@ -184,7 +223,7 @@ async function speakPremiumWeb(audio: ArrayBuffer): Promise<void> {
   el.onpause = null;
   el.onloadedmetadata = null;
   el.src = url;
-  diag(`audio: carregando ${audio.byteLength} bytes`);
+  diag(`audio: carregando ${audio.byteLength} bytes (sessão ${(navigator as Navigator & { audioSession?: { type: string } }).audioSession?.type ?? "sem API"})`);
   await new Promise<void>((resolve, reject) => {
     let watchdog: ReturnType<typeof setTimeout> | null = null;
     const finish = () => {
@@ -192,11 +231,7 @@ async function speakPremiumWeb(audio: ArrayBuffer): Promise<void> {
       currentFinish = null;
       if (watchdog) clearTimeout(watchdog);
       el.onended = el.onerror = el.onpause = el.onloadedmetadata = null;
-      try {
-        el.pause();
-      } catch {
-        /* ignore */
-      }
+      releaseAudio(el);
       URL.revokeObjectURL(url);
       resolve();
     };

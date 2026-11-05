@@ -3,6 +3,10 @@
  * - Alert.alert do React Native Web não faz nada: usamos alert/confirm/prompt do navegador.
  */
 import { Alert, type AlertButton } from "react-native";
+import { setWebAudioSession } from "@/voice/tts";
+
+// O Jarvis toca a resposta e depois volta a ouvir: avisa o Safari desde o início.
+setWebAudioSession("play-and-record");
 
 Alert.alert = (title: string, message?: string, buttons?: AlertButton[]) => {
   const text = [title, message].filter(Boolean).join("\n\n");

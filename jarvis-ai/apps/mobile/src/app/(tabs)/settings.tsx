@@ -17,7 +17,7 @@ import * as Device from "expo-device";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePrefs } from "@/providers/PrefsProvider";
 import { listPortugueseVoices, setWebServerVoice, speak, unlockWebSpeech } from "@/voice/tts";
-import { DEFAULT_SERVER_VOICE, SERVER_VOICES } from "@/logic/voices";
+import { DEFAULT_SERVER_VOICE, isVoiceId, SERVER_VOICES } from "@/logic/voices";
 import { colors, font, radius, space } from "@/theme";
 
 function Row({ title, subtitle, value, onChange, disabled }: { title: string; subtitle?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -54,6 +54,7 @@ export default function Settings() {
   const [devices, setDevices] = useState<DeviceToken[]>([]);
   const [siriReady, setSiriReady] = useState(jarvisNative.hasCredentials());
   const [siriBusy, setSiriBusy] = useState(false);
+  const [customVoice, setCustomVoice] = useState("");
 
   const loadDevices = useCallback(async () => {
     try {
@@ -244,7 +245,6 @@ export default function Settings() {
     void speak(`Olá, ${ownerName || "senhor"}. Como posso ajudar hoje?`, { voiceIdentifier: null, rate: prefs.speechRate, premium: true, serverVoiceId: id });
   };
   const serverVoiceInUse = Boolean(health?.tts.configured) && (WEB || prefs.premiumVoice);
-  const selectedServerVoice = prefs.serverVoiceId ?? DEFAULT_SERVER_VOICE;
 
   return (
     <Screen>
@@ -469,23 +469,60 @@ export default function Settings() {
           {serverVoiceInUse ? (
             <>
               <Text style={[font.small, { marginTop: space(3) }]}>Voz do Jarvis — toque no nome para escolher e em ▶ para ouvir uma amostra.</Text>
-              {SERVER_VOICES.map((v) => {
-                const active = selectedServerVoice === v.id;
+              {[{ id: null as string | null, name: "Padrão do servidor", description: "A voz configurada na Vercel (ELEVENLABS_VOICE_ID)" }, ...SERVER_VOICES].map((v) => {
+                const active = (prefs.serverVoiceId ?? null) === v.id;
                 return (
-                  <View key={v.id} style={[styles.serverVoice, active && styles.serverVoiceActive]}>
+                  <View key={v.id ?? "padrao"} style={[styles.serverVoice, active && styles.serverVoiceActive]}>
                     <Pressable style={{ flex: 1 }} onPress={() => setPrefs({ serverVoiceId: v.id })}>
                       <Text style={[font.body, { fontWeight: "700", color: active ? colors.cyan : colors.text }]}>
                         {active ? "● " : ""}
-                        {v.name} {v.gender === "f" ? "(feminina)" : ""}
+                        {v.name}
                       </Text>
                       <Text style={font.small}>{v.description}</Text>
                     </Pressable>
-                    <Pressable onPress={() => previewServerVoice(v.id)} style={styles.play} accessibilityLabel={`Ouvir ${v.name}`}>
+                    <Pressable onPress={() => previewServerVoice(v.id ?? DEFAULT_SERVER_VOICE)} style={styles.play} accessibilityLabel={`Ouvir ${v.name}`}>
                       <Text style={[font.body, { color: colors.cyan }]}>▶</Text>
                     </Pressable>
                   </View>
                 );
               })}
+              {prefs.serverVoiceId && !SERVER_VOICES.some((v) => v.id === prefs.serverVoiceId) ? (
+                <View style={[styles.serverVoice, styles.serverVoiceActive]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[font.body, { fontWeight: "700", color: colors.cyan }]}>● Voz personalizada</Text>
+                    <Text style={font.small}>ID {prefs.serverVoiceId}</Text>
+                  </View>
+                  <Pressable onPress={() => previewServerVoice(prefs.serverVoiceId!)} style={styles.play} accessibilityLabel="Ouvir voz personalizada">
+                    <Text style={[font.body, { color: colors.cyan }]}>▶</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              <Text style={[font.small, { marginTop: space(4) }]}>
+                Outra voz da ElevenLabs: no site, abra a voz que você gostou, toque em “ID” para copiar e cole aqui.
+              </Text>
+              <View style={{ flexDirection: "row", gap: space(2), marginTop: space(2), alignItems: "center" }}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder="Cole o ID da voz"
+                  placeholderTextColor={colors.textFaint}
+                  value={customVoice}
+                  onChangeText={setCustomVoice}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <Button
+                  title="Usar"
+                  onPress={() => {
+                    const id = customVoice.trim();
+                    if (!isVoiceId(id)) return setError("ID de voz inválido: copie o ID (só letras e números) na página da voz na ElevenLabs.");
+                    setError(null);
+                    setPrefs({ serverVoiceId: id });
+                    setCustomVoice("");
+                    previewServerVoice(id);
+                  }}
+                  disabled={!customVoice.trim()}
+                />
+              </View>
             </>
           ) : null}
           {WEB && health?.tts.configured ? null : <>

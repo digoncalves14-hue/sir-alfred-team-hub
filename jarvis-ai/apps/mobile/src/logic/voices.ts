@@ -1,34 +1,38 @@
 /**
  * Vozes em português do Brasil da biblioteca da ElevenLabs (voz do servidor).
  * O ID não é segredo: só identifica a voz. A chave da ElevenLabs fica no servidor.
+ * O usuário também pode colar o ID de qualquer outra voz da ElevenLabs em Ajustes.
  */
 export interface ServerVoice {
   id: string;
   name: string;
   description: string;
-  gender: "m" | "f";
 }
 
+/** Voz configurada no servidor (ELEVENLABS_VOICE_ID). */
 export const DEFAULT_SERVER_VOICE = "tgdUjOYNdMYKFLKpkiG6";
 
+/** Homens maduros / mais velhos — vozes graves e calmas, boas para um assistente. */
 export const SERVER_VOICES: ServerVoice[] = [
-  { id: "tgdUjOYNdMYKFLKpkiG6", name: "Victor", description: "Calmo e natural (padrão)", gender: "m" },
-  { id: "Dps47AVoFamqqkDShRDS", name: "Fabio Oliveira", description: "Grave e maduro, tom executivo", gender: "m" },
-  { id: "1DXriIY2zhyCt1cj8onn", name: "Cirilo", description: "Médio-grave, quente, levemente rouco", gender: "m" },
-  { id: "a2RTfXZv18BLdBvhWhl2", name: "Fabio Manarin", description: "Encorpado, estilo radialista", gender: "m" },
-  { id: "ceOf6Sb1xKhC0ZVxHIzb", name: "Andrey", description: "Articulado, claro e confiável", gender: "m" },
-  { id: "blPx0tvsvee8CuFd63lX", name: "Sávio", description: "Calmo e acolhedor, ritmo pausado", gender: "m" },
-  { id: "6PhbMr9YjdeOaTNz9y24", name: "Davi Leão", description: "Jovem, caloroso e conversacional", gender: "m" },
-  { id: "R3mQ9kzdIW8y3atS1Ec2", name: "Kenn", description: "Amigável e confiante", gender: "m" },
-  { id: "8xLytQymTNCxwboEkZ4O", name: "Getta", description: "Aconchegante, aveludada", gender: "m" },
-  { id: "lser24BNNkQ9n1qONoiM", name: "Luc Santos", description: "Conversacional e simpático", gender: "m" },
-  { id: "TOXnXBKJSHqTwwqoWW0D", name: "Christine", description: "Firme e articulada", gender: "f" },
-  { id: "PZMcMFpToj1IIYF0QDwX", name: "Marianne", description: "Jovem, profissional, de assistente", gender: "f" },
-  { id: "GDzHdQOi6jjf8zaXhCYD", name: "Raquel", description: "Jovem, simpática e clara", gender: "f" },
-  { id: "k5aKjuBz9NhUMZc7SDpl", name: "Marilita", description: "Natural e conversacional", gender: "f" },
-  { id: "7iqXtOF3wl3pomwXFY7G", name: "Fernanda", description: "Acolhedora e profissional", gender: "f" },
-  { id: "RGymW84CSmfVugnA5tvA", name: "Roberta", description: "Leve e descontraída", gender: "f" },
+  { id: "X3j2R63Qu4Gdv6dsU2hB", name: "Moutella — Mentor", description: "Madura, médio-grave, serena e conversacional" },
+  { id: "rnJZLKxtlBZt77uIED10", name: "Sergio", description: "Sênior, grave, poderosa e séria" },
+  { id: "Hsrdp9vv51A8JfLqfIH8", name: "Jaan", description: "Homem sênior, voz grave de narrador" },
+  { id: "zJ72ys7tsUtDi2rbhNPg", name: "Begonsi", description: "Mais velho, calmo, profundo e em paz" },
+  { id: "oQL5kq26ctJzupM0mJot", name: "Noah — Veludo", description: "Idoso, grave e aveludado, transmite sabedoria" },
+  { id: "4XmhZ74tBbUVCXIYNMMo", name: "Leonardo", description: "Grave, profunda e aveludada, tom de cinema" },
+  { id: "bEYEuRWlSrSpweXZIhwF", name: "Mauricio Nocce", description: "Madura, grave e imponente" },
+  { id: "96bMRo5cMbvHHsds2Wr0", name: "Narrador Lopes", description: "Madura, cadenciada, passa confiança" },
+  { id: "KFngny3CPdDkcmlKEUlK", name: "Nunes Silva", description: "52 anos, executivo, grave e encorpada" },
+  { id: "H6CTgG0uZDmiNsMwijeo", name: "Neto", description: "50 anos, grave, estilo locutor" },
+  { id: "CPYJeGOY3LvpmBJRlYK9", name: "Adriano Ferreira", description: "50 anos, calmo e educado" },
+  { id: "ZJifS0J2hVgU6cVz2sIC", name: "Professor Ulisses", description: "50 anos, autoridade e conhecimento" },
+  { id: "F2CrQM2UonBN6qFJbaKN", name: "André Assis", description: "Grave, calma, muita credibilidade" },
+  { id: "362PVGN0qz9gh4Hb4qdA", name: "Jairo Moraes", description: "60 anos, sotaque do interior paulista" },
+  { id: "zoe2cQFqDDW4DteHDEWI", name: "Manoel Lopes", description: "68 anos, voz de senhor brasileiro" },
 ];
+
+/** ID de voz da ElevenLabs (letras e números). */
+export const isVoiceId = (v: string) => /^[A-Za-z0-9]{10,40}$/.test(v.trim());
 
 /** Velocidade aceita pela ElevenLabs (0,7 a 1,2). */
 export const clampServerSpeed = (rate: number) => Math.min(1.2, Math.max(0.7, Math.round(rate * 100) / 100));

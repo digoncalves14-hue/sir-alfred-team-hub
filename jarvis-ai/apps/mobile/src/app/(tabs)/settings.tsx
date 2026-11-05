@@ -453,7 +453,7 @@ export default function Settings() {
             value={prefs.bargeIn}
             onChange={(v) => setPrefs({ bargeIn: v })}
           />}
-          {<Row
+          {WEB ? null : <Row
             title="Conversa contínua"
             subtitle="Toque uma vez e converse; diga “pode parar” ou fique em silêncio para encerrar"
             value={prefs.continuousConversation}

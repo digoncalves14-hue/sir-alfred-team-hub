@@ -331,9 +331,11 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
   const start = useCallback(async (continuous: boolean) => {
     if (WEB) {
       // Nada de await antes do start(): o Safari exige o toque "ao vivo".
-      if (!beginWebListening(continuous)) return;
+      // Conversa contínua fica desligada na web: no iPhone, quando a voz do Jarvis toca,
+      // o Safari desliga o microfone do site e só o religa com um novo toque.
+      if (!beginWebListening(false)) return;
       void stopSpeaking();
-      dispatch({ type: "START", continuous });
+      dispatch({ type: "START", continuous: false });
       return;
     }
     const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
@@ -386,7 +388,7 @@ export function useVoiceEngine(opts: VoiceEngineOptions) {
         dispatch({ type: "INTERRUPT" });
         return;
       }
-      if (!beginWebListening(stateRef.current.sessionActive)) return;
+      if (!beginWebListening(false)) return;
       void stopSpeaking();
       dispatch({ type: "INTERRUPT" });
       return;

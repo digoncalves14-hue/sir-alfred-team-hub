@@ -294,9 +294,9 @@ export async function buildApp(deps: AppDeps) {
     // ---- Voz premium (opcional) ----
     v1.post("/tts", async (req, reply: FastifyReply) => {
       if (!deps.tts.configured) throw new AppError("tts_nao_configurado", 503, "Voz premium não configurada; usando a voz do iPhone.");
-      const { text } = TtsRequestSchema.parse(req.body);
+      const { text, voiceId, speed } = TtsRequestSchema.parse(req.body);
       await deps.orchestrator.assertWithinBudget(req.store, await req.store.getProfile());
-      const { audio, contentType } = await deps.tts.synthesize(text);
+      const { audio, contentType } = await deps.tts.synthesize(text, { voiceId, speed });
       await req.store.recordUsage({
         kind: "tts",
         provider: deps.tts.name,

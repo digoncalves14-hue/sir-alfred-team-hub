@@ -11,6 +11,8 @@ export interface Prefs {
   premiumVoice: boolean;
   /** Identificador da voz nativa do iOS (pt-BR) escolhida. */
   voiceIdentifier: string | null;
+  /** Voz do servidor (ElevenLabs) escolhida; null = padrão do servidor. */
+  serverVoiceId: string | null;
   speechRate: number;
   /** Exigir Face ID ao abrir o app. */
   biometricLock: boolean;
@@ -29,6 +31,7 @@ export const DEFAULT_PREFS: Prefs = {
   continuousConversation: true,
   premiumVoice: false,
   voiceIdentifier: null,
+  serverVoiceId: null,
   speechRate: 1.0,
   biometricLock: false,
   pushEnabled: false,

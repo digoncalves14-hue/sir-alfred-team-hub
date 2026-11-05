@@ -7,7 +7,7 @@ export interface TtsProvider {
   readonly name: string;
   readonly configured: boolean;
   readonly model: string;
-  synthesize(text: string): Promise<{ audio: Buffer; contentType: string }>;
+  synthesize(text: string, opts?: { voiceId?: string; speed?: number }): Promise<{ audio: Buffer; contentType: string }>;
 }
 
 export class ElevenLabsTts implements TtsProvider {
@@ -24,13 +24,13 @@ export class ElevenLabsTts implements TtsProvider {
     return this.opts.modelId;
   }
 
-  async synthesize(text: string) {
+  async synthesize(text: string, opts: { voiceId?: string; speed?: number } = {}) {
     if (!this.configured) throw new Error("Voz premium não configurada.");
-    const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(this.opts.voiceId!)}?output_format=mp3_44100_64`;
+    const url = `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(opts.voiceId ?? this.opts.voiceId!)}?output_format=mp3_44100_64`;
     const res = await this.fetchImpl(url, {
       method: "POST",
       headers: { "xi-api-key": this.opts.apiKey!, "content-type": "application/json", accept: "audio/mpeg" },
-      body: JSON.stringify({ text, model_id: this.opts.modelId }),
+      body: JSON.stringify({ text, model_id: this.opts.modelId, ...(opts.speed ? { voice_settings: { speed: opts.speed } } : {}) }),
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) {

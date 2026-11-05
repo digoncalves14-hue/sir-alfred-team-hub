@@ -10,11 +10,14 @@ import { File, Paths } from "expo-file-system";
 import { Platform } from "react-native";
 import { api } from "@/lib/api";
 import { forSpeech, SentenceBuffer } from "@/logic/sentences";
+import { clampServerSpeed } from "@/logic/voices";
 
 export interface SpeakOptions {
   voiceIdentifier: string | null;
   rate: number;
   premium: boolean;
+  /** Voz do servidor (ElevenLabs) escolhida em Ajustes; null = padrão do servidor. */
+  serverVoiceId?: string | null;
 }
 
 /**
@@ -199,8 +202,8 @@ async function speakPremiumWeb(audio: ArrayBuffer): Promise<void> {
   });
 }
 
-async function speakPremium(text: string): Promise<void> {
-  const audio = await api.tts(text);
+async function speakPremium(text: string, opts: SpeakOptions): Promise<void> {
+  const audio = await api.tts(text, { voiceId: opts.serverVoiceId ?? undefined, speed: clampServerSpeed(opts.rate) });
   if (Platform.OS === "web") return speakPremiumWeb(audio);
   const file = new File(Paths.cache, `jarvis-tts-${Date.now()}.mp3`);
   file.write(new Uint8Array(audio));
@@ -246,7 +249,7 @@ export async function speak(text: string, opts: SpeakOptions): Promise<void> {
   await stopSpeaking();
   if (usePremium(opts)) {
     try {
-      await speakPremium(text);
+      await speakPremium(text, opts);
       return;
     } catch {
       // Voz premium indisponível (não configurada, sem rede, limite): usa a nativa.

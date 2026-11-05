@@ -17,6 +17,7 @@ import * as Device from "expo-device";
 import { useAuth } from "@/providers/AuthProvider";
 import { usePrefs } from "@/providers/PrefsProvider";
 import { listPortugueseVoices, setWebServerVoice, speak, unlockWebSpeech } from "@/voice/tts";
+import { DEFAULT_SERVER_VOICE, SERVER_VOICES } from "@/logic/voices";
 import { colors, font, radius, space } from "@/theme";
 
 function Row({ title, subtitle, value, onChange, disabled }: { title: string; subtitle?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
@@ -235,8 +236,15 @@ export default function Settings() {
 
   const testVoice = () => {
     if (Platform.OS === "web") unlockWebSpeech();
-    return speak(`Olá, ${ownerName || "senhor"}. Esta é a minha voz.`, { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice });
+    return speak(`Olá, ${ownerName || "senhor"}. Esta é a minha voz.`, { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice, serverVoiceId: prefs.serverVoiceId });
   };
+  /** Ouve uma voz do servidor antes de escolher (amostra curta: gasta poucos créditos). */
+  const previewServerVoice = (id: string) => {
+    if (Platform.OS === "web") unlockWebSpeech();
+    void speak(`Olá, ${ownerName || "senhor"}. Como posso ajudar hoje?`, { voiceIdentifier: null, rate: prefs.speechRate, premium: true, serverVoiceId: id });
+  };
+  const serverVoiceInUse = Boolean(health?.tts.configured) && (WEB || prefs.premiumVoice);
+  const selectedServerVoice = prefs.serverVoiceId ?? DEFAULT_SERVER_VOICE;
 
   return (
     <Screen>
@@ -451,13 +459,36 @@ export default function Settings() {
             value={prefs.continuousConversation}
             onChange={(v) => setPrefs({ continuousConversation: v })}
           />}
-          <Row
+          {WEB ? null : <Row
             title="Voz premium (servidor)"
             subtitle={health?.tts.configured ? "ElevenLabs configurada no backend" : "Não configurada no backend — usando a voz do iPhone"}
             value={prefs.premiumVoice}
             onChange={(v) => setPrefs({ premiumVoice: v })}
             disabled={!health?.tts.configured}
-          />
+          />}
+          {serverVoiceInUse ? (
+            <>
+              <Text style={[font.small, { marginTop: space(3) }]}>Voz do Jarvis — toque no nome para escolher e em ▶ para ouvir uma amostra.</Text>
+              {SERVER_VOICES.map((v) => {
+                const active = selectedServerVoice === v.id;
+                return (
+                  <View key={v.id} style={[styles.serverVoice, active && styles.serverVoiceActive]}>
+                    <Pressable style={{ flex: 1 }} onPress={() => setPrefs({ serverVoiceId: v.id })}>
+                      <Text style={[font.body, { fontWeight: "700", color: active ? colors.cyan : colors.text }]}>
+                        {active ? "● " : ""}
+                        {v.name} {v.gender === "f" ? "(feminina)" : ""}
+                      </Text>
+                      <Text style={font.small}>{v.description}</Text>
+                    </Pressable>
+                    <Pressable onPress={() => previewServerVoice(v.id)} style={styles.play} accessibilityLabel={`Ouvir ${v.name}`}>
+                      <Text style={[font.body, { color: colors.cyan }]}>▶</Text>
+                    </Pressable>
+                  </View>
+                );
+              })}
+            </>
+          ) : null}
+          {WEB && health?.tts.configured ? null : <>
           <Text style={[font.small, { marginTop: space(3) }]}>Voz do iPhone (pt-BR). Para vozes mais naturais, baixe em Ajustes › Acessibilidade › Conteúdo Falado › Vozes › Português (Brasil).</Text>
           <View style={styles.voices}>
             <Pressable onPress={() => setPrefs({ voiceIdentifier: null })} style={[styles.voice, !prefs.voiceIdentifier && styles.voiceActive]}>
@@ -475,9 +506,10 @@ export default function Settings() {
               );
             })}
           </View>
-          <View style={{ flexDirection: "row", gap: space(2), marginTop: space(3), alignItems: "center" }}>
+          </>}
+          <View style={{ flexDirection: "row", gap: space(2), marginTop: space(3), alignItems: "center", flexWrap: "wrap" }}>
             <Text style={font.small}>Velocidade</Text>
-            {[0.9, 1.0, 1.1].map((r) => (
+            {[0.9, 1.0, 1.1, 1.2].map((r) => (
               <Pressable key={r} onPress={() => setPrefs({ speechRate: r })} style={[styles.voice, prefs.speechRate === r && styles.voiceActive]}>
                 <Text style={[font.small, { color: prefs.speechRate === r ? colors.bg : colors.text }]}>{r.toFixed(1)}×</Text>
               </Pressable>
@@ -521,6 +553,9 @@ export default function Settings() {
 }
 
 const styles = StyleSheet.create({
+  serverVoice: { flexDirection: "row", alignItems: "center", gap: space(2), marginTop: space(2), padding: space(3), borderRadius: radius.sm, borderWidth: 1, borderColor: colors.cardBorder },
+  serverVoiceActive: { borderColor: colors.cyan },
+  play: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.cardBorder },
   row: { flexDirection: "row", alignItems: "center", gap: space(3), paddingVertical: space(2) },
   input: {
     borderWidth: 1,

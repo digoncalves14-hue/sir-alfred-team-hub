@@ -152,5 +152,18 @@ describe("ElevenLabs", () => {
     expect(out.audio.length).toBe(3);
     expect(seen!.url).toContain("/v1/text-to-speech/voz");
     expect((seen!.init.headers as Record<string, string>)["xi-api-key"]).toBe("k");
+    expect(JSON.parse(String(seen!.init.body)).voice_settings).toBeUndefined();
+  });
+
+  it("usa a voz e a velocidade escolhidas pelo usuário", async () => {
+    let seen: { url: string; init: RequestInit } | null = null;
+    const fakeFetch = (async (url: string, init: RequestInit) => {
+      seen = { url, init };
+      return new Response(new Uint8Array([1]), { status: 200 });
+    }) as unknown as typeof fetch;
+    const t = new ElevenLabsTts({ apiKey: "k", voiceId: "padrao", modelId: "eleven_flash_v2_5" }, fakeFetch);
+    await t.synthesize("Olá", { voiceId: "tgdUjOYNdMYKFLKpkiG6", speed: 1.15 });
+    expect(seen!.url).toContain("/v1/text-to-speech/tgdUjOYNdMYKFLKpkiG6");
+    expect(JSON.parse(String(seen!.init.body)).voice_settings).toEqual({ speed: 1.15 });
   });
 });

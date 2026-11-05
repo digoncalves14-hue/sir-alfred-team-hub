@@ -205,5 +205,6 @@ export const api = {
   reindexMemories: () => json(zod.object({ indexed: zod.number() }), "/v1/memories/reindex", { method: "POST", timeoutMs: 120_000 }),
 
   /** Áudio MP3 da voz premium (ElevenLabs), quando configurada no backend. */
-  tts: async (text: string): Promise<ArrayBuffer> => (await raw("/v1/tts", { method: "POST", body: body({ text }), headers: { accept: "audio/mpeg" } })).arrayBuffer(),
+  tts: async (text: string, opts: { voiceId?: string; speed?: number } = {}): Promise<ArrayBuffer> =>
+    (await raw("/v1/tts", { method: "POST", body: body({ text, ...opts }), headers: { accept: "audio/mpeg" } })).arrayBuffer(),
 };

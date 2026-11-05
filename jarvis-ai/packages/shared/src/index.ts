@@ -274,7 +274,13 @@ export const HealthSchema = z.object({
 });
 export type Health = z.infer<typeof HealthSchema>;
 
-export const TtsRequestSchema = z.object({ text: z.string().trim().min(1).max(1500) });
+export const TtsRequestSchema = z.object({
+  text: z.string().trim().min(1).max(1500),
+  /** Voz escolhida pelo usuário (ID da ElevenLabs). Sem ela, usa a voz padrão do servidor. */
+  voiceId: z.string().regex(/^[A-Za-z0-9]{10,40}$/).optional(),
+  /** Velocidade da fala (0,7 = mais lenta, 1,2 = mais rápida). */
+  speed: z.number().min(0.7).max(1.2).optional(),
+});
 
 /** Erro padronizado da API. */
 export const ApiErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });

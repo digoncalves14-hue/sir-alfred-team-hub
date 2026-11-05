@@ -149,7 +149,7 @@ export default function JarvisScreen() {
     onUtterance: (text, sink) => send(text, "voice", sink),
     speakReplies: prefs.speakReplies,
     bargeIn: prefs.bargeIn,
-    speech: { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice },
+    speech: { voiceIdentifier: prefs.voiceIdentifier, rate: prefs.speechRate, premium: prefs.premiumVoice, serverVoiceId: prefs.serverVoiceId },
   });
   const { phase, transcript, level, error: voiceError } = voice.state;
 
@@ -181,7 +181,7 @@ export default function JarvisScreen() {
   async function speakTyped(text: string, routineId?: string) {
     setSending(true);
     const sink = prefsRef.current.speakReplies
-      ? createSpeechStream({ voiceIdentifier: prefsRef.current.voiceIdentifier, rate: prefsRef.current.speechRate, premium: prefsRef.current.premiumVoice }, () => undefined)
+      ? createSpeechStream({ voiceIdentifier: prefsRef.current.voiceIdentifier, rate: prefsRef.current.speechRate, premium: prefsRef.current.premiumVoice, serverVoiceId: prefsRef.current.serverVoiceId }, () => undefined)
       : null;
     const speech = await send(text, "text", sink, routineId);
     setSending(false);

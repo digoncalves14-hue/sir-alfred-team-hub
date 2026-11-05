@@ -58,6 +58,8 @@ const EnvSchema = z.object({
   // Endereço público do servidor (ex.: https://jarvis-ai.onrender.com). No Render vem de RENDER_EXTERNAL_URL.
   PUBLIC_URL: z.string().url().optional(),
   RENDER_EXTERNAL_URL: z.string().url().optional(),
+  // Na Vercel: domínio de produção (sem https://), fornecido automaticamente.
+  VERCEL_PROJECT_PRODUCTION_URL: z.string().optional(),
   // Pasta com o app web exportado (expo export --platform web). Se existir, o servidor entrega o app.
   WEB_DIR: z.string().optional(),
   // Opcional: token de acesso da Expo se você ativar "push security" no projeto.

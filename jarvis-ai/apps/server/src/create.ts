@@ -36,7 +36,8 @@ export async function createJarvis(config: Config, opts: { startScheduler?: bool
     ? new SupabaseSystemStore(createServiceClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY))
     : null;
   const box = config.TOKEN_ENCRYPTION_KEY ? new SecretBox(config.TOKEN_ENCRYPTION_KEY) : null;
-  const publicUrl = (config.PUBLIC_URL ?? config.RENDER_EXTERNAL_URL ?? "").replace(/\/+$/, "") || null;
+  const vercelUrl = config.VERCEL_PROJECT_PRODUCTION_URL ? `https://${config.VERCEL_PROJECT_PRODUCTION_URL.replace(/^https?:\/\//, "")}` : "";
+  const publicUrl = (config.PUBLIC_URL ?? config.RENDER_EXTERNAL_URL ?? vercelUrl).replace(/\/+$/, "") || null;
   const googleOAuth = !box
     ? null
     : config.GOOGLE_WEB_CLIENT_ID && config.GOOGLE_WEB_CLIENT_SECRET && publicUrl

@@ -15,7 +15,7 @@ import {
   type MediaProbe,
   type Timeline,
 } from "@vision/core";
-import { analyzeFile, analyzeMusic, createPreviewProxy, ffmpeg, probeFile } from "../src/node";
+import { analyzeFile, analyzeMusic, createPreviewProxy, ffmpeg, isFilterReinitError, normalizeVideo, probeFile } from "../src/node";
 import { ProcessingError } from "../src/errors";
 import { makeFixtures } from "../../../scripts/make-fixtures";
 
@@ -302,6 +302,25 @@ describe("processamento real com FFmpeg", () => {
       return Number(/mean_volume: (-?[\d.]+)/.exec(stderr)?.[1] ?? -99);
     };
     expect(await level(3.6)).toBeGreaterThan((await level(1.0)) + 6);
+  }, 120_000);
+
+  it("normaliza vídeo de celular (HEVC 10 bits girado) para H.264 uniforme e reconhece o erro de reconfiguração", async () => {
+    const raw = path.join(dir, "girado-raw.mov");
+    const rot = path.join(dir, "girado.mov");
+    await ffmpeg(["-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:r=30", "-f", "lavfi", "-i", "sine=f=300", "-t", "2", "-c:v", "libx265", "-preset", "ultrafast", "-pix_fmt", "yuv420p10le", "-tag:v", "hvc1", "-c:a", "aac", raw]);
+    await ffmpeg(["-hide_banner", "-nostdin", "-y", "-display_rotation", "90", "-i", raw, "-c", "copy", rot]);
+    const out = path.join(dir, "girado-norm.mp4");
+    await normalizeVideo(rot, out, 30, 2);
+    const p = await probeFile(out);
+    expect([p.width, p.height, p.videoCodec, p.rotation ?? 0]).toEqual([360, 640, "h264", 0]);
+    expect(p.hasAudio).toBe(true);
+    // mensagem real vista em produção (FFmpeg 5.1)
+    expect(
+      isFilterReinitError({
+        detail: "[auto_scale_4 @ 0x5619f3b3cf80] Failed to configure output pad on auto_scale_4\nError reinitializing filters!\nFailed to inject frame into filter network: Resource temporarily unavailable",
+      }),
+    ).toBe(true);
+    expect(isFilterReinitError({ detail: "Invalid data found when processing input" })).toBe(false);
   }, 120_000);
 
   it("vídeo sem áudio recebe trilha silenciosa", async () => {

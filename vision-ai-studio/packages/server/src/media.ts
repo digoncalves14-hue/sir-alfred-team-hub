@@ -158,6 +158,41 @@ export async function inspectLogo(filePath: string): Promise<{ hasAlpha: boolean
   }
 }
 
+/**
+ * Converte um vídeo de origem para um intermediário uniforme (H.264 8 bits, quadros
+ * com rotação já aplicada, dimensões pares, fps constante). Usado como segunda
+ * tentativa quando o arquivo original muda de formato no meio (comum em vídeos de
+ * celular) e o FFmpeg não consegue reconfigurar os filtros do render.
+ */
+export async function normalizeVideo(filePath: string, outPath: string, fps: number, durationSec: number, signal?: AbortSignal): Promise<void> {
+  await mkdir(path.dirname(outPath), { recursive: true });
+  await ffmpeg(
+    [
+      "-hide_banner", "-nostdin", "-y", "-i", filePath,
+      "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "-1",
+      "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p,setsar=1",
+      "-r", String(fps), "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-g", String(fps),
+      "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+      "-movflags", "+faststart", outPath,
+    ],
+    { signal, expectedDurationSec: durationSec, timeoutMs: Math.max(10 * 60_000, durationSec * 6000) },
+  );
+}
+
+/** Logo em PNG RGBA comum (evita formatos exóticos: CMYK, 16 bits, paleta, WebP). */
+export async function normalizeImage(filePath: string, outPath: string): Promise<void> {
+  await mkdir(path.dirname(outPath), { recursive: true });
+  await ffmpeg(["-hide_banner", "-nostdin", "-y", "-i", filePath, "-frames:v", "1", "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=rgba", outPath], {
+    timeoutMs: 60_000,
+  });
+}
+
+/** Erros do FFmpeg ligados a mudança de formato no meio do arquivo (resolvidos normalizando as entradas). */
+export function isFilterReinitError(err: unknown): boolean {
+  const d = (err as { detail?: string })?.detail ?? "";
+  return /reinitializ|Failed to configure output pad|Failed to inject frame/i.test(d);
+}
+
 /** Extrai quadros (JPEG pequenos) em instantes específicos — usados na análise visual por IA. */
 export async function extractFrames(filePath: string, times: number[], outDir: string, width = 512, signal?: AbortSignal): Promise<string[]> {
   await mkdir(outDir, { recursive: true });

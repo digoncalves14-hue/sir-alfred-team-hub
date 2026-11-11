@@ -73,7 +73,7 @@ export async function analyzeFile(filePath: string, probe: MediaProbe, opts: Ana
         "-an",
         "-sn",
         "-filter_complex",
-        `[0:v]fps=4,scale=160:-2,split=2[sc][mv];[sc]select='gt(scene\\,0.32)',showinfo[scout];[mv]fps=${ACT_FPS},scale=${ACT_W}:${ACT_H},format=gray[mvout]`,
+        `[0:v]fps=4,scale=160:-2,split=2[sc][mv];[sc]select='eq(n\\,0)+gt(scene\\,0.32)',showinfo[scout];[mv]fps=${ACT_FPS},scale=${ACT_W}:${ACT_H},format=gray[mvout]`,
         "-map",
         "[scout]",
         "-f",

@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { getConfig } from "./config";
 import { CanceledError, ProcessingError } from "./errors";
 
@@ -83,7 +83,31 @@ export function runBinary(bin: string, args: string[], opts: RunOptions = {}): P
 }
 
 export function ffmpeg(args: string[], opts?: RunOptions) {
-  return runBinary(getConfig().FFMPEG_PATH, args, opts);
+  return runBinary(getConfig().FFMPEG_PATH, adaptArgs(args), opts);
+}
+
+let majorVersion: number | null | undefined;
+
+/** Versão principal do FFmpeg instalado (null se não for possível ler). */
+export function ffmpegMajorVersion(): number | null {
+  if (majorVersion !== undefined) return majorVersion;
+  try {
+    const r = spawnSync(getConfig().FFMPEG_PATH, ["-hide_banner", "-version"], { encoding: "utf8", timeout: 10_000 });
+    const m = /ffmpeg version n?(\d+)\./.exec(r.stdout ?? "");
+    majorVersion = m ? Number(m[1]) : null;
+  } catch {
+    majorVersion = null;
+  }
+  return majorVersion;
+}
+
+/**
+ * Compatibilidade entre versões: "-filter_complex_script <arquivo>" foi removido no
+ * FFmpeg 8; a forma nova "-/filter_complex <arquivo>" existe desde o 7.
+ */
+export function adaptArgs(args: string[], major = ffmpegMajorVersion()): string[] {
+  if (!major || major < 7) return args;
+  return args.map((a) => (a === "-filter_complex_script" ? "-/filter_complex" : a));
 }
 
 export function ffprobe(args: string[], opts?: RunOptions) {

@@ -26,7 +26,7 @@ import {
   makeStorageKey,
   recordUsage,
 } from "@vision/server";
-import { ffmpeg, inspectLogo, probeFile } from "@vision/server/node";
+import { ffmpeg, inspectLogo, isFilterReinitError, normalizeImage, normalizeVideo, probeFile } from "@vision/server/node";
 import type { JobContext } from "../context";
 
 /** Renderização real: timeline → FFmpeg → MP4 H.264 + SRT, com progresso e verificação. */
@@ -75,8 +75,17 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
       const f = await storage.materialize(row.storageKey, ctx.tmpDir);
       cleanups.push(f.cleanup);
       if (row.role === "logo" || row.kind === "image") {
-        inputs.images.set(row.id, f.path);
-        inputs.logoMeta.set(row.id, { width: row.width ?? 1, height: row.height ?? 1, ...(await inspectLogo(f.path)) });
+        // logo sempre em PNG RGBA comum: formatos exóticos (CMYK, 16 bits, WebP) não chegam ao render
+        const png = path.join(ctx.tmpDir, `logo-${row.id}.png`);
+        let logoPath = f.path;
+        try {
+          await normalizeImage(f.path, png);
+          logoPath = png;
+        } catch (err) {
+          ctx.log.warn("logo_normalize_failed", { assetId: row.id, detail: (err as { detail?: string }).detail?.slice(-500) });
+        }
+        inputs.images.set(row.id, logoPath);
+        inputs.logoMeta.set(row.id, { width: row.width ?? 1, height: row.height ?? 1, ...(await inspectLogo(logoPath)) });
       }
       else if (row.role === "music" || row.kind === "audio") inputs.audios.set(row.id, f.path);
       else
@@ -141,18 +150,36 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
     const started = Date.now();
     let lastSaved = 0;
     ctx.progress(0.02, "Renderizando");
-    await ffmpeg(cmd.args, {
-      signal: ctx.signal,
-      expectedDurationSec: cmd.durationSec,
-      onProgress: (f) => {
-        const p = 0.02 + f * 0.93;
-        ctx.progress(p, "Renderizando");
-        if (Date.now() - lastSaved > 1500) {
-          lastSaved = Date.now();
-          void db.update(renders).set({ progress: p }).where(eq(renders.id, render.id));
-        }
-      },
-    });
+    const runRender = (args: string[]) =>
+      ffmpeg(args, {
+        signal: ctx.signal,
+        expectedDurationSec: cmd.durationSec,
+        onProgress: (f) => {
+          const p = 0.02 + f * 0.93;
+          ctx.progress(p, "Renderizando");
+          if (Date.now() - lastSaved > 1500) {
+            lastSaved = Date.now();
+            void db.update(renders).set({ progress: p }).where(eq(renders.id, render.id));
+          }
+        },
+      });
+    try {
+      await runRender(cmd.args);
+    } catch (err) {
+      if (!isFilterReinitError(err) || ctx.signal.aborted) throw err;
+      // vídeos de celular às vezes mudam de formato no meio do arquivo: normaliza as origens e tenta de novo
+      ctx.log.warn("render_retry_normalized", { detail: (err as { detail?: string }).detail?.slice(-800) });
+      ctx.progress(0.02, "Preparando os vídeos (formato uniforme)");
+      for (const [id, a] of inputs.assets) {
+        const norm = path.join(ctx.tmpDir, `norm-${id}.mp4`);
+        await normalizeVideo(a.path, norm, cmd.fps, a.duration, ctx.signal);
+        inputs.assets.set(id, { ...a, path: norm, hasAudio: a.hasAudio });
+      }
+      const retry = buildRenderCommand(timeline, inputs, settings, outPath, graphPath);
+      await writeFile(graphPath, retry.filterGraph, "utf8");
+      ctx.progress(0.05, "Renderizando");
+      await runRender(retry.args);
+    }
 
     ctx.progress(0.96, "Verificando arquivo final");
     const probe = await probeFile(outPath);

@@ -26,7 +26,7 @@ import {
   makeStorageKey,
   recordUsage,
 } from "@vision/server";
-import { ffmpeg, inspectLogo, isFilterReinitError, normalizeImage, normalizeVideo, probeFile } from "@vision/server/node";
+import { diagnoseFilterFailure, ffmpeg, inspectLogo, isFilterReinitError, normalizeImage, normalizeVideo, probeFile } from "@vision/server/node";
 import type { JobContext } from "../context";
 
 /** Renderização real: timeline → FFmpeg → MP4 H.264 + SRT, com progresso e verificação. */
@@ -85,18 +85,31 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
           ctx.log.warn("logo_normalize_failed", { assetId: row.id, detail: (err as { detail?: string }).detail?.slice(-500) });
         }
         inputs.images.set(row.id, logoPath);
-        inputs.logoMeta.set(row.id, { width: row.width ?? 1, height: row.height ?? 1, ...(await inspectLogo(logoPath)) });
+        const lp = await probeFile(logoPath, ctx.signal).catch(() => null);
+        inputs.logoMeta.set(row.id, {
+          width: lp?.width && lp.width > 0 ? lp.width : (row.width ?? 1),
+          height: lp?.height && lp.height > 0 ? lp.height : (row.height ?? 1),
+          ...(await inspectLogo(logoPath)),
+        });
       }
       else if (row.role === "music" || row.kind === "audio") inputs.audios.set(row.id, f.path);
-      else
+      else {
+        // medidas reais do arquivo que vai entrar no render (já com a rotação do celular aplicada)
+        const real = await probeFile(f.path, ctx.signal).catch(() => null);
+        const width = real?.hasVideo && real.width && real.width > 1 ? real.width : (row.width ?? 1920);
+        const height = real?.hasVideo && real.height && real.height > 1 ? real.height : (row.height ?? 1080);
+        if (real && (real.width !== row.width || real.height !== row.height)) {
+          ctx.log.warn("render_source_dims_differ", { assetId: row.id, db: [row.width, row.height], file: [real.width, real.height] });
+        }
         inputs.assets.set(row.id, {
           path: f.path,
-          width: row.width ?? 1920,
-          height: row.height ?? 1080,
+          width,
+          height,
           hasAudio: Boolean(row.hasAudio),
           hasVideo: true,
           duration: row.durationSec ?? 0,
         });
+      }
     }
     const first = rows.find((r) => r.role === "source");
     if (render.kind === "export" && first && !resolutionAllowed(settings.resolution, first.width ?? 0, first.height ?? 0)) {
@@ -166,6 +179,7 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
     try {
       await runRender(cmd.args);
     } catch (err) {
+      logFilterFailure(ctx, err, cmd.filterGraph, inputs.assets);
       if (!isFilterReinitError(err) || ctx.signal.aborted) throw err;
       // vídeos de celular às vezes mudam de formato no meio do arquivo: normaliza as origens e tenta de novo
       ctx.log.warn("render_retry_normalized", { detail: (err as { detail?: string }).detail?.slice(-800) });
@@ -173,12 +187,18 @@ export async function handleRender(ctx: JobContext): Promise<Record<string, unkn
       for (const [id, a] of inputs.assets) {
         const norm = path.join(ctx.tmpDir, `norm-${id}.mp4`);
         await normalizeVideo(a.path, norm, cmd.fps, a.duration, ctx.signal);
-        inputs.assets.set(id, { ...a, path: norm, hasAudio: a.hasAudio });
+        const np = await probeFile(norm, ctx.signal);
+        inputs.assets.set(id, { ...a, path: norm, width: np.width ?? a.width, height: np.height ?? a.height, hasAudio: a.hasAudio });
       }
       const retry = buildRenderCommand(timeline, inputs, settings, outPath, graphPath);
       await writeFile(graphPath, retry.filterGraph, "utf8");
       ctx.progress(0.05, "Renderizando");
-      await runRender(retry.args);
+      try {
+        await runRender(retry.args);
+      } catch (err2) {
+        logFilterFailure(ctx, err2, retry.filterGraph, inputs.assets);
+        throw err2;
+      }
     }
 
     ctx.progress(0.96, "Verificando arquivo final");
@@ -254,4 +274,16 @@ async function projectAccent(db: JobContext["db"], brandId: string | null): Prom
   if (!brandId) return null;
   const [b] = await db.select({ colors: brands.colors }).from(brands).where(eq(brands.id, brandId));
   return b ? brandPalette(b.colors).accentColor : null;
+}
+
+/** Registra qual filtro do grafo falhou (com o trecho do grafo e as medidas das origens). */
+function logFilterFailure(ctx: JobContext, err: unknown, graph: string, assets: Map<string, RenderAsset>) {
+  const detail = (err as { detail?: string }).detail;
+  if (!detail) return;
+  const d = diagnoseFilterFailure(detail, graph);
+  if (!d) return;
+  ctx.log.warn("render_filter_failure", {
+    ...d,
+    sources: [...assets.entries()].map(([id, a]) => ({ id: id.slice(0, 8), w: a.width, h: a.height, dur: a.duration })),
+  });
 }

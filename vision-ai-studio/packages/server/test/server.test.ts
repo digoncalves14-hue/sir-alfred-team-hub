@@ -61,3 +61,16 @@ describe("transcrição", () => {
     expect(words.map((w) => w.text)).toEqual(["Olá,", "tudo", "bem?"]);
   });
 });
+
+describe("diagnóstico de falha no grafo de filtros", () => {
+  it("encontra o filtro citado pelo FFmpeg respeitando aspas e escapes", async () => {
+    const { diagnoseFilterFailure } = await import("../src/ffmpeg");
+    const graph = "[0:v]format=yuv420p,setsar=1[a];\n[a]split=2[b][c];\n[b]null[d];\n[c]drawtext=text='a\\, b; c',scale=70000:70000[e];\n[d][e]overlay[vout]";
+    const stderr = "[Parsed_scale_5 @ 0x1] [IMGUTILS @ 0x2] Picture size 70000x70000 is invalid\n[Parsed_scale_5 @ 0x1] Failed to configure output pad on Parsed_scale_5\nError reinitializing filters!";
+    const d = diagnoseFilterFailure(stderr, graph);
+    expect(d?.filterText).toBe("scale=70000:70000");
+    expect(d?.chain).toContain("drawtext");
+    expect(d?.messages[0]).toMatch(/Picture size/);
+    expect(diagnoseFilterFailure("sem filtro", graph)).toBeNull();
+  });
+});

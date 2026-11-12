@@ -129,3 +129,45 @@ export function friendlyFfmpegError(stderr: string): string {
   if (/does not contain any stream|Output file .* does not contain any stream/i.test(stderr)) return "O arquivo não contém trilhas de vídeo/áudio utilizáveis.";
   return "Falha ao processar o vídeo com o FFmpeg.";
 }
+
+/**
+ * Diagnóstico de falha no grafo de filtros: o FFmpeg nomeia os filtros como
+ * "Parsed_<nome>_<índice>" na ordem em que aparecem no script. Devolve as linhas
+ * do erro que citam esse filtro e o trecho do grafo correspondente.
+ */
+export function diagnoseFilterFailure(stderr: string, graph: string): { filter: string; messages: string[]; chain: string | null; filterText: string | null } | null {
+  const m = /Parsed_([a-z0-9_]+?)_(\d+)\b/i.exec(stderr);
+  if (!m) return null;
+  const [name, idx] = [m[1], Number(m[2])];
+  const tag = `Parsed_${name}_${idx}`;
+  const messages = stderr.split("\n").filter((l) => l.includes(tag) || /Invalid|invalid|too big|not positive|out of range/.test(l)).slice(0, 12);
+  // separa o script em filtros respeitando aspas e escapes
+  const filters: Array<{ text: string; chain: number }> = [];
+  const chains: string[] = [""];
+  let cur = "";
+  let quoted = false;
+  const push = () => {
+    const text = cur.replace(/\[[^\]]*\]/g, "").trim();
+    if (text) filters.push({ text, chain: chains.length - 1 });
+    cur = "";
+  };
+  for (let i = 0; i < graph.length; i++) {
+    const c = graph[i];
+    chains[chains.length - 1] += c;
+    if (c === "\\" && i + 1 < graph.length) {
+      cur += c + graph[++i];
+      chains[chains.length - 1] += graph[i];
+      continue;
+    }
+    if (c === "'") quoted = !quoted;
+    if (!quoted && (c === "," || c === ";")) {
+      push();
+      if (c === ";") chains.push("");
+      continue;
+    }
+    cur += c;
+  }
+  push();
+  const f = filters[idx];
+  return { filter: tag, messages, chain: f ? chains[f.chain].trim().slice(0, 1500) : null, filterText: f?.text.slice(0, 500) ?? null };
+}

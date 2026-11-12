@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { SYSTEM_TEMPLATES, applyEditPlan, diffTimelines, outputTimeToSource, placeClips, round3, timelineDuration, type Timeline } from "@vision/core";
+import { SYSTEM_TEMPLATES, applyEditPlan, parseEditPlan, diffTimelines, outputTimeToSource, placeClips, round3, timelineDuration, type Timeline } from "@vision/core";
 import { and, desc, eq, inArray, ne, or, aiCommands, assets, projects, templates } from "@vision/db";
 import {
   LimitError,
@@ -16,7 +16,7 @@ import {
   loadVoiceovers,
   recordUsage,
 } from "@vision/server";
-import { extractFrames, planEdit, type PlannerFrame } from "@vision/server/node";
+import { extractFrames, planEdit, type PlannerFrame, type PlannerOutput } from "@vision/server/node";
 import type { JobContext } from "../context";
 import { transcribeAsset } from "./transcribe";
 import { resolveGenerativeOps } from "./generate-audio";
@@ -37,7 +37,9 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
   const current = await getCurrentVersion(db, project);
   if (!current) throw new ProcessingError("not_ready", "O projeto ainda não tem vídeos processados.");
   const caps = capabilities();
-  if (caps.ai) {
+  // operações definidas pelos controles do estúdio: sem planejamento por IA
+  const manual = cmd.engine === "manual" && cmd.plan ? parseEditPlan(cmd.plan) : null;
+  if (caps.ai && !manual) {
     try {
       await assertWithinLimits(db, project.orgId, "ai");
     } catch (e) {
@@ -68,9 +70,11 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
     .limit(4);
 
   ctx.progress(0.1, "Interpretando o pedido");
-  const frames = caps.ai && caps.visionFrames > 0 ? await sampleFrames(ctx, current.timeline, caps.visionFrames) : [];
+  const frames = caps.ai && caps.visionFrames > 0 && !manual ? await sampleFrames(ctx, current.timeline, caps.visionFrames) : [];
   ctx.progress(0.3, frames.length ? `Analisando ${frames.length} quadros com IA` : "Planejando a edição");
-  const planned = await planEdit({
+  const planned: PlannerOutput = manual
+    ? { plan: manual, engine: "manual", model: null, inputTokens: 0, outputTokens: 0, costUsd: 0 }
+    : await planEdit({
     command: cmd.text,
     timeline: current.timeline,
     sources,
@@ -93,7 +97,12 @@ export async function handleAiCommand(ctx: JobContext): Promise<Record<string, u
   }
 
   // legendas precisam de transcrição: transcreve antes de aplicar, se possível
-  const wantsCaptions = planned.plan.operations.some((o) => o.op === "set_captions" && o.enabled);
+  const willMute =
+    current.timeline.audio.originalVolume <= 0.01 ||
+    planned.plan.operations.some((o) => o.op === "set_audio" && o.original_volume !== null && o.original_volume <= 0.01);
+  const willNarrate = current.timeline.audio.voiceover !== null || planned.plan.operations.some((o) => o.op === "set_voiceover");
+  // vídeo mudo com narração: a legenda vem da narração, sem transcrever os vídeos
+  const wantsCaptions = planned.plan.operations.some((o) => o.op === "set_captions" && o.enabled) && !(willMute && willNarrate);
   const preWarnings: string[] = [];
   if (wantsCaptions) {
     const missing = assetIds.filter((id) => !sources.get(id)?.transcript);

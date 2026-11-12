@@ -159,6 +159,7 @@ export const OpAddNarration = z.object({
   op: z.literal("add_narration"),
   text: z.string().describe("Roteiro da narração em português do Brasil (~2,5 palavras por segundo de vídeo)"),
   voice: z.enum(["feminina", "masculina"]).nullable(),
+  voice_id: z.string().max(64).nullable().describe("ID de voz ElevenLabs escolhida pelo usuário (null = escolher pelo gênero)"),
   start_sec: z.number().nullable().describe("Início da narração no vídeo final (null = 0)"),
 });
 export const OpRemoveNarration = z.object({

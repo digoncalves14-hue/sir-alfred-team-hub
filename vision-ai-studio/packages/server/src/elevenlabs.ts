@@ -88,8 +88,8 @@ async function pickVoice(gender: "feminina" | "masculina"): Promise<{ id: string
 }
 
 /** Narração em português com tempos por palavra. */
-export async function narrate(text: string, gender: "feminina" | "masculina"): Promise<NarrationResult> {
-  const voice = await pickVoice(gender);
+export async function narrate(text: string, gender: "feminina" | "masculina", voiceId?: string | null): Promise<NarrationResult> {
+  const voice = voiceId ? { id: voiceId, name: voiceId } : await pickVoice(gender);
   try {
     const r = await el().textToSpeech.convertWithTimestamps(voice.id, {
       text: text.slice(0, 2500),

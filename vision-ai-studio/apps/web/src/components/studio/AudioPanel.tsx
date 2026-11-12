@@ -1,7 +1,7 @@
 "use client";
-import { useRef, useState } from "react";
-import { Music2, Upload, VolumeX, Wand2 } from "lucide-react";
-import type { Timeline } from "@vision/core";
+import { useEffect, useRef, useState } from "react";
+import { Mic, Music2, Pause, Play, Upload, Volume2, VolumeX, Wand2 } from "lucide-react";
+import { timelineDuration, type EditOperation, type Timeline } from "@vision/core";
 import { uploadFile } from "@/lib/upload-client";
 import { apiFetch } from "@/lib/client";
 import { Alert, Button, Progress, cx } from "../ui";
@@ -19,13 +19,18 @@ export function AudioPanel({ data, timeline, actions }: { data: Detail; timeline
   const [mood, setMood] = useState("");
   const [script, setScript] = useState("");
   const [voice, setVoice] = useState<"feminina" | "masculina">("feminina");
+  const [voiceId, setVoiceId] = useState<string>("");
+  const [muteOriginal, setMuteOriginal] = useState(true);
+  const [narrationCaptions, setNarrationCaptions] = useState(true);
   const [genBusy, setGenBusy] = useState(false);
   const aiAudio = data.capabilities.aiMusic;
+  const voices = useVoices(aiAudio);
+  const muted = timeline.audio.originalVolume <= 0.01;
   // a geração passa pelo assistente (fica no histórico e vira nova versão)
-  const command = async (text: string, done: string) => {
+  const command = async (text: string, done: string, operations?: EditOperation[]) => {
     setGenBusy(true);
     try {
-      await apiFetch(`/api/projects/${data.project.id}/commands`, { method: "POST", json: { text } });
+      await apiFetch(`/api/projects/${data.project.id}/commands`, { method: "POST", json: operations ? { text, operations } : { text } });
       actions.notify(done, "success");
       await actions.refresh();
     } catch (e) {
@@ -65,31 +70,51 @@ export function AudioPanel({ data, timeline, actions }: { data: Detail; timeline
                 <Wand2 className="h-4 w-4" /> Gerar trilha
               </Button>
             </div>
-            <textarea className="input min-h-20 w-full text-sm" placeholder="Texto da narração (deixe vazio para a IA escrever o roteiro)" value={script} onChange={(e) => setScript(e.target.value)} />
-            <div className="flex items-center gap-2">
-              <select className="input w-auto py-1 text-xs" value={voice} onChange={(e) => setVoice(e.target.value as "feminina" | "masculina")} aria-label="Voz">
-                <option value="feminina">Voz feminina</option>
-                <option value="masculina">Voz masculina</option>
-              </select>
-              <Button
-                size="sm"
-                disabled={genBusy}
-                onClick={() =>
-                  void command(
-                    script.trim()
-                      ? `Adicione a narração com voz ${voice}: "${script.trim().replace(/"/g, "'")}"`
-                      : `Escreva um roteiro curto de narração para este vídeo e adicione com voz ${voice}, com legendas`,
-                    "Gravando a narração… acompanhe no Assistente.",
-                  )
-                }
-              >
-                <Wand2 className="h-4 w-4" /> Gerar narração
-              </Button>
-              {timeline.audio.voiceover && (
-                <button className="text-xs text-neutral-500 hover:text-red-400" onClick={() => void actions.runOps([{ op: "remove_narration" }], "Narração removida")}>
-                  remover narração
-                </button>
+            <div className="space-y-2 rounded-lg border border-ink-700 p-3">
+              <p className="flex items-center gap-1.5 text-sm font-medium"><Mic className="h-4 w-4 text-gold-500" /> Narração com voz de IA</p>
+              <textarea
+                className="input min-h-24 w-full text-sm"
+                placeholder="Escreva o que a voz vai falar no vídeo. Deixe vazio para a IA escrever o roteiro."
+                value={script}
+                onChange={(e) => setScript(e.target.value)}
+                maxLength={2500}
+              />
+              {script.trim() && (
+                <p className="text-[11px] text-neutral-500">
+                  ≈ {Math.round(script.trim().split(/\s+/).length / 2.5)}s de fala · vídeo com {Math.round(timelineDuration(timeline))}s
+                </p>
               )}
+              <VoicePicker voices={voices} voiceId={voiceId} setVoiceId={setVoiceId} gender={voice} setGender={setVoice} />
+              <Toggle checked={muteOriginal} label="Deixar o vídeo mudo (tirar o som original dos vídeos)" onChange={setMuteOriginal} />
+              <Toggle checked={narrationCaptions} label="Colocar legenda acompanhando a narração" onChange={setNarrationCaptions} />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={genBusy}
+                  onClick={() => {
+                    const text = script.trim();
+                    const name = voices.list?.find((v) => v.id === voiceId)?.name;
+                    if (!text) {
+                      return void command(
+                        `Escreva um roteiro curto de narração para este vídeo e adicione com voz ${voice}${narrationCaptions ? ", com legendas" : ""}${muteOriginal ? ", e deixe o áudio original dos vídeos mudo" : ""}`,
+                        "Escrevendo e gravando a narração… acompanhe no Assistente.",
+                      );
+                    }
+                    const ops: EditOperation[] = [];
+                    if (muteOriginal) ops.push({ op: "set_audio", original_volume: 0, normalize: null, denoise: null });
+                    ops.push({ op: "add_narration", text, voice, voice_id: voiceId || null, start_sec: null });
+                    if (narrationCaptions) ops.push({ op: "set_captions", enabled: true, style: null, position: null });
+                    void command(`Narração${name ? ` com a voz ${name}` : ` com voz ${voice}`}: "${text.slice(0, 200)}${text.length > 200 ? "…" : ""}"`, "Gravando a narração… acompanhe no Assistente.", ops);
+                  }}
+                >
+                  <Wand2 className="h-4 w-4" /> Gravar narração
+                </Button>
+                {timeline.audio.voiceover && (
+                  <button className="text-xs text-neutral-500 hover:text-red-400" onClick={() => void actions.runOps([{ op: "remove_narration" }], "Narração removida")}>
+                    remover narração
+                  </button>
+                )}
+              </div>
             </div>
             <p className="text-[11px] text-neutral-500">Áudio gerado pela ElevenLabs; o uso comercial segue os termos do plano da sua conta ElevenLabs.</p>
           </>
@@ -97,6 +122,13 @@ export function AudioPanel({ data, timeline, actions }: { data: Detail; timeline
       </section>
       <section className="space-y-3">
         <p className="label">Áudio original</p>
+        <Button
+          size="sm"
+          variant={muted ? "primary" : "ghost"}
+          onClick={() => actions.runOps([{ op: "set_audio", original_volume: muted ? 1 : 0, normalize: null, denoise: null }], muted ? "Som original ligado" : "Vídeo mudo: som original desligado")}
+        >
+          {muted ? <><Volume2 className="h-3.5 w-3.5" /> Ligar o som original</> : <><VolumeX className="h-3.5 w-3.5" /> Deixar o vídeo mudo</>}
+        </Button>
         <label className="block text-xs text-neutral-400">
           Volume {Math.round(timeline.audio.originalVolume * 100)}%
           <input type="range" min={0} max={2} step={0.05} defaultValue={timeline.audio.originalVolume} key={timeline.audio.originalVolume} className="mt-1 w-full" onMouseUp={(e) => actions.runOps([{ op: "set_audio", original_volume: Number(e.currentTarget.value), normalize: null, denoise: null }], "Volume original ajustado")} onTouchEnd={(e) => actions.runOps([{ op: "set_audio", original_volume: Number(e.currentTarget.value), normalize: null, denoise: null }], "Volume original ajustado")} />
@@ -185,5 +217,108 @@ function Toggle({ checked, label, onChange }: { checked: boolean; label: string;
       <input type="checkbox" className="accent-[#D4AF37]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       {label}
     </label>
+  );
+}
+
+interface VoiceOption {
+  id: string;
+  name: string;
+  gender: "feminina" | "masculina" | null;
+  description: string;
+  portuguese: boolean;
+  previewUrl: string | null;
+}
+
+function useVoices(enabled: boolean) {
+  const [list, setList] = useState<VoiceOption[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!enabled) return;
+    let alive = true;
+    apiFetch<{ voices: VoiceOption[] }>("/api/voices")
+      .then((r) => alive && setList(r.voices))
+      .catch((e) => alive && setError((e as Error).message));
+    return () => {
+      alive = false;
+    };
+  }, [enabled]);
+  return { list, error };
+}
+
+/** Escolha da voz da ElevenLabs, com amostra para ouvir antes de gravar. */
+function VoicePicker({
+  voices,
+  voiceId,
+  setVoiceId,
+  gender,
+  setGender,
+}: {
+  voices: { list: VoiceOption[] | null; error: string | null };
+  voiceId: string;
+  setVoiceId: (id: string) => void;
+  gender: "feminina" | "masculina";
+  setGender: (g: "feminina" | "masculina") => void;
+}) {
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => () => audio.current?.pause(), []);
+  const selected = voices.list?.find((v) => v.id === voiceId) ?? null;
+  const preview = () => {
+    if (!selected?.previewUrl) return;
+    if (playing) {
+      audio.current?.pause();
+      setPlaying(false);
+      return;
+    }
+    audio.current?.pause();
+    const a = new Audio(selected.previewUrl);
+    a.onended = () => setPlaying(false);
+    audio.current = a;
+    void a.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+  };
+  const pt = voices.list?.filter((v) => v.portuguese) ?? [];
+  const other = voices.list?.filter((v) => !v.portuguese) ?? [];
+  const label = (v: VoiceOption) => `${v.name}${v.gender ? ` (${v.gender})` : ""}${v.description ? ` · ${v.description}` : ""}`;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <select
+          className="input min-w-0 flex-1 py-1 text-xs"
+          aria-label="Voz da narração"
+          value={voiceId || `auto:${gender}`}
+          onChange={(e) => {
+            audio.current?.pause();
+            setPlaying(false);
+            const v = e.target.value;
+            if (v.startsWith("auto:")) {
+              setVoiceId("");
+              setGender(v.slice(5) as "feminina" | "masculina");
+            } else {
+              setVoiceId(v);
+              const g = voices.list?.find((x) => x.id === v)?.gender;
+              if (g) setGender(g);
+            }
+          }}
+        >
+          <option value="auto:feminina">Automática · voz feminina</option>
+          <option value="auto:masculina">Automática · voz masculina</option>
+          {pt.length > 0 && (
+            <optgroup label="Falam português">
+              {pt.map((v) => <option key={v.id} value={v.id}>{label(v)}</option>)}
+            </optgroup>
+          )}
+          {other.length > 0 && (
+            <optgroup label="Outras vozes (multilíngues)">
+              {other.map((v) => <option key={v.id} value={v.id}>{label(v)}</option>)}
+            </optgroup>
+          )}
+        </select>
+        <Button size="sm" variant="ghost" disabled={!selected?.previewUrl} onClick={preview} aria-label="Ouvir amostra da voz">
+          {playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />} Ouvir
+        </Button>
+      </div>
+      {voices.list === null && !voices.error && <p className="text-[11px] text-neutral-500">Carregando vozes da ElevenLabs…</p>}
+      {voices.error && <p className="text-[11px] text-amber-400">{voices.error} Dá para gravar com a voz automática.</p>}
+    </div>
   );
 }

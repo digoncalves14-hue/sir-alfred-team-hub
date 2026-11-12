@@ -39,7 +39,7 @@ export async function resolveGenerativeOps(
     if (op.op === "add_narration") {
       ctx.progress(0.55, "Gravando narração com voz de IA");
       try {
-        const n = await narrate(op.text, op.voice ?? "feminina");
+        const n = await narrate(op.text, op.voice ?? "feminina", op.voice_id);
         const id = await saveAudio(ctx, project, n.audio, "voiceover", "Narração IA.mp3", AI_VOICE_LICENSE_NOTE, false);
         if (n.words.length) {
           await ctx.db.insert(transcripts).values({

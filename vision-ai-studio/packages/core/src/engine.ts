@@ -80,12 +80,21 @@ export function applyEditPlan(current: Timeline, plan: EditPlan, ctx: EngineCont
     }
   }
 
+  if (isMutedWithNarration(tl)) {
+    const vo = tl.audio.voiceover!.assetId;
+    if (tl.captions.blocks.some((b) => b.assetId === vo)) tl.captions = { ...tl.captions, blocks: tl.captions.blocks.filter((b) => b.assetId === vo) };
+  }
   tl.clips = applyDynamicZoom(tl);
   tl.clips = applyAutoFocus(tl.clips, ctx.sources);
   if (tl.clips.length === 0) {
     throw new Error("A edição removeria todo o conteúdo do vídeo. Nenhuma alteração foi aplicada.");
   }
   return { timeline: parseTimeline(tl), applied, warnings, unsupported };
+}
+
+/** Som original desligado e narração presente: só a narração deve ser legendada. */
+function isMutedWithNarration(tl: Timeline): boolean {
+  return tl.audio.originalVolume <= 0.01 && tl.audio.voiceover !== null;
 }
 
 interface OpResult {
@@ -204,7 +213,9 @@ function applyOperation(tl: Timeline, op: EditOperation, ctx: EngineContext): Op
       if (!op.enabled) {
         return { timeline: { ...tl, captions: { ...tl.captions, enabled: false } }, message: "Legendas desativadas.", warnings: w };
       }
-      const assetIds = [...new Set(tl.clips.map((c) => c.assetId))];
+      // vídeo mudo com narração: a legenda acompanha só a narração
+      const narrationOnly = isMutedWithNarration(tl);
+      const assetIds = narrationOnly ? [] : [...new Set(tl.clips.map((c) => c.assetId))];
       let blocks = tl.captions.blocks;
       const styleId = op.style ?? tl.captions.style ?? style.captionStyle;
       const missing = assetIds.filter((id) => !ctx.sources.get(id)?.transcript);

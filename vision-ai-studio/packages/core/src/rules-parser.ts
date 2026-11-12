@@ -297,7 +297,7 @@ export function parseCommandLocally(input: string): EditPlan {
   }
   const narr = raw.match(/(?:narra[cç][aã]o|locu[cç][aã]o|narre|narra)[^"“]*["“]([^"”]{3,600})["”]/i);
   if (narr) {
-    ops.push({ op: "add_narration", text: narr[1].trim(), voice: /masculin|homem/.test(t) ? "masculina" : /feminin|mulher/.test(t) ? "feminina" : null, start_sec: null });
+    ops.push({ op: "add_narration", text: narr[1].trim(), voice: /masculin|homem/.test(t) ? "masculina" : /feminin|mulher/.test(t) ? "feminina" : null, voice_id: null, start_sec: null });
     said.push("gravar a narração com voz de IA");
   } else if (/narrac|locucao|voz (masculina|feminina|artificial)/.test(t)) {
     ops.push({

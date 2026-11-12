@@ -169,7 +169,7 @@ describe("trilha e narração por IA", () => {
   it("sem provedor, gerar trilha/narração vira 'não executado' com o motivo", () => {
     const r = run(tl0, [
       { op: "generate_music", prompt: "upbeat", instrumental: true },
-      { op: "add_narration", text: "Olá", voice: null, start_sec: null },
+      { op: "add_narration", text: "Olá", voice: null, voice_id: null, start_sec: null },
     ]);
     expect(r.unsupported.map((u) => u.request)).toEqual(["gerar trilha sonora com IA", "narração com voz de IA"]);
   });
@@ -196,6 +196,38 @@ describe("trilha e narração por IA", () => {
     expect(off.timeline.captions.blocks.some((b) => b.assetId === VO)).toBe(false);
   });
 
+  it("vídeo mudo com narração: som original zerado e legenda só da narração", () => {
+    const withSourceCaptions = applyEditPlan(tl0, { reply: "", operations: [{ op: "set_captions", enabled: true, style: null, position: null }] }, vctx).timeline;
+    const sourceBlocks = withSourceCaptions.captions.blocks.filter((b) => b.assetId !== VO).length;
+    const r = applyEditPlan(
+      withSourceCaptions,
+      {
+        reply: "",
+        operations: [
+          { op: "set_audio", original_volume: 0, normalize: null, denoise: null },
+          { op: "set_voiceover", asset_id: VO, start_sec: null, volume: null },
+          { op: "set_captions", enabled: true, style: null, position: null },
+        ],
+      },
+      vctx,
+    );
+    expect(r.timeline.audio.originalVolume).toBe(0);
+    expect(r.timeline.captions.enabled).toBe(true);
+    expect(r.timeline.captions.blocks.length).toBeGreaterThan(0);
+    expect(r.timeline.captions.blocks.every((b) => b.assetId === VO)).toBe(true);
+    // com som original ligado, as falas dos vídeos continuam legendadas
+    if (sourceBlocks) {
+      const loud = applyEditPlan(withSourceCaptions, { reply: "", operations: [{ op: "set_voiceover", asset_id: VO, start_sec: null, volume: null }] }, vctx);
+      expect(loud.timeline.captions.blocks.some((b) => b.assetId !== VO)).toBe(true);
+    }
+  });
+
+  it("plano da IA sem voice_id continua válido (preenche null)", async () => {
+    const { planFromEnvelope } = await import("../src");
+    const plan = planFromEnvelope({ reply: "ok", operations: [{ op: "add_narration", args: JSON.stringify({ text: "Olá", voice: "feminina", start_sec: null }) }] });
+    expect(plan.operations[0]).toEqual({ op: "add_narration", text: "Olá", voice: "feminina", voice_id: null, start_sec: null });
+  });
+
   it("narração de outro projeto é recusada", () => {
     const r = run(tl0, [{ op: "set_voiceover", asset_id: VO, start_sec: null, volume: null }]);
     expect(r.timeline.audio.voiceover).toBeNull();
@@ -207,7 +239,7 @@ describe("trilha e narração por IA", () => {
     expect(p.operations).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ op: "generate_music", instrumental: true }),
-        { op: "add_narration", text: "Venha conhecer nosso curso", voice: "masculina", start_sec: null },
+        { op: "add_narration", text: "Venha conhecer nosso curso", voice: "masculina", voice_id: null, start_sec: null },
       ]),
     );
   });

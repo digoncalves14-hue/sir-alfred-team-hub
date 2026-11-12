@@ -7,3 +7,4 @@ export * from "./auth-crypto";
 export * from "./usage";
 export * from "./projects";
 export * from "./pipeline";
+export * from "./voices";

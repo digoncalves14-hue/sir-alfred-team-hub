@@ -42,7 +42,7 @@ export interface PlannerInput {
 
 export interface PlannerOutput {
   plan: EditPlan;
-  engine: "anthropic" | "local-rules";
+  engine: "anthropic" | "local-rules" | "manual";
   model: string | null;
   inputTokens: number;
   outputTokens: number;

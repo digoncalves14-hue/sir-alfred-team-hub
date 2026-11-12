@@ -14,15 +14,43 @@ export interface UploadOptions {
   signal?: AbortSignal;
 }
 
+/** Sem nenhum byte enviado por este tempo, a conexão é considerada travada e a parte é reenviada. */
+const STALL_MS = 45_000;
+
 function put(url: string, body: Blob, headers: Record<string, string>, onProgress: (loaded: number) => void, signal?: AbortSignal) {
   return new Promise<string | null>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    let lastActivity = Date.now();
+    let stalled = false;
+    // conexões móveis/Wi-Fi às vezes param sem erro: o navegador espera para sempre
+    const watchdog = setInterval(() => {
+      if (Date.now() - lastActivity > STALL_MS) {
+        stalled = true;
+        xhr.abort();
+      }
+    }, 5_000);
+    const finish = () => clearInterval(watchdog);
     xhr.open("PUT", url);
     for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
-    xhr.upload.onprogress = (e) => onProgress(e.loaded);
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve(xhr.getResponseHeader("ETag") ?? bodyEtag(xhr)) : reject(new UploadError(uploadError(xhr), xhr.status)));
-    xhr.onerror = () => reject(new UploadError("Falha de rede durante o upload.", 0));
-    xhr.onabort = () => reject(new Error("Upload cancelado."));
+    xhr.upload.onprogress = (e) => {
+      lastActivity = Date.now();
+      onProgress(e.loaded);
+    };
+    // depois do último byte, o servidor ainda pode levar um tempo para responder
+    xhr.upload.onload = () => (lastActivity = Date.now() + 60_000);
+    xhr.onload = () => {
+      finish();
+      if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.getResponseHeader("ETag") ?? bodyEtag(xhr));
+      else reject(new UploadError(uploadError(xhr), xhr.status));
+    };
+    xhr.onerror = () => {
+      finish();
+      reject(new UploadError("Falha de rede durante o upload.", 0));
+    };
+    xhr.onabort = () => {
+      finish();
+      reject(stalled ? new UploadError("A conexão parou durante o upload.", 0) : new Error("Upload cancelado."));
+    };
     signal?.addEventListener("abort", () => xhr.abort());
     xhr.send(body);
   });
@@ -79,7 +107,7 @@ export async function uploadFile(file: File, opts: UploadOptions): Promise<strin
   });
   const report = (loaded: number) => opts.onProgress?.(Math.min(1, loaded / file.size));
   if (target.mode === "single") {
-    await put(target.url, file, target.headers, report, opts.signal);
+    await putWithRetry(target.url, file, target.headers, report, opts.signal);
     await apiFetch(`/api/uploads/${assetId}/complete`, { method: "POST", json: {} });
     return assetId;
   }
